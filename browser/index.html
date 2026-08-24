@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="referrer" content="no-referrer">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; manifest-src 'none'; worker-src 'none'"
+    >
+    <meta
+      name="description"
+      content="Verify LiquiLens Evidence Carrier v1 JSON locally in your browser. No upload, analytics, cookies, or network calls."
+    >
+    <link rel="canonical" href="https://beepboop2025.github.io/liquilens-evidence-carrier/">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="./styles.css">
+    <title>Evidence Bench · LiquiLens</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#carrier-input">Skip to carrier JSON</a>
+
+    <header class="masthead">
+      <a
+        class="wordmark"
+        href="https://github.com/beepboop2025/liquilens-evidence-carrier"
+        rel="noreferrer noopener"
+      >
+        <span class="wordmark-mark" aria-hidden="true">LL</span>
+        <span>LiquiLens Evidence</span>
+      </a>
+      <div class="release-strip" aria-label="Release and license">
+        <span>Protocol 1.0</span>
+        <span>Release 0.14.0</span>
+        <a
+          href="https://github.com/beepboop2025/liquilens-evidence-carrier/blob/v0.14.0/LICENSE"
+          rel="noreferrer noopener"
+        >Apache-2.0</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Zero-install evidence verification</p>
+          <h1 id="page-title">Bring the carrier.<br>Keep the evidence here.</h1>
+          <p class="lede">
+            Recompute a full carrier’s content identity or inspect a redacted
+            reference against the exact v1 contract. Verification stays inside
+            this tab.
+          </p>
+        </div>
+        <aside class="locality-card" aria-label="Local verification guarantees">
+          <p class="locality-signal"><span aria-hidden="true"></span> Local circuit</p>
+          <dl>
+            <div><dt>Uploads</dt><dd>0</dd></div>
+            <div><dt>Analytics</dt><dd>0</dd></div>
+            <div><dt>Cookies</dt><dd>0</dd></div>
+            <div><dt>Runtime dependencies</dt><dd>0</dd></div>
+          </dl>
+          <p>Content Security Policy blocks every connection from the verifier.</p>
+        </aside>
+      </section>
+
+      <section class="bench" aria-label="Evidence verification bench">
+        <section class="input-panel" aria-labelledby="input-title">
+          <header class="panel-header">
+            <div>
+              <p class="panel-kicker">Input / untrusted</p>
+              <h2 id="input-title">Carrier JSON</h2>
+            </div>
+            <div class="example-controls" aria-label="Known-good examples">
+              <button id="load-full" class="quiet-button" type="button">Full example</button>
+              <button id="load-reference" class="quiet-button" type="button">Reference example</button>
+            </div>
+          </header>
+
+          <div id="editor-shell" class="editor-shell">
+            <label class="sr-only" for="carrier-input">Carrier JSON to verify</label>
+            <textarea
+              id="carrier-input"
+              aria-describedby="editor-help"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+            ></textarea>
+            <div class="editor-footer">
+              <p id="editor-help">Paste, drop a JSON file, or use an example. Maximum 1 MiB.</p>
+              <input id="carrier-file" type="file" accept="application/json,.json">
+              <label class="file-button" for="carrier-file">Choose JSON</label>
+            </div>
+          </div>
+
+          <div class="primary-actions">
+            <button id="verify-button" class="verify-button" type="button">Verify locally</button>
+            <button id="clear-button" class="clear-button" type="button">Clear</button>
+            <span class="shortcut" aria-hidden="true">⌘ / Ctrl + Enter</span>
+          </div>
+        </section>
+
+        <section class="result-panel" aria-labelledby="result-title">
+          <header class="panel-header">
+            <div>
+              <p class="panel-kicker">Output / local proof</p>
+              <h2 id="result-title">Verification record</h2>
+            </div>
+            <span id="proof-mode" class="proof-mode" data-kind="full">FULL · EXACT PROOF</span>
+          </header>
+
+          <div id="verification-status" class="verification-status" data-state="idle">
+            <span class="status-lamp" aria-hidden="true"></span>
+            <div>
+              <h3 id="status-title">Waiting for evidence</h3>
+              <p id="status-detail">Paste JSON, choose a file, or load a known-good example.</p>
+            </div>
+          </div>
+          <p id="error-message" class="error-message" role="alert" hidden></p>
+
+          <div id="proof-output" hidden>
+            <section class="hash-proof" aria-labelledby="hash-title">
+              <div class="hash-heading">
+                <h3 id="hash-title">Record hash</h3>
+                <p id="hash-caption"></p>
+              </div>
+              <output id="hash-rail" class="hash-rail" aria-label="Verified SHA-256 record hash"></output>
+            </section>
+
+            <ol id="checks-list" class="checks-list" aria-label="Verification checks"></ol>
+            <dl id="facts-list" class="facts-list"></dl>
+          </div>
+          <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <section class="method" aria-labelledby="method-title">
+        <div>
+          <p class="eyebrow">What this proves</p>
+          <h2 id="method-title">A full carrier and a reference are different instruments.</h2>
+        </div>
+        <div class="method-grid">
+          <article>
+            <span class="method-index">F</span>
+            <h3>Full carrier</h3>
+            <p>
+              The verifier parses numeric lexemes without losing integer precision,
+              builds the <code>liquilens-hash-tree-v1</code> tree, recomputes SHA-256,
+              and binds the carrier ID to that digest.
+            </p>
+          </article>
+          <article>
+            <span class="method-index">R</span>
+            <h3>Redacted reference</h3>
+            <p>
+              The verifier enforces the reference schema, confirms the payload is
+              absent, and binds the preserved carrier ID to the declared full-carrier
+              hash. It never pretends to re-hash undisclosed content.
+            </p>
+          </article>
+          <article>
+            <span class="method-index">Ø</span>
+            <h3>No authority upgrade</h3>
+            <p>
+              Both contracts must keep execution, recommendation, and credit-rating
+              authority false. Structural verification is not financial advice or a
+              market-data entitlement.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        LiquiLens Evidence Carrier 0.14.0 · Protocol 1.0 · Apache-2.0
+      </p>
+      <nav aria-label="Protocol resources">
+        <a
+          href="https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
+          rel="noreferrer noopener"
+        >Full schema</a>
+        <a
+          href="https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+          rel="noreferrer noopener"
+        >Reference schema</a>
+        <a
+          href="https://github.com/beepboop2025/liquilens-evidence-carrier/tree/v0.14.0"
+          rel="noreferrer noopener"
+        >Release source</a>
+      </nav>
+    </footer>
+
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>
