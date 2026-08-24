@@ -64,6 +64,10 @@ def main() -> int:
     assert (ROOT / "macros/test_liquilens_evidence_contract.sql").read_bytes() == (
         ROOT / "integrations/dbt/macros/test_liquilens_evidence_contract.sql"
     ).read_bytes()
+    release_workflow = (ROOT / ".github/workflows/release.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "! -name '.*' ! -name SHA256SUMS" in release_workflow
     return 0
 
 
