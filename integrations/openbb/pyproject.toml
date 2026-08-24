@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openbb-liquilens-evidence"
+version = "0.1.0"
+description = "Offline LiquiLens evidence verification for OpenBB"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<4"
+authors = [{name = "LiquiLens"}]
+keywords = ["openbb", "financial-evidence", "provenance", "verification"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "openbb-core>=1.6.13,<2",
+    "liquilens-evidence @ https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl#sha256=f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24",
+]
+
+[project.optional-dependencies]
+test = [
+    "httpx>=0.28,<1",
+    "pytest>=8,<10",
+    "ruff>=0.15,<0.16",
+]
+
+[project.urls]
+Homepage = "https://liquilens.in/protocol/"
+Documentation = "https://github.com/beepboop2025/liquilens-evidence-carrier/tree/main/integrations/openbb"
+Repository = "https://github.com/beepboop2025/liquilens-evidence-carrier"
+Issues = "https://github.com/beepboop2025/liquilens-evidence-carrier/issues"
+
+[project.entry-points."openbb_core_extension"]
+liquilens = "openbb_liquilens_evidence.router:router"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+openbb_liquilens_evidence = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
