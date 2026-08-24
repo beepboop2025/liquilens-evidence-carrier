@@ -1,0 +1,293 @@
+name: MCP Container
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/mcp-container.yml"
+      - "Dockerfile.mcp"
+      - "Dockerfile.mcp.dockerignore"
+      - "scripts/mcp_container_smoke.sh"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Signed carrier release tag to package
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mcp-container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BASE_DIGEST: sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1
+  BASE_IMAGE: ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1
+  RELEASE_TAG: v0.14.0
+
+jobs:
+  dispatch-authority:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require the current protected main branch
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$(git rev-parse --is-shallow-repository)" = "false"
+          git fetch origin --force --no-tags \
+            "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+
+  mcp-container-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Resolve build metadata
+        id: source
+        run: |
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >>"$GITHUB_OUTPUT"
+      - name: Build native smoke image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.mcp
+          load: true
+          platforms: linux/amd64
+          push: false
+          tags: liquilens-evidence-carrier-mcp:smoke
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            BASE_DIGEST=${{ env.BASE_DIGEST }}
+            VERSION=0.14.0
+            BUILD_REVISION=${{ steps.source.outputs.revision }}
+            RELEASE_REVISION=8683351bd72c2a4b46d6913cd5e75c5536a410f1
+            CREATED=${{ steps.source.outputs.created }}
+            README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
+          cache-from: type=gha,scope=mcp-container-pr
+          cache-to: type=gha,mode=max,scope=mcp-container-pr
+      - name: Exercise default offline MCP entrypoint
+        run: scripts/mcp_container_smoke.sh liquilens-evidence-carrier-mcp:smoke 0.14.0
+      - name: Build both release architectures
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.mcp
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            BASE_DIGEST=${{ env.BASE_DIGEST }}
+            VERSION=0.14.0
+            BUILD_REVISION=${{ steps.source.outputs.revision }}
+            RELEASE_REVISION=8683351bd72c2a4b46d6913cd5e75c5536a410f1
+            CREATED=${{ steps.source.outputs.created }}
+            README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
+          cache-from: type=gha,scope=mcp-container-pr
+
+  publish:
+    needs: dispatch-authority
+    if: >-
+      always() &&
+      github.event_name == 'workflow_dispatch' &&
+      needs.dispatch-authority.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/liquilens-evidence-carrier-mcp
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify protected source and signed carrier release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          git fetch origin --force --no-tags \
+            "+refs/heads/main:refs/remotes/origin/main"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse refs/remotes/origin/main)"
+          test "$REQUESTED_TAG" = "$RELEASE_TAG"
+
+          signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
+          git fetch origin --force \
+            "refs/tags/${REQUESTED_TAG}:refs/tags/${REQUESTED_TAG}"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-tag --raw "$REQUESTED_TAG"
+          release_commit="$(git rev-list -n 1 "$REQUESTED_TAG")"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-commit --raw "$release_commit"
+          test "$(git rev-parse --is-shallow-repository)" = "false"
+          git merge-base --is-ancestor "$release_commit" HEAD
+
+          version="${REQUESTED_TAG#v}"
+          test "$(cat VERSION)" = "$version"
+          test "$release_commit" = "8683351bd72c2a4b46d6913cd5e75c5536a410f1"
+          gh attestation verify "oci://$BASE_IMAGE" \
+            --repo "$GITHUB_REPOSITORY"
+
+          {
+            echo "tag=$REQUESTED_TAG"
+            echo "version=$version"
+            echo "minor=${version%.*}"
+            echo "build_revision=$(git rev-parse HEAD)"
+            echo "release_revision=$release_commit"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "readme_url=https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$(git rev-parse HEAD)/README.md"
+          } >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and publish MCP OCI index
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.mcp
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.release.outputs.version }}
+            ${{ env.IMAGE }}:${{ steps.release.outputs.minor }}
+            ${{ env.IMAGE }}:sha-${{ steps.release.outputs.build_revision }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_IMAGE }}
+            BASE_DIGEST=${{ env.BASE_DIGEST }}
+            VERSION=${{ steps.release.outputs.version }}
+            BUILD_REVISION=${{ steps.release.outputs.build_revision }}
+            RELEASE_REVISION=${{ steps.release.outputs.release_revision }}
+            CREATED=${{ steps.release.outputs.created }}
+            README_URL=${{ steps.release.outputs.readme_url }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.release.outputs.created }}
+            org.opencontainers.image.description=Offline read-only MCP verification and projection of local financial evidence carriers.
+            org.opencontainers.image.documentation=https://liquilens.in/protocol/
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ steps.release.outputs.build_revision }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=LiquiLens Evidence Carrier MCP
+            org.opencontainers.image.url=https://liquilens.in/protocol/
+            org.opencontainers.image.vendor=LiquiLens
+            org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            org.opencontainers.image.base.name=ghcr.io/${{ github.repository }}
+            org.opencontainers.image.base.digest=${{ env.BASE_DIGEST }}
+            io.liquilens.evidence.release.revision=${{ steps.release.outputs.release_revision }}
+            io.artifacthub.package.category=integration-delivery
+            io.artifacthub.package.keywords=finance,evidence,provenance,mcp,offline,read-only
+            io.artifacthub.package.license=Apache-2.0
+            io.artifacthub.package.maintainers=[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]
+            io.artifacthub.package.readme-url=${{ steps.release.outputs.readme_url }}
+          annotations: |
+            index:org.opencontainers.image.created=${{ steps.release.outputs.created }}
+            index:org.opencontainers.image.description=Offline read-only MCP verification and projection of local financial evidence carriers.
+            index:org.opencontainers.image.documentation=https://liquilens.in/protocol/
+            index:org.opencontainers.image.licenses=Apache-2.0
+            index:org.opencontainers.image.revision=${{ steps.release.outputs.build_revision }}
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.title=LiquiLens Evidence Carrier MCP
+            index:org.opencontainers.image.url=https://liquilens.in/protocol/
+            index:org.opencontainers.image.vendor=LiquiLens
+            index:org.opencontainers.image.version=${{ steps.release.outputs.version }}
+            index:org.opencontainers.image.base.name=ghcr.io/${{ github.repository }}
+            index:org.opencontainers.image.base.digest=${{ env.BASE_DIGEST }}
+            index:io.liquilens.evidence.release.revision=${{ steps.release.outputs.release_revision }}
+            index:io.artifacthub.package.category=integration-delivery
+            index:io.artifacthub.package.keywords=finance,evidence,provenance,mcp,offline,read-only
+            index:io.artifacthub.package.license=Apache-2.0
+            index:io.artifacthub.package.maintainers=[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]
+            index:io.artifacthub.package.readme-url=${{ steps.release.outputs.readme_url }}
+          cache-from: type=gha,scope=mcp-container-release
+          cache-to: type=gha,mode=max,scope=mcp-container-release
+          provenance: mode=max
+          sbom: true
+      - name: Attest published MCP index
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Verify MCP index and metadata
+        env:
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+          EXPECTED_BUILD_REVISION: ${{ steps.release.outputs.build_revision }}
+          EXPECTED_RELEASE_REVISION: ${{ steps.release.outputs.release_revision }}
+          EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          docker buildx imagetools inspect --raw "$IMAGE@$EXPECTED_DIGEST" >mcp-index.json
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+
+          index = json.load(open("mcp-index.json", encoding="utf-8"))
+          assert index["mediaType"] == "application/vnd.oci.image.index.v1+json"
+          platforms = {
+              (item.get("platform", {}).get("os"), item.get("platform", {}).get("architecture"))
+              for item in index["manifests"]
+          }
+          assert {("linux", "amd64"), ("linux", "arm64")} <= platforms
+          annotations = index["annotations"]
+          assert annotations["org.opencontainers.image.version"] == os.environ["EXPECTED_VERSION"]
+          assert annotations["org.opencontainers.image.revision"] == os.environ["EXPECTED_BUILD_REVISION"]
+          assert annotations["org.opencontainers.image.base.digest"] == os.environ["BASE_DIGEST"]
+          assert annotations["io.liquilens.evidence.release.revision"] == os.environ[
+              "EXPECTED_RELEASE_REVISION"
+          ]
+          assert annotations["io.artifacthub.package.license"] == "Apache-2.0"
+          json.loads(annotations["io.artifacthub.package.maintainers"])
+          dt.datetime.fromisoformat(
+              annotations["org.opencontainers.image.created"].replace("Z", "+00:00")
+          )
+          PY
+          docker buildx imagetools inspect "$IMAGE@$EXPECTED_DIGEST"
+      - name: Smoke the published MCP digest
+        env:
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          docker pull --platform linux/amd64 "$IMAGE@$EXPECTED_DIGEST"
+          scripts/mcp_container_smoke.sh \
+            "$IMAGE@$EXPECTED_DIGEST" \
+            "${{ steps.release.outputs.version }}"
+      - name: Record immutable MCP receipt
+        env:
+          PUBLISHED_DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          {
+            echo "### LiquiLens Evidence Carrier MCP image"
+            echo
+            echo "- Image: \`$IMAGE@$PUBLISHED_DIGEST\`"
+            echo "- Carrier release: \`${{ steps.release.outputs.tag }}\`"
+            echo "- Image source revision: \`${{ steps.release.outputs.build_revision }}\`"
+            echo "- Carrier release revision: \`${{ steps.release.outputs.release_revision }}\`"
+            echo "- Base image digest: \`$BASE_DIGEST\`"
+            echo "- Platforms: \`linux/amd64\`, \`linux/arm64\`"
+            echo "- BuildKit provenance: \`mode=max\`"
+            echo "- BuildKit SBOM: enabled"
+          } >>"$GITHUB_STEP_SUMMARY"
