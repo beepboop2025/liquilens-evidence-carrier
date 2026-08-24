@@ -6,7 +6,7 @@ export const FULL_EXAMPLE = String.raw`{
     "is_credit_rating": false
   },
   "canonicalization": "liquilens-hash-tree-v1",
-  "carrier_id": "evidence_a459bd4c9d12565239d6c65a",
+  "carrier_id": "evidence_0c1ba9b4c2184c6b1eb76ebf",
   "claim": {
     "kind": "conformance_example",
     "status": "structural",
@@ -26,9 +26,9 @@ export const FULL_EXAMPLE = String.raw`{
   "producer": {
     "endpoint": "https://liquilens.in/protocol/",
     "name": "liquilens",
-    "version": "0.13.6"
+    "version": "0.14.0"
   },
-  "record_hash": "a459bd4c9d12565239d6c65ac88a521bde6d86d49af48b78dc15504f4c4b393b",
+  "record_hash": "0c1ba9b4c2184c6b1eb76ebfc8ffd1e85d3e040f0b2d348618292f71d119f376",
   "rights": {
     "attribution": "LiquiLens Evidence Carrier contributors",
     "jurisdictions": [
@@ -72,7 +72,7 @@ export const REFERENCE_EXAMPLE = String.raw`{
     "is_credit_rating": false
   },
   "canonicalization": "liquilens-hash-tree-v1",
-  "carrier_id": "evidence_88232e614710ede2f6848913",
+  "carrier_id": "evidence_b6628c11e9382595a649bb7c",
   "claim": {
     "kind": "conformance_example",
     "status": "structural",
@@ -89,12 +89,12 @@ export const REFERENCE_EXAMPLE = String.raw`{
   "producer": {
     "endpoint": "https://liquilens.in/protocol/",
     "name": "liquilens",
-    "version": "0.13.6"
+    "version": "0.14.0"
   },
   "reason_codes": [
     "redistribution_not_permitted"
   ],
-  "record_hash": "88232e614710ede2f684891323377eea9d7359e3b5fd3d192186c13545797ab0",
+  "record_hash": "b6628c11e9382595a649bb7cf717dd2665cb7034d6fbe50c659c90598d9e38b1",
   "rights": {
     "attribution": "LiquiLens Evidence Carrier contributors",
     "jurisdictions": [

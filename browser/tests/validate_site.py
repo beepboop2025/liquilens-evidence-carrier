@@ -51,7 +51,7 @@ def main() -> int:
     for expected in (
         "LiquiLens Evidence",
         "Protocol 1.0",
-        "Release 0.13.6",
+        "Release 0.14.0",
         "Apache-2.0",
         "Uploads",
         "Analytics",
@@ -126,7 +126,7 @@ def main() -> int:
 
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     catalog = json.loads((ROOT / "protocol/catalog.json").read_text(encoding="utf-8"))
-    assert version == "0.13.6" == catalog["release"]
+    assert version == "0.14.0" == catalog["release"]
     assert f'RELEASE_VERSION = "{version}"' in (SITE / "verifier.mjs").read_text()
     assert re.search(rf"Release\s+{re.escape(version)}", text)
     assert (SITE / ".nojekyll").is_file()

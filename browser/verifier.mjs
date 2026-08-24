@@ -1,4 +1,4 @@
-export const RELEASE_VERSION = "0.13.6";
+export const RELEASE_VERSION = "0.14.0";
 export const PROTOCOL_VERSION = "1.0";
 export const CANONICALIZATION = "liquilens-hash-tree-v1";
 export const FULL_SCHEMA_URL =
