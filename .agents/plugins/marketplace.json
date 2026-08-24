@@ -1,0 +1,20 @@
+{
+  "name": "liquilens",
+  "interface": {
+    "displayName": "Liquilens"
+  },
+  "plugins": [
+    {
+      "name": "liquilens-evidence",
+      "source": {
+        "source": "local",
+        "path": "./plugins/liquilens-evidence"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

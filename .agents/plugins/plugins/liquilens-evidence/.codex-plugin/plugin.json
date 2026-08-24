@@ -1,0 +1,37 @@
+{
+  "name": "liquilens-evidence",
+  "version": "0.14.0",
+  "description": "Verify and rights-safely project local LiquiLens Evidence Carrier JSON.",
+  "author": {
+    "name": "LiquiLens",
+    "url": "https://liquilens.in/protocol/"
+  },
+  "homepage": "https://liquilens.in/protocol/",
+  "repository": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+  "license": "Apache-2.0",
+  "keywords": [
+    "financial-evidence",
+    "provenance",
+    "rights",
+    "verification"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "LiquiLens Evidence",
+    "shortDescription": "Verify financial evidence without widening its rights.",
+    "longDescription": "Verify local Evidence Carrier identity, clocks, freshness, redistribution rights, and authority boundaries before producing bounded projections.",
+    "developerName": "LiquiLens",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Read-only verification",
+      "Rights-aware projection"
+    ],
+    "websiteURL": "https://liquilens.in/protocol/",
+    "defaultPrompt": [
+      "Verify this local evidence carrier.",
+      "Explain why this carrier fails closed.",
+      "Project this verified carrier without widening rights."
+    ],
+    "brandColor": "#0B1623"
+  }
+}
