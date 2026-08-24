@@ -110,17 +110,20 @@ jobs:
           release_commit="$(git rev-list -n 1 "$REQUESTED_TAG")"
           git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
             verify-commit --raw "$release_commit"
-          git fetch origin main --no-tags
-          git merge-base --is-ancestor "$release_commit" origin/main
+          test "$(git rev-parse --is-shallow-repository)" = "false"
+          git merge-base --is-ancestor "$release_commit" HEAD
 
           version="${REQUESTED_TAG#v}"
           test "$(cat VERSION)" = "$version"
           wheel_name="liquilens_evidence-${version}-py3-none-any.whl"
           release_dir="$(mktemp -d)"
-          gh release download "$REQUESTED_TAG" \
-            --pattern SHA256SUMS \
-            --pattern "$wheel_name" \
-            --dir "$release_dir"
+          release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${REQUESTED_TAG}"
+          curl --fail --location --silent --show-error \
+            --output "$release_dir/SHA256SUMS" \
+            "$release_base/SHA256SUMS"
+          curl --fail --location --silent --show-error \
+            --output "$release_dir/$wheel_name" \
+            "$release_base/$wheel_name"
           wheel_sha="$(awk -v file="$wheel_name" '$2 == file {print $1}' "$release_dir/SHA256SUMS")"
           test -n "$wheel_sha"
           printf '%s  %s\n' "$wheel_sha" "$release_dir/$wheel_name" \
