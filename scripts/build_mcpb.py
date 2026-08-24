@@ -86,6 +86,8 @@ def check_registry_metadata(output: Path, digest: str) -> None:
     package = packages[0]
     if not isinstance(package, dict) or package.get("registryType") != "mcpb":
         raise SystemExit("server.json package must use registryType mcpb")
+    if "registryBaseUrl" in package:
+        raise SystemExit("MCPB packages must not set registryBaseUrl")
     expected_name = f"liquilens-evidence-carrier-mcp-{version}.mcpb"
     if output.name != expected_name:
         raise SystemExit(f"MCPB filename must be {expected_name}")
