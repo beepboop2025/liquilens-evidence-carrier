@@ -1,0 +1,82 @@
+{
+  "name": "liquilens-evidence",
+  "displayName": "LiquiLens Evidence",
+  "description": "Offline, fail-closed diagnostics for LiquiLens Evidence Carrier JSON.",
+  "version": "0.1.0",
+  "publisher": "liquilens",
+  "license": "Apache-2.0",
+  "homepage": "https://liquilens.in/protocol/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/beepboop2025/liquilens-evidence-carrier.git",
+    "directory": "integrations/vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/beepboop2025/liquilens-evidence-carrier/issues"
+  },
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Linters",
+    "Other"
+  ],
+  "keywords": [
+    "financial evidence",
+    "provenance",
+    "rights",
+    "lineage",
+    "fdc3"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": {
+      "supported": true
+    }
+  },
+  "browser": "./dist/extension.cjs",
+  "activationEvents": [
+    "onLanguage:json",
+    "onLanguage:jsonc",
+    "onCommand:liquilensEvidence.verifyCarrier"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "liquilensEvidence.verifyCarrier",
+        "title": "LiquiLens: Verify Evidence Carrier",
+        "category": "LiquiLens"
+      }
+    ],
+    "configuration": {
+      "title": "LiquiLens Evidence",
+      "properties": {
+        "liquilensEvidence.validateOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify matching Evidence Carrier JSON when it opens."
+        },
+        "liquilensEvidence.validateOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Verify matching Evidence Carrier JSON when it is saved."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild src/extension.mjs --bundle --platform=browser --format=cjs --target=es2022 --external:vscode --legal-comments=external --outfile=dist/extension.cjs",
+    "test": "node --test test/*.test.mjs",
+    "package": "npm run build && vsce package --no-dependencies --out dist/liquilens-evidence-0.1.0.vsix",
+    "check": "npm test && npm run package"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "3.9.2",
+    "esbuild": "0.28.2"
+  }
+}
