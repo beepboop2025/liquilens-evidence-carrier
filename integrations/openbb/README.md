@@ -21,8 +21,14 @@ python -m pip install \
 openbb-build
 ```
 
-For a reproducible installation, replace `main` with a reviewed commit SHA.
-The package pins the LiquiLens verifier dependency to the immutable v0.14.0
+For a reproducible installation, pin the reviewed extension source snapshot:
+
+```bash
+python -m pip install \
+  "git+https://github.com/beepboop2025/liquilens-evidence-carrier.git@f4e9d6fb6bb20abbe6fc4625bd8c0f3279b48674#subdirectory=integrations/openbb"
+```
+
+The package also pins the LiquiLens verifier dependency to the immutable v0.14.0
 GitHub release wheel and its SHA-256 digest.
 
 ## Python interface
