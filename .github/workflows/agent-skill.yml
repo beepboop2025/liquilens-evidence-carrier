@@ -1,0 +1,33 @@
+name: Agent skill
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - ".github/workflows/agent-skill.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - ".github/workflows/agent-skill.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24"
+      - name: Discover the public skill
+        env:
+          DO_NOT_TRACK: "1"
+        run: |
+          skill_list="$(npx --yes skills@1.5.23 add . --list)"
+          printf '%s\n' "$skill_list"
+          grep --fixed-strings 'liquilens-evidence' <<<"$skill_list"
