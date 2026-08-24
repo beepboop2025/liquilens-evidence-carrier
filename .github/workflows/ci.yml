@@ -48,6 +48,49 @@ jobs:
           uv run --locked --extra dev pre-commit validate-manifest .pre-commit-hooks.yaml
           uv run --locked --extra dev ruff check .
           uv run --locked --extra dev mypy
+      - name: Validate exact MCP protocol responses
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/mcp-protocol.schema.json \
+            https://raw.githubusercontent.com/modelcontextprotocol/modelcontextprotocol/2026-07-28/schema/2026-07-28/schema.json
+          printf '%s  %s\n' \
+            'ef70b61f99b6d2e5e3b46863822eab08dff6a45bedc7a08914e0e5b133f40203' \
+            '/tmp/mcp-protocol.schema.json' \
+            | sha256sum --check --strict
+          MCP_PROTOCOL_SCHEMA=/tmp/mcp-protocol.schema.json \
+            uv run --locked --extra dev pytest -q tests/test_mcp_server.py
+      - name: Validate deterministic MCPB and Registry metadata
+        run: |
+          curl --fail --location --silent --show-error \
+            --output /tmp/mcpb-manifest.schema.json \
+            https://raw.githubusercontent.com/modelcontextprotocol/mcpb/v2.1.2/schemas/mcpb-manifest-v0.3.schema.json
+          printf '%s  %s\n' \
+            '3a0ac9d845711a1b9b17dfa5a52f8b60628239d6a86a9db417206a9efc78592d' \
+            '/tmp/mcpb-manifest.schema.json' \
+            | sha256sum --check --strict
+          uv run --locked --extra dev python - <<'PY'
+          import json
+          from pathlib import Path
+          import jsonschema
+
+          schema = json.loads(Path('/tmp/mcpb-manifest.schema.json').read_text())
+          manifest = json.loads(Path('mcpb/manifest.json').read_text())
+          jsonschema.Draft7Validator(schema).validate(manifest)
+          PY
+          version="$(cat VERSION)"
+          uv run --locked --extra dev python scripts/build_mcpb.py \
+            --output "dist/liquilens-evidence-carrier-mcp-${version}.mcpb" \
+            --check-registry-metadata
+          curl --fail --location --silent --show-error \
+            --output /tmp/mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            '/tmp/mcp-publisher.tar.gz' \
+            | sha256sum --check --strict
+          tar --extract --gzip --file /tmp/mcp-publisher.tar.gz \
+            --directory /tmp mcp-publisher
+          /tmp/mcp-publisher validate server.json
       - name: Build and inspect package
         run: |
           uv build

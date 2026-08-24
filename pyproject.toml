@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liquilens-evidence"
-version = "0.13.6"
+version = "0.14.0"
 description = "Portable, fail-closed financial evidence provenance"
 readme = "README.md"
 license = "Apache-2.0"
@@ -38,6 +38,7 @@ Issues = "https://github.com/beepboop2025/liquilens-evidence-carrier/issues"
 
 [project.scripts]
 liquilens-evidence = "liquilens_evidence.evidence_cli:main"
+liquilens-evidence-mcp = "liquilens_evidence.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
