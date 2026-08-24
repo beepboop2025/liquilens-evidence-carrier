@@ -1,0 +1,16 @@
+{
+  "name": "LiquiLens Evidence Carrier",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "args": {
+      "VERSION": "0.14.0",
+      "REVISION": "8683351bd72c2a4b46d6913cd5e75c5536a410f1",
+      "CREATED": "2026-08-24T12:43:34Z"
+    }
+  },
+  "containerUser": "liquilens",
+  "remoteUser": "liquilens",
+  "updateRemoteUserUID": false,
+  "overrideCommand": true
+}
