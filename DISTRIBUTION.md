@@ -110,6 +110,61 @@ The plugin deliberately does not auto-start an MCP server or choose a local
 filesystem root. Configure the verifier separately for the directory the user
 has actually authorized.
 
+## VS Code desktop, remote, web, and Codespaces
+
+The public `vscode-v0.1.0` release contains an attested VSIX built from a signed
+source tag. The package is 16,612 bytes with SHA-256
+`ebc17ca1aa54d3e6c93494bb19f82df2f6460f314c40074a4f6b41d94170d6cf`.
+
+```bash
+curl --fail --location --remote-name \
+  https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/vscode-v0.1.0/liquilens-evidence-0.1.0.vsix
+curl --fail --location --remote-name \
+  https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/vscode-v0.1.0/SHA256SUMS
+shasum -a 256 --check SHA256SUMS
+code --install-extension liquilens-evidence-0.1.0.vsix
+```
+
+The extension verifies matching carrier JSON locally and fail-closed. It has no
+runtime dependency, telemetry, schema fetch, or financial authority. The same
+browser bundle supports desktop, remote, virtual, untrusted, and web
+workspaces. This public release is not a Microsoft Marketplace or Open VSX
+listing; those stores require separate publisher-controlled publication.
+
+## Airflow
+
+The separate Apache Airflow provider release is checksum-pinned to a public
+wheel whose provider discovery, database migration, DAG serialization,
+operator execution, and DAG run passed in a clean Airflow 3.3.1 installation:
+
+```bash
+python -m pip install \
+  'https://github.com/beepboop2025/liquilens-airflow-provider/releases/download/v0.1.0/liquilens_airflow_provider-0.1.0-py3-none-any.whl#sha256=aa91a2528ebf2e1583c379a08ce60f9aa52fc33d9d89da0bab9876d5720956bf'
+```
+
+Repository and release receipts are at
+[`beepboop2025/liquilens-airflow-provider`](https://github.com/beepboop2025/liquilens-airflow-provider/releases/tag/v0.1.0).
+This is a public provider artifact, not an Apache Software Foundation catalog
+listing or endorsement.
+
+## Dev Containers and Codespaces images
+
+Use the public Dev Container Feature by immutable OCI digest in
+`.devcontainer/devcontainer.json`:
+
+```json
+{
+  "features": {
+    "ghcr.io/beepboop2025/liquilens-devcontainer-features/liquilens-evidence@sha256:79ac17d7c3f91dc9360c6aa63cb9e4fa0081d5c81e1a1492b2198a8280f5b22d": {}
+  }
+}
+```
+
+An anonymous non-root consumer resolved that digest, revalidated the exact
+carrier wheel, and exercised both the CLI and MCP server. The feature is
+available directly from GHCR; inclusion in the community index remains under
+external review.
+
 ## Browser and notebooks
 
 - [Browser verifier](https://beepboop2025.github.io/liquilens-evidence-carrier/)
@@ -156,6 +211,7 @@ upstream listings:
 - [Docker MCP Registry: Financial Evidence #4765](https://github.com/docker/mcp-registry/pull/4765)
 - [Awesome OpenBB #11](https://github.com/OpenBB-finance/awesome-openbb/pull/11)
 - [GitHub Awesome Copilot #2785](https://github.com/github/awesome-copilot/pull/2785)
+- [Dev Containers community index #729](https://github.com/devcontainers/devcontainers.github.io/pull/729)
 
 Bloomberg, LSEG, FactSet, S&P Global, Nasdaq, and other proprietary financial
 platforms require their own entitlements, commercial validation, rights review,
