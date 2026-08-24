@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MARKETPLACE = ROOT / ".agents/plugins/marketplace.json"
-PLUGIN = ROOT / ".agents/plugins/plugins/liquilens-evidence"
+PLUGIN = ROOT / "plugins/liquilens-evidence"
 
 
 def test_codex_plugin_manifest_and_marketplace_are_consistent() -> None:
@@ -11,7 +11,7 @@ def test_codex_plugin_manifest_and_marketplace_are_consistent() -> None:
     marketplace = json.loads(MARKETPLACE.read_text())
 
     assert manifest["name"] == "liquilens-evidence"
-    assert manifest["version"] == "0.14.0"
+    assert manifest["version"] == "0.14.1"
     assert manifest["license"] == "Apache-2.0"
     assert manifest["skills"] == "./skills/"
     assert "mcpServers" not in manifest
