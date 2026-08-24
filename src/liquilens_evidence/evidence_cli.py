@@ -130,6 +130,34 @@ def _project(format_name: str, verified: VerifiedEvidenceCarrier) -> Any:
     raise AssertionError(f"unhandled projection: {format_name}")
 
 
+def _verification_result(verified: VerifiedEvidenceCarrier) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "carrier_id": verified.carrier["carrier_id"],
+        "record_hash": verified.carrier["record_hash"],
+        "export_disposition": verified.disposition.value,
+        "reason_codes": list(verified.reason_codes),
+        "policy_version": verified.policy_version,
+    }
+
+
+def _verify_paths(
+    path_texts: list[str], *, evaluated_at: datetime
+) -> dict[str, Any]:
+    results: list[dict[str, Any]] = []
+    for path_text in path_texts:
+        try:
+            verified = verify_evidence_carrier(
+                _read_json(path_text), evaluated_at=evaluated_at
+            )
+        except (EvidenceCarrierError, TypeError, ValueError) as error:
+            raise EvidenceCarrierError(f"{path_text}: {error}") from error
+        result = _verification_result(verified)
+        result["input"] = path_text
+        results.append(result)
+    return {"ok": True, "verified": results}
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="liquilens-evidence",
@@ -145,6 +173,12 @@ def _parser() -> argparse.ArgumentParser:
     verify = subcommands.add_parser("verify", help="verify carrier identity and policy")
     verify.add_argument("input", help="carrier JSON path, or - for stdin")
     verify.add_argument("--as-of", help="UTC policy evaluation time ending in Z")
+
+    verify_files = subcommands.add_parser(
+        "verify-files", help="verify one or more carrier JSON files"
+    )
+    verify_files.add_argument("inputs", nargs="+", help="carrier JSON paths")
+    verify_files.add_argument("--as-of", help="UTC policy evaluation time ending in Z")
 
     convert = subcommands.add_parser("convert", help="project a verified carrier")
     convert.add_argument("input", help="carrier JSON path, or - for stdin")
@@ -170,24 +204,22 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        value = _read_json(args.input)
-        if args.command == "issue":
-            output = _issue(value)
-        else:
-            verified = verify_evidence_carrier(
-                value, evaluated_at=_evaluated_at(args.as_of)
+        if args.command == "verify-files":
+            output = _verify_paths(
+                args.inputs, evaluated_at=_evaluated_at(args.as_of)
             )
-            if args.command == "verify":
-                output = {
-                    "ok": True,
-                    "carrier_id": verified.carrier["carrier_id"],
-                    "record_hash": verified.carrier["record_hash"],
-                    "export_disposition": verified.disposition.value,
-                    "reason_codes": list(verified.reason_codes),
-                    "policy_version": verified.policy_version,
-                }
+        else:
+            value = _read_json(args.input)
+            if args.command == "issue":
+                output = _issue(value)
             else:
-                output = _project(args.format, verified)
+                verified = verify_evidence_carrier(
+                    value, evaluated_at=_evaluated_at(args.as_of)
+                )
+                if args.command == "verify":
+                    output = _verification_result(verified)
+                else:
+                    output = _project(args.format, verified)
     except (EvidenceCarrierError, TypeError, ValueError) as error:
         print(f"liquilens-evidence: {error}", file=sys.stderr)
         return 2

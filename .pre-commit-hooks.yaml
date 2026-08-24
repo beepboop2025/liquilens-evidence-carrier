@@ -1,0 +1,6 @@
+- id: liquilens-evidence-verify
+  name: Verify LiquiLens Evidence Carrier files
+  description: Fail closed on invalid identity, clocks, rights, or export policy.
+  entry: liquilens-evidence verify-files
+  language: python
+  files: '\.(evidence|carrier)\.json$'

@@ -67,9 +67,15 @@ def main() -> int:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "https://pypi.org/project/liquilens-evidence/" not in readme
     assert (
-        "releases/download/v0.13.5/"
-        "liquilens_evidence-0.13.5-py3-none-any.whl"
+        "releases/download/v0.13.6/"
+        "liquilens_evidence-0.13.6-py3-none-any.whl"
     ) in readme
+    action = (ROOT / "action.yml").read_text(encoding="utf-8")
+    assert "using: composite" in action
+    assert "scripts/action_verify.py" in action
+    hooks = (ROOT / ".pre-commit-hooks.yaml").read_text(encoding="utf-8")
+    assert "liquilens-evidence verify-files" in hooks
+    assert r"\.(evidence|carrier)\.json$" in hooks
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text(
         encoding="utf-8"
     )

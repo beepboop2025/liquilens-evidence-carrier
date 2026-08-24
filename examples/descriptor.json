@@ -1,7 +1,7 @@
 {
   "producer": {
     "name": "liquilens",
-    "version": "0.13.5",
+    "version": "0.13.6",
     "endpoint": "https://liquilens.in/protocol/"
   },
   "subject": {
