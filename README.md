@@ -1,7 +1,6 @@
 # LiquiLens Evidence Carrier
 
 [![CI](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml)
-[![Nix](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/nix.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/nix.yml)
 [![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.14.0)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
@@ -48,30 +47,6 @@ included for cross-language `liquilens-hash-tree-v1` identity checks:
 ```bash
 node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
 ```
-
-## Run directly with Nix
-
-Nix users can run the v0.14.0 verifier from this public repository without a
-Python environment or package-registry account:
-
-```bash
-nix run github:beepboop2025/liquilens-evidence-carrier -- --help
-nix run github:beepboop2025/liquilens-evidence-carrier -- verify carrier.json
-```
-
-Run the offline stdio server through the dedicated app:
-
-```bash
-nix run github:beepboop2025/liquilens-evidence-carrier#mcp -- \
-  --root /absolute/path/to/evidence
-```
-
-For an immutable v0.14.0 flake source, replace the repository reference above
-with
-`github:beepboop2025/liquilens-evidence-carrier/225c3e2fc96efb0ca78256e3ec96ac25901c10c7`.
-The committed `flake.lock` pins NixOS 26.05 inputs. Nix may fetch those public
-build inputs before launch; the resulting verifier and MCP server themselves
-remain dependency-free at runtime, offline, read-only, and non-authoritative.
 
 ## Canonical contracts
 
