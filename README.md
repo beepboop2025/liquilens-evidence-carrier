@@ -1,7 +1,7 @@
 # LiquiLens Evidence Carrier
 
 [![CI](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.13.5)
+[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.13.6)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 LiquiLens Evidence Carrier is a transport-neutral contract for moving financial
@@ -34,15 +34,14 @@ separately identified reference rather than silently upgraded.
 ## Install and verify
 
 ```bash
-python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.13.5/liquilens_evidence-0.13.5-py3-none-any.whl
+python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.13.6/liquilens_evidence-0.13.6-py3-none-any.whl
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
 ```
 
-The release wheel has SHA-256
-`277317d588daa72de6bf966442a883c94665ae719f6888edbffc28e39018f14c`.
-The Python runtime has no third-party dependencies. A Node.js verifier is also
+The release publishes a wheel and checksum manifest. The Python runtime has no
+third-party dependencies. A Node.js verifier is also
 included for cross-language `liquilens-hash-tree-v1` identity checks:
 
 ```bash
@@ -58,8 +57,8 @@ node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` |
 
-The current protocol is v1 and the initial public implementation release is
-`0.13.5`. Pin production integrations to a signed tag or release checksum; use
+The current protocol is v1 and the current public implementation release is
+`0.13.6`. Pin production integrations to a signed tag or release checksum; use
 the canonical URLs for schema identity and discovery.
 
 ## Integration kit
@@ -75,6 +74,20 @@ the canonical URLs for schema identity and discovery.
   directory remains available for integration-bundle consumers.
 - [`protocol/verify_hash_tree_v1.mjs`](protocol/verify_hash_tree_v1.mjs) verifies
   content identities without trusting Python number formatting.
+
+## Inherit verification in existing workflows
+
+Pin the reusable action to an exact release tag:
+
+```yaml
+- uses: beepboop2025/liquilens-evidence-carrier@v0.13.6
+  with:
+    path: evidence/close.evidence.json
+```
+
+For local commit gates, add this repository to `.pre-commit-config.yaml`. The
+published hook verifies files ending in `.evidence.json` or `.carrier.json` and
+passes every matched file through `liquilens-evidence verify-files`.
 
 ## Use in another product
 

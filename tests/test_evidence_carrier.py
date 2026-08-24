@@ -599,3 +599,52 @@ def test_cli_rejects_duplicate_keys(tmp_path: Path) -> None:
     )
     assert completed.returncode == 2
     assert "duplicate JSON object key" in completed.stderr
+
+
+def test_cli_verifies_multiple_hook_files(tmp_path: Path) -> None:
+    paths: list[Path] = []
+    for name in ("opening.evidence.json", "close.carrier.json"):
+        path = tmp_path / name
+        path.write_text(json.dumps(_issue()), encoding="utf-8")
+        paths.append(path)
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "liquilens_evidence.evidence_cli",
+            "verify-files",
+            *(str(path) for path in paths),
+            "--as-of",
+            "2026-08-24T12:00:00Z",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    output = json.loads(completed.stdout)
+    assert output["ok"] is True
+    assert [row["input"] for row in output["verified"]] == [
+        str(path) for path in paths
+    ]
+
+
+def test_composite_action_wrapper_verifies_without_install(tmp_path: Path) -> None:
+    carrier_path = tmp_path / "close.evidence.json"
+    carrier_path.write_text(json.dumps(_issue()), encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts/action_verify.py"),
+            str(carrier_path),
+            "--as-of",
+            "2026-08-24T12:00:00Z",
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout)["ok"] is True
