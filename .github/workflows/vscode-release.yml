@@ -1,0 +1,159 @@
+name: VS Code release
+
+on:
+  push:
+    tags:
+      - "vscode-v*"
+
+permissions:
+  attestations: write
+  contents: write
+  id-token: write
+
+jobs:
+  attested-vsix:
+    name: Attested VSIX release
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: integrations/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: integrations/vscode/package-lock.json
+      - name: Verify signed tag, commit, ancestry, and version
+        working-directory: .
+        run: |
+          signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-tag --raw "$GITHUB_REF_NAME"
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-commit --raw "$release_commit"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$release_commit" origin/main
+          package_version="$(
+            node -p "require('./integrations/vscode/package.json').version"
+          )"
+          test "$GITHUB_REF_NAME" = "vscode-v${package_version}"
+      - name: Install, test, and package
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run check
+          (
+            cd dist
+            sha256sum "liquilens-evidence-0.1.0.vsix" > SHA256SUMS
+          )
+      - name: Inspect the release candidate and offline boundary
+        run: |
+          archive="dist/liquilens-evidence-0.1.0.vsix"
+          unzip -t "$archive"
+          expected="$(printf '%s\n' \
+            '[Content_Types].xml' \
+            'extension.vsixmanifest' \
+            'extension/LICENSE.txt' \
+            'extension/NOTICE' \
+            'extension/changelog.md' \
+            'extension/dist/extension.cjs' \
+            'extension/package.json' \
+            'extension/readme.md' \
+            | sort)"
+          actual="$(unzip -Z1 "$archive" | sort)"
+          test "$actual" = "$expected"
+          unzip -p "$archive" extension/package.json \
+            | node -e '
+                const fs = require("node:fs");
+                const manifest = JSON.parse(fs.readFileSync(0, "utf8"));
+                if (manifest.version !== "0.1.0") process.exit(1);
+                if (manifest.browser !== "./dist/extension.cjs") process.exit(1);
+                if (manifest.extensionKind.join(",") !== "workspace") process.exit(1);
+              '
+          if grep -En \
+            'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' \
+            dist/extension.cjs; then
+            exit 1
+          fi
+      - name: Attest the installable VSIX
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: integrations/vscode/dist/liquilens-evidence-0.1.0.vsix
+      - name: Publish public VSIX release
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            integrations/vscode/dist/liquilens-evidence-0.1.0.vsix \
+            integrations/vscode/dist/SHA256SUMS \
+            --verify-tag \
+            --title "LiquiLens Evidence for VS Code 0.1.0" \
+            --notes "Offline, fail-closed Evidence Carrier diagnostics for VS Code desktop, remote and web workspaces. This public VSIX does not collect data, fetch schemas, trade, recommend, rate credit, or imply publication in a third-party extension store."
+
+  anonymous-consumer:
+    name: Anonymous VSIX consumer
+    needs: attested-vsix
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: read
+      contents: read
+      id-token: write
+    steps:
+      - name: Download public assets without credentials
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          mkdir released
+          base="https://github.com/$REPOSITORY/releases/download/$RELEASE_TAG"
+          curl --fail --location --silent --show-error \
+            --output released/liquilens-evidence-0.1.0.vsix \
+            "$base/liquilens-evidence-0.1.0.vsix"
+          curl --fail --location --silent --show-error \
+            --output released/SHA256SUMS \
+            "$base/SHA256SUMS"
+          (
+            cd released
+            sha256sum --check --strict SHA256SUMS
+          )
+      - name: Verify package structure and offline boundary
+        run: |
+          archive="released/liquilens-evidence-0.1.0.vsix"
+          unzip -t "$archive"
+          expected="$(printf '%s\n' \
+            '[Content_Types].xml' \
+            'extension.vsixmanifest' \
+            'extension/LICENSE.txt' \
+            'extension/NOTICE' \
+            'extension/changelog.md' \
+            'extension/dist/extension.cjs' \
+            'extension/package.json' \
+            'extension/readme.md' \
+            | sort)"
+          actual="$(unzip -Z1 "$archive" | sort)"
+          test "$actual" = "$expected"
+          unzip -p "$archive" extension/package.json \
+            | node -e '
+                const fs = require("node:fs");
+                const manifest = JSON.parse(fs.readFileSync(0, "utf8"));
+                if (manifest.version !== "0.1.0") process.exit(1);
+                if (manifest.browser !== "./dist/extension.cjs") process.exit(1);
+              '
+          unzip -p "$archive" extension/dist/extension.cjs \
+            > released/extension.cjs
+          if grep -En \
+            'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' \
+            released/extension.cjs; then
+            exit 1
+          fi
+      - name: Verify GitHub build provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify \
+            released/liquilens-evidence-0.1.0.vsix \
+            --repo "$GITHUB_REPOSITORY"

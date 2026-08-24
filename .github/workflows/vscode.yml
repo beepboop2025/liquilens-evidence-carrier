@@ -1,0 +1,61 @@
+name: VS Code extension
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  vscode:
+    name: VSIX package
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: integrations/vscode
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: integrations/vscode/package-lock.json
+      - name: Install the locked build environment
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Test and package the web extension
+        run: npm run check
+      - name: Inspect the VSIX and offline boundary
+        run: |
+          archive="dist/liquilens-evidence-0.1.0.vsix"
+          unzip -t "$archive"
+          expected="$(printf '%s\n' \
+            '[Content_Types].xml' \
+            'extension.vsixmanifest' \
+            'extension/LICENSE.txt' \
+            'extension/NOTICE' \
+            'extension/changelog.md' \
+            'extension/dist/extension.cjs' \
+            'extension/package.json' \
+            'extension/readme.md' \
+            | sort)"
+          actual="$(unzip -Z1 "$archive" | sort)"
+          test "$actual" = "$expected"
+          unzip -p "$archive" extension/package.json \
+            | node -e '
+                const fs = require("node:fs");
+                const manifest = JSON.parse(fs.readFileSync(0, "utf8"));
+                if (manifest.version !== "0.1.0") process.exit(1);
+                if (manifest.browser !== "./dist/extension.cjs") process.exit(1);
+                if (manifest.extensionKind.join(",") !== "workspace") process.exit(1);
+              '
+          if grep -En \
+            'fetch\(|XMLHttpRequest|WebSocket|sendBeacon' \
+            dist/extension.cjs; then
+            exit 1
+          fi
+          sha256sum "$archive"

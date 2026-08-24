@@ -10,7 +10,7 @@ on:
       - "scripts/container_smoke.sh"
   push:
     tags:
-      - "v*"
+      - "v[0-9]*"
   workflow_dispatch:
     inputs:
       release_tag:
