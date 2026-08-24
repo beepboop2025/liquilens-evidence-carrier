@@ -1,14 +1,18 @@
+ARG VERSION="0.14.0"
+
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844 AS builder
 
+ARG VERSION
 ARG LIQUILENS_WHEEL_URL="https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl"
 ARG LIQUILENS_WHEEL_SHA256="f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24"
 
 RUN set -eu; \
-    wget --quiet --output-document=/tmp/liquilens-evidence.whl \
+    wheel_path="/tmp/liquilens_evidence-${VERSION}-py3-none-any.whl"; \
+    wget --quiet --output-document="${wheel_path}" \
       "${LIQUILENS_WHEEL_URL}"; \
     printf '%s  %s\n' \
       "${LIQUILENS_WHEEL_SHA256}" \
-      /tmp/liquilens-evidence.whl \
+      "${wheel_path}" \
       | sha256sum -c; \
     python -m venv /opt/liquilens; \
     /opt/liquilens/bin/python -m pip install \
@@ -16,12 +20,12 @@ RUN set -eu; \
       --no-cache-dir \
       --no-compile \
       --no-deps \
-      /tmp/liquilens-evidence.whl; \
+      "${wheel_path}"; \
     /opt/liquilens/bin/python -m pip uninstall --yes pip
 
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844
 
-ARG VERSION="0.14.0"
+ARG VERSION
 ARG REVISION="8683351bd72c2a4b46d6913cd5e75c5536a410f1"
 ARG CREATED="2026-08-24T12:43:34Z"
 ARG README_URL="https://raw.githubusercontent.com/beepboop2025/liquilens-evidence-carrier/8683351bd72c2a4b46d6913cd5e75c5536a410f1/README.md"
