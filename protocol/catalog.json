@@ -1,0 +1,31 @@
+{
+  "schema": "liquilens.evidence-carrier-catalog.v1",
+  "release": "0.13.5",
+  "license": "Apache-2.0",
+  "artifacts": [
+    {
+      "name": "LiquiLens Evidence Carrier v1",
+      "path": "liquilens-evidence-carrier-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json",
+      "sha256": "7f8494d8470853dc88665ea32c1dccb40cc58c55b07e9267aa28c81f83c1ccd3"
+    },
+    {
+      "name": "LiquiLens Evidence Carrier Reference v1",
+      "path": "liquilens-evidence-carrier-reference-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json",
+      "sha256": "d54043bf11359749597bff7495b0fffe6ff8453a35144cee4a2bd69711fec7e8"
+    },
+    {
+      "name": "LiquiLens FDC3 Evidence Context",
+      "path": "../integrations/fdc3/com.liquilens.evidence.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json",
+      "sha256": "9519474a4d0bf3a77834320d9aa43a88d5df96d49f691110154050212c7511b7"
+    },
+    {
+      "name": "LiquiLens OpenLineage Evidence Facet",
+      "path": "../integrations/openlineage/liquilens-evidence-facet.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json",
+      "sha256": "e4c6035452d75be280a7b717f85da87319a078dbf5563e62ac3a3cb83486e9a5"
+    }
+  ]
+}

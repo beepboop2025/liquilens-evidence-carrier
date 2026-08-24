@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  signed-release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Verify signed tag, commit, ancestry, and version
+        run: |
+          signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-tag --raw "$GITHUB_REF_NAME"
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-commit --raw "$release_commit"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$release_commit" origin/main
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
+              raise SystemExit("tag and project version differ")
+          PY
+      - name: Test and build deterministic artifacts
+        run: |
+          python -m pip install uv==0.12.5
+          uv sync --locked --extra dev
+          uv run --locked --extra dev pytest -q
+          uv run --locked --extra dev python scripts/validate_kit.py
+          source_date_epoch="$(git show -s --format=%ct HEAD)"
+          SOURCE_DATE_EPOCH="$source_date_epoch" uv build --out-dir dist
+          cp protocol/liquilens-evidence-carrier-v1.schema.json dist/
+          cp protocol/liquilens-evidence-carrier-reference-v1.schema.json dist/
+          cp integrations/fdc3/com.liquilens.evidence.schema.json dist/
+          cp integrations/openlineage/liquilens-evidence-facet.schema.json dist/
+          tar \
+            --sort=name \
+            --mtime="@$source_date_epoch" \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -czf "dist/liquilens-evidence-carrier-${GITHUB_REF_NAME#v}.tar.gz" \
+            LICENSE NOTICE README.md docs protocol integrations examples
+          (
+            cd dist
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > SHA256SUMS
+          )
+      - name: Publish public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --verify-tag \
+            --title "LiquiLens Evidence Carrier ${GITHUB_REF_NAME#v}" \
+            --notes "Apache-2.0 public release of the portable, fail-closed evidence protocol, Python CLI, and integration kit. Carries no trading, recommendation, credit-rating, or third-party platform authority."

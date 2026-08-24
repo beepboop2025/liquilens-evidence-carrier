@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json",
+  "title": "LiquiLens Evidence Carrier Reference v1",
+  "description": "A policy-redacted reference to a verified LiquiLens Evidence Carrier. The original payload is not disclosed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "carrier_id",
+    "record_hash",
+    "canonicalization",
+    "producer",
+    "subject",
+    "claim",
+    "clocks",
+    "sources",
+    "rights",
+    "authority",
+    "payload_disclosed",
+    "reason_codes",
+    "policy_version"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.evidence-carrier-reference.v1"},
+    "carrier_id": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/carrier_id"
+    },
+    "record_hash": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/record_hash"
+    },
+    "canonicalization": {"const": "liquilens-hash-tree-v1"},
+    "producer": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/producer"
+    },
+    "subject": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/subject"
+    },
+    "claim": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/claim"
+    },
+    "clocks": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/clocks"
+    },
+    "sources": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/sources"
+    },
+    "rights": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/rights"
+    },
+    "authority": {
+      "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json#/properties/authority"
+    },
+    "payload_disclosed": {"const": false},
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "policy_version": {"type": "string", "minLength": 1}
+  }
+}

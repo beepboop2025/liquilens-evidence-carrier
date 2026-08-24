@@ -1,0 +1,48 @@
+{
+  "producer": {
+    "name": "liquilens",
+    "version": "0.13.5",
+    "endpoint": "https://liquilens.in/protocol/"
+  },
+  "subject": {
+    "kind": "protocol_artifact",
+    "name": "LiquiLens Evidence Carrier v1",
+    "identifiers": {
+      "schema": "liquilens-evidence-carrier-v1"
+    }
+  },
+  "claim": {
+    "kind": "conformance_example",
+    "summary": "Example carrier for the public protocol schema",
+    "status": "structural"
+  },
+  "clocks": {
+    "event_time": "2026-08-24T11:26:45Z",
+    "knowledge_time": "2026-08-24T11:26:45Z",
+    "as_of": "2026-08-24T11:26:46Z",
+    "expires_at": "2030-01-01T00:00:00Z"
+  },
+  "sources": [
+    {
+      "source_id": "liquilens:evidence-carrier-schema:v1",
+      "publisher": "LiquiLens",
+      "title": "LiquiLens Evidence Carrier v1 JSON Schema",
+      "url": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json",
+      "retrieved_at": "2026-08-24T11:26:45Z",
+      "content_sha256": "7f8494d8470853dc88665ea32c1dccb40cc58c55b07e9267aa28c81f83c1ccd3"
+    }
+  ],
+  "rights": {
+    "status": "licensed",
+    "permissions": ["ingest", "derive", "display", "redistribute"],
+    "license": "Apache-2.0",
+    "license_url": "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/main/LICENSE",
+    "attribution": "LiquiLens Evidence Carrier contributors",
+    "jurisdictions": ["global"]
+  },
+  "payload": {
+    "protocol": "liquilens-evidence-carrier-v1",
+    "purpose": "conformance demonstration"
+  },
+  "extensions": {}
+}

@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: LiquiLens Evidence Carrier
+message: "If this protocol supports your research or infrastructure, cite this repository and the exact release."
+type: software
+version: 0.13.5
+date-released: 2026-08-24
+authors:
+  - name: LiquiLens
+repository-code: "https://github.com/beepboop2025/liquilens-evidence-carrier"
+url: "https://liquilens.in/protocol/"
+license: Apache-2.0

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json",
+  "title": "LiquiLens OpenLineage Evidence Facet",
+  "description": "Custom OpenLineage facet for a policy-bounded LiquiLens Evidence Carrier view.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_producer",
+    "_schemaURL",
+    "carrierSchemaURL",
+    "carrier",
+    "disposition"
+  ],
+  "properties": {
+    "_producer": {"type": "string", "format": "uri", "pattern": "^https://"},
+    "_schemaURL": {
+      "const": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json"
+    },
+    "carrierSchemaURL": {
+      "enum": [
+        "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json",
+        "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+      ]
+    },
+    "carrier": {
+      "oneOf": [
+        {
+          "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
+        },
+        {
+          "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+        }
+      ]
+    },
+    "disposition": {"enum": ["full", "metadata_only"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"disposition": {"const": "full"}}},
+      "then": {
+        "properties": {
+          "carrierSchemaURL": {
+            "const": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
+          },
+          "carrier": {
+            "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"disposition": {"const": "metadata_only"}}},
+      "then": {
+        "properties": {
+          "carrierSchemaURL": {
+            "const": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+          },
+          "carrier": {
+            "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+          }
+        }
+      }
+    }
+  ]
+}

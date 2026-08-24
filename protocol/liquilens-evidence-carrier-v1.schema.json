@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json",
+  "title": "LiquiLens Evidence Carrier v1",
+  "description": "A transport-neutral, content-addressed evidence object. It carries no trading, recommendation, or credit-rating authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "canonicalization",
+    "carrier_id",
+    "record_hash",
+    "producer",
+    "subject",
+    "claim",
+    "clocks",
+    "sources",
+    "rights",
+    "authority",
+    "payload",
+    "extensions"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "canonicalization": {"const": "liquilens-hash-tree-v1"},
+    "carrier_id": {"type": "string", "pattern": "^evidence_[0-9a-f]{24}$"},
+    "record_hash": {"$ref": "#/$defs/sha256"},
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "endpoint"],
+      "properties": {
+        "name": {"enum": ["liquilens", "seiche", "undertow", "palimpsest"]},
+        "version": {"type": "string", "minLength": 1},
+        "endpoint": {"type": "string", "format": "uri", "pattern": "^https://"}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "identifiers"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "identifiers": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "summary", "status"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "status": {
+          "enum": [
+            "observed",
+            "derived",
+            "structural",
+            "research",
+            "restricted",
+            "unavailable"
+          ]
+        }
+      }
+    },
+    "clocks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_time", "knowledge_time", "as_of"],
+      "properties": {
+        "event_time": {"$ref": "#/$defs/timestamp"},
+        "knowledge_time": {"$ref": "#/$defs/timestamp"},
+        "as_of": {"$ref": "#/$defs/timestamp"},
+        "expires_at": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "publisher",
+          "title",
+          "url",
+          "retrieved_at",
+          "content_sha256"
+        ],
+        "properties": {
+          "source_id": {"type": "string", "minLength": 1},
+          "publisher": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "url": {"type": "string", "format": "uri", "pattern": "^https://"},
+          "retrieved_at": {"$ref": "#/$defs/timestamp"},
+          "content_sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "rights": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "permissions",
+        "license",
+        "license_url",
+        "attribution",
+        "jurisdictions"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "licensed",
+            "allowed",
+            "metadata_only",
+            "restricted",
+            "unknown",
+            "blocked"
+          ]
+        },
+        "permissions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["ingest", "derive", "display", "redistribute"]}
+        },
+        "license": {"type": ["string", "null"], "minLength": 1},
+        "license_url": {
+          "type": ["string", "null"],
+          "format": "uri",
+          "pattern": "^https://"
+        },
+        "attribution": {"type": ["string", "null"], "minLength": 1},
+        "jurisdictions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "financial_authority",
+        "can_execute",
+        "can_recommend",
+        "is_credit_rating"
+      ],
+      "properties": {
+        "financial_authority": {"const": "none"},
+        "can_execute": {"const": false},
+        "can_recommend": {"const": false},
+        "is_credit_rating": {"const": false}
+      }
+    },
+    "payload": {"type": "object"},
+    "extensions": {"type": "object"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    }
+  }
+}
