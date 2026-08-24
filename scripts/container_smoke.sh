@@ -5,8 +5,10 @@ image_ref="${1:?usage: container_smoke.sh IMAGE [VERSION]}"
 expected_version="${2:-0.14.0}"
 smoke_dir="$(mktemp -d)"
 trap 'rm -rf -- "$smoke_dir"' EXIT HUP INT TERM
+chmod 0755 "$smoke_dir"
 
 cp examples/descriptor.json "$smoke_dir/descriptor.json"
+chmod 0644 "$smoke_dir/descriptor.json"
 
 docker run --rm \
   --network none \
