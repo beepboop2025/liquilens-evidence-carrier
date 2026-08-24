@@ -9,7 +9,7 @@ RUN set -eu; \
     printf '%s  %s\n' \
       "${LIQUILENS_WHEEL_SHA256}" \
       /tmp/liquilens-evidence.whl \
-      | sha256sum --check; \
+      | sha256sum -c; \
     python -m venv /opt/liquilens; \
     /opt/liquilens/bin/python -m pip install \
       --disable-pip-version-check \
