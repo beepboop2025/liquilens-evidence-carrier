@@ -58,6 +58,12 @@ def main() -> int:
     assert "NotImplementedError" not in (
         ROOT / "examples/evidence_delivery_policy.py"
     ).read_text(encoding="utf-8")
+    assert (ROOT / "dbt_project.yml").read_bytes() == (
+        ROOT / "integrations/dbt/dbt_project.yml"
+    ).read_bytes()
+    assert (ROOT / "macros/test_liquilens_evidence_contract.sql").read_bytes() == (
+        ROOT / "integrations/dbt/macros/test_liquilens_evidence_contract.sql"
+    ).read_bytes()
     return 0
 
 

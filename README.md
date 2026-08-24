@@ -68,8 +68,9 @@ the canonical URLs for schema identity and discovery.
   context schema.
 - [`integrations/openlineage`](integrations/openlineage) contains the custom
   lineage facet schema.
-- [`integrations/dbt`](integrations/dbt) contains a dependency-free warehouse
-  data test that rejects stripped evidence semantics.
+- [`dbt_project.yml`](dbt_project.yml) and [`macros`](macros) make the repository
+  directly installable as a dbt package. The mirrored [`integrations/dbt`](integrations/dbt)
+  directory remains available for integration-bundle consumers.
 - [`protocol/verify_hash_tree_v1.mjs`](protocol/verify_hash_tree_v1.mjs) verifies
   content identities without trusting Python number formatting.
 
