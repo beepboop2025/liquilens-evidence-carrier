@@ -102,7 +102,7 @@ tag, then install the explicit opt-in plugin from the configured marketplace:
 
 ```bash
 codex plugin marketplace add beepboop2025/liquilens-evidence-carrier \
-  --ref plugin-v0.14.0
+  --ref plugin-v0.14.1
 codex plugin add liquilens-evidence@liquilens
 ```
 
