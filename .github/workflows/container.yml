@@ -153,8 +153,13 @@ jobs:
           curl --fail --location --silent --show-error \
             --output "$release_dir/$wheel_name" \
             "$release_base/$wheel_name"
-          wheel_sha="$(awk -v file="$wheel_name" '$2 == file {print $1}' "$release_dir/SHA256SUMS")"
-          test -n "$wheel_sha"
+          wheel_sha="$(awk -v file="$wheel_name" \
+            '$2 == file || $2 == "./" file {print $1}' \
+            "$release_dir/SHA256SUMS")"
+          if ! printf '%s\n' "$wheel_sha" | grep -Eq '^[0-9a-f]{64}$'; then
+            echo "release checksum manifest has no unique SHA-256 for $wheel_name" >&2
+            exit 1
+          fi
           printf '%s  %s\n' "$wheel_sha" "$release_dir/$wheel_name" \
             | sha256sum --check --strict
           gh attestation verify "$release_dir/$wheel_name" \
