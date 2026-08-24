@@ -64,6 +64,12 @@ def main() -> int:
     assert (ROOT / "macros/test_liquilens_evidence_contract.sql").read_bytes() == (
         ROOT / "integrations/dbt/macros/test_liquilens_evidence_contract.sql"
     ).read_bytes()
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert "https://pypi.org/project/liquilens-evidence/" not in readme
+    assert (
+        "releases/download/v0.13.5/"
+        "liquilens_evidence-0.13.5-py3-none-any.whl"
+    ) in readme
     release_workflow = (ROOT / ".github/workflows/release.yml").read_text(
         encoding="utf-8"
     )

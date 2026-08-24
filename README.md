@@ -1,7 +1,7 @@
 # LiquiLens Evidence Carrier
 
 [![CI](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/liquilens-evidence.svg)](https://pypi.org/project/liquilens-evidence/)
+[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.13.5)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 LiquiLens Evidence Carrier is a transport-neutral contract for moving financial
@@ -34,12 +34,14 @@ separately identified reference rather than silently upgraded.
 ## Install and verify
 
 ```bash
-python -m pip install liquilens-evidence
+python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.13.5/liquilens_evidence-0.13.5-py3-none-any.whl
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
 ```
 
+The release wheel has SHA-256
+`277317d588daa72de6bf966442a883c94665ae719f6888edbffc28e39018f14c`.
 The Python runtime has no third-party dependencies. A Node.js verifier is also
 included for cross-language `liquilens-hash-tree-v1` identity checks:
 
