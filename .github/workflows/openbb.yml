@@ -1,0 +1,61 @@
+name: OpenBB extension
+
+on:
+  pull_request:
+    paths:
+      - integrations/openbb/**
+      - .github/workflows/openbb.yml
+  push:
+    branches: [main]
+    paths:
+      - integrations/openbb/**
+      - .github/workflows/openbb.yml
+
+permissions:
+  contents: read
+
+jobs:
+  router:
+    name: router (Python ${{ matrix.python-version }})
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install exact current OpenBB extension floor
+        run: |
+          python -m pip install './integrations/openbb[test]'
+          python -m pip install --no-deps openbb==4.7.2
+      - name: Test the router and entry-point boundary
+        working-directory: integrations/openbb
+        run: |
+          python -m pytest
+          ruff check .
+      - name: Exercise the generated OpenBB Python interface
+        run: |
+          openbb-build --force
+          python integrations/openbb/tests/smoke_openbb_interface.py
+      - name: Build and inspect the standalone wheel
+        working-directory: integrations/openbb
+        run: |
+          python -m pip wheel --no-deps --wheel-dir dist .
+          python -m zipfile --list dist/*.whl
+      - name: Exercise public direct install at the exact main SHA
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          python -m venv /tmp/liquilens-openbb-public
+          /tmp/liquilens-openbb-public/bin/python -m pip install \
+            "git+https://github.com/${GITHUB_REPOSITORY}.git@${GITHUB_SHA}#subdirectory=integrations/openbb"
+          /tmp/liquilens-openbb-public/bin/python -m pip install --no-deps openbb==4.7.2
+          /tmp/liquilens-openbb-public/bin/openbb-build --force
+          /tmp/liquilens-openbb-public/bin/python \
+            integrations/openbb/tests/smoke_installed.py
+          /tmp/liquilens-openbb-public/bin/python \
+            integrations/openbb/tests/smoke_openbb_interface.py
