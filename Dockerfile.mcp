@@ -1,0 +1,33 @@
+ARG BASE_IMAGE="ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1"
+
+FROM ${BASE_IMAGE}
+
+ARG VERSION="0.14.0"
+ARG BUILD_REVISION="3c97b71093f8bca201e74bb5cc7ddbe50d9fa052"
+ARG RELEASE_REVISION="8683351bd72c2a4b46d6913cd5e75c5536a410f1"
+ARG CREATED="2026-08-24T13:19:09Z"
+ARG BASE_DIGEST="sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1"
+ARG README_URL="https://raw.githubusercontent.com/beepboop2025/liquilens-evidence-carrier/3c97b71093f8bca201e74bb5cc7ddbe50d9fa052/README.md"
+ARG MAINTAINERS='[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]'
+
+LABEL org.opencontainers.image.title="LiquiLens Evidence Carrier MCP" \
+      org.opencontainers.image.description="Offline read-only MCP verification and projection of local financial evidence carriers." \
+      org.opencontainers.image.created="${CREATED}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${BUILD_REVISION}" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/beepboop2025/liquilens-evidence-carrier" \
+      org.opencontainers.image.documentation="https://liquilens.in/protocol/" \
+      org.opencontainers.image.url="https://liquilens.in/protocol/" \
+      org.opencontainers.image.vendor="LiquiLens" \
+      org.opencontainers.image.base.name="ghcr.io/beepboop2025/liquilens-evidence-carrier" \
+      org.opencontainers.image.base.digest="${BASE_DIGEST}" \
+      io.liquilens.evidence.release.revision="${RELEASE_REVISION}" \
+      io.artifacthub.package.readme-url="${README_URL}" \
+      io.artifacthub.package.keywords="finance,evidence,provenance,mcp,offline,read-only" \
+      io.artifacthub.package.license="Apache-2.0" \
+      io.artifacthub.package.maintainers="${MAINTAINERS}" \
+      io.artifacthub.package.category="integration-delivery"
+
+ENTRYPOINT ["liquilens-evidence-mcp"]
+CMD ["--root", "/evidence"]
