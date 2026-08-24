@@ -1,0 +1,56 @@
+name: Nix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flake:
+    name: flake (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            system: x86_64-linux
+          - runner: ubuntu-22.04-arm
+            system: aarch64-linux
+          - runner: macos-15-intel
+            system: x86_64-darwin
+          - runner: macos-15
+            system: aarch64-darwin
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+      - name: Verify runner architecture
+        env:
+          EXPECTED_SYSTEM: ${{ matrix.system }}
+        run: test "$(nix eval --raw --impure --expr builtins.currentSystem)" = "$EXPECTED_SYSTEM"
+      - name: Build package and behavioral checks
+        run: nix flake check --print-build-logs
+      - name: Require a current committed lock
+        run: |
+          if ! git diff --exit-code -- flake.lock \
+            || test -n "$(git status --porcelain -- flake.lock)"; then
+            echo '::error::flake.lock is missing or stale'
+            sed -n '1,240p' flake.lock
+            exit 1
+          fi
+      - name: Exercise both local app entry points
+        run: |
+          nix run . -- --help
+          nix run .#mcp -- --help
+      - name: Exercise the public GitHub flake reference
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          nix run "github:${GITHUB_REPOSITORY}/${GITHUB_SHA}" -- --help
+          nix run "github:${GITHUB_REPOSITORY}/${GITHUB_SHA}#mcp" -- --help
