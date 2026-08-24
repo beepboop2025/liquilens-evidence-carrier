@@ -6,7 +6,9 @@ on:
       - "v*"
 
 permissions:
+  attestations: write
   contents: write
+  id-token: write
 
 jobs:
   signed-release:
@@ -49,6 +51,10 @@ jobs:
           cp protocol/liquilens-evidence-carrier-reference-v1.schema.json dist/
           cp integrations/fdc3/com.liquilens.evidence.schema.json dist/
           cp integrations/openlineage/liquilens-evidence-facet.schema.json dist/
+          version="${GITHUB_REF_NAME#v}"
+          uv run --locked --extra dev python scripts/build_mcpb.py \
+            --output "dist/liquilens-evidence-carrier-mcp-${version}.mcpb" \
+            --check-registry-metadata
           tar \
             --sort=name \
             --mtime="@$source_date_epoch" \
@@ -56,13 +62,21 @@ jobs:
             --group=0 \
             --numeric-owner \
             -czf "dist/liquilens-evidence-carrier-${GITHUB_REF_NAME#v}.tar.gz" \
-            LICENSE NOTICE README.md docs protocol integrations examples
+            LICENSE NOTICE README.md server.json mcpb docs protocol integrations examples
           (
             cd dist
             find . -maxdepth 1 -type f ! -name '.*' ! -name SHA256SUMS -print0 \
               | sort -z \
               | xargs -0 sha256sum > SHA256SUMS
           )
+      - name: Attest runnable and package release artifacts
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/liquilens_evidence-*.tar.gz
+            dist/liquilens-evidence-carrier-*.tar.gz
+            dist/*.mcpb
       - name: Publish public release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -70,4 +84,43 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --verify-tag \
             --title "LiquiLens Evidence Carrier ${GITHUB_REF_NAME#v}" \
-            --notes "Apache-2.0 public release of the portable, fail-closed evidence protocol, Python CLI, and integration kit. Carries no trading, recommendation, credit-rating, or third-party platform authority."
+            --notes "Apache-2.0 public release of the portable, fail-closed evidence protocol, Python CLI, offline MCP server and integration kit. Release packages carry GitHub build-provenance attestations and no trading, recommendation, credit-rating, or third-party platform authority."
+
+  mcp-registry:
+    needs: signed-release
+    runs-on: ubuntu-24.04
+    permissions:
+      attestations: read
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify released MCPB attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir released
+          gh release download "$GITHUB_REF_NAME" \
+            --pattern '*.mcpb' \
+            --dir released
+          gh attestation verify released/*.mcpb \
+            --repo "$GITHUB_REPOSITORY"
+      - name: Install pinned MCP publisher
+        run: |
+          curl --fail --location --silent --show-error \
+            --output mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            'mcp-publisher.tar.gz' \
+            | sha256sum --check --strict
+          tar --extract --gzip --file mcp-publisher.tar.gz mcp-publisher
+          ./mcp-publisher --version
+      - name: Validate Registry metadata
+        run: ./mcp-publisher validate server.json
+      - name: Authenticate to the official Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to the official MCP Registry
+        run: ./mcp-publisher publish server.json

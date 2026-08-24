@@ -67,9 +67,15 @@ def main() -> int:
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "https://pypi.org/project/liquilens-evidence/" not in readme
     assert (
-        "releases/download/v0.13.6/"
-        "liquilens_evidence-0.13.6-py3-none-any.whl"
+        f"releases/download/v{version}/liquilens_evidence-{version}-py3-none-any.whl"
     ) in readme
+    mcp_source = (ROOT / "src/liquilens_evidence/mcp_server.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'MCP_PROTOCOL_VERSION = "2026-07-28"' in mcp_source
+    assert 'MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"' in mcp_source
+    assert "to_openfigi_mapping_jobs" not in mcp_source
+    assert "requests" not in project["project"]["dependencies"]
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert "using: composite" in action
     assert "scripts/action_verify.py" in action

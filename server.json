@@ -1,0 +1,34 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.beepboop2025/liquilens-evidence-carrier",
+  "title": "LiquiLens Evidence Carrier",
+  "description": "Offline verification and rights-bounded projection of local LiquiLens evidence carrier JSON.",
+  "websiteUrl": "https://liquilens.in/protocol/",
+  "repository": {
+    "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+    "source": "github",
+    "id": "1344895874"
+  },
+  "version": "0.14.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "registryBaseUrl": "https://github.com",
+      "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens-evidence-carrier-mcp-0.14.0.mcpb",
+      "fileSha256": "e57e3039d7ae53b6feb3638dbc2f7ba413ff437e5c3a1b62172cad6f3b98e6ea",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "protocolVersions": [
+        "2026-07-28",
+        "2025-11-25"
+      ],
+      "networkAccess": false,
+      "financialAuthority": "none"
+    }
+  }
+}

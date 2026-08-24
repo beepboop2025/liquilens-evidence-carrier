@@ -1,7 +1,7 @@
 # LiquiLens Evidence Carrier
 
 [![CI](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.13.6)
+[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.14.0)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 LiquiLens Evidence Carrier is a transport-neutral contract for moving financial
@@ -34,7 +34,7 @@ separately identified reference rather than silently upgraded.
 ## Install and verify
 
 ```bash
-python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.13.6/liquilens_evidence-0.13.6-py3-none-any.whl
+python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
@@ -58,8 +58,42 @@ node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` |
 
 The current protocol is v1 and the current public implementation release is
-`0.13.6`. Pin production integrations to a signed tag or release checksum; use
+`0.14.0`. Pin production integrations to a signed tag or release checksum; use
 the canonical URLs for schema identity and discovery.
+
+## Offline MCP server
+
+The package includes a zero-third-party-dependency stdio server for agents that
+need to inspect local carrier JSON. It implements current stateless MCP
+`2026-07-28` (including `server/discover`) and the latest initialization-based
+revision, `2025-11-25`, for existing clients.
+
+```json
+{
+  "mcpServers": {
+    "liquilens-evidence-carrier": {
+      "command": "liquilens-evidence-mcp",
+      "args": ["--root", "/absolute/path/to/evidence"]
+    }
+  }
+}
+```
+
+The server exposes two read-only tools:
+
+- `verify_carrier` verifies the content identity, clocks, rights, and export
+  disposition of one explicit JSON path below the configured root.
+- `project_carrier` applies an existing rights-aware projection (`fdc3`,
+  `cloudevent`, `otel`, `openlineage`, `jsonld`, `csl`, `flat`, or `arrow`).
+
+It never fetches network data, expands restricted rights, recommends, rates
+credit, or executes a financial action. The GitHub release also carries a
+checksum-pinned
+[`liquilens-evidence-carrier-mcp-0.14.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens-evidence-carrier-mcp-0.14.0.mcpb)
+bundle for compatible desktop clients. Registry identity:
+`io.github.beepboop2025/liquilens-evidence-carrier`.
+
+<!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
 ## Integration kit
 
@@ -80,7 +114,7 @@ the canonical URLs for schema identity and discovery.
 Pin the reusable action to an exact release tag:
 
 ```yaml
-- uses: beepboop2025/liquilens-evidence-carrier@v0.13.6
+- uses: beepboop2025/liquilens-evidence-carrier@v0.14.0
   with:
     path: evidence/close.evidence.json
 ```
