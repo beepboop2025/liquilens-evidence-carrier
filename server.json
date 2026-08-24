@@ -13,7 +13,6 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "registryBaseUrl": "https://github.com",
       "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens-evidence-carrier-mcp-0.14.0.mcpb",
       "fileSha256": "e57e3039d7ae53b6feb3638dbc2f7ba413ff437e5c3a1b62172cad6f3b98e6ea",
       "transport": {

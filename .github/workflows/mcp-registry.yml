@@ -1,0 +1,56 @@
+name: Publish MCP Registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  attestations: read
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download and verify the declared MCPB
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(jq --raw-output '.version' server.json)"
+          identifier="$(jq --raw-output '.packages[0].identifier' server.json)"
+          expected="$(jq --raw-output '.packages[0].fileSha256' server.json)"
+          asset="${identifier##*/}"
+          case "$version" in
+            *[!0-9A-Za-z.-]*|'') exit 1 ;;
+          esac
+          case "$asset" in
+            *[!0-9A-Za-z._-]*|'') exit 1 ;;
+          esac
+          mkdir released
+          gh release download "v${version}" \
+            --pattern "$asset" \
+            --dir released
+          printf '%s  %s\n' "$expected" "released/$asset" \
+            | sha256sum --check --strict
+          gh attestation verify "released/$asset" \
+            --repo "$GITHUB_REPOSITORY"
+      - name: Install pinned MCP publisher
+        run: |
+          curl --fail --location --silent --show-error \
+            --output mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            'mcp-publisher.tar.gz' \
+            | sha256sum --check --strict
+          tar --extract --gzip --file mcp-publisher.tar.gz mcp-publisher
+          ./mcp-publisher --version
+      - name: Validate Registry metadata
+        run: ./mcp-publisher validate server.json
+      - name: Authenticate to the official Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to the official MCP Registry
+        run: ./mcp-publisher publish server.json
