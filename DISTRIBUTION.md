@@ -218,7 +218,20 @@ offline verifier for caller-supplied JSON, not a market-data provider.
 - Use the dbt project directly from a pinned Git revision until its dbt Hub
   submission is accepted.
 
-## Upstream review is not deployment
+## Upstream distribution state
+
+### Live or merged upstream
+
+- [Dev Containers community index #729](https://github.com/devcontainers/devcontainers.github.io/pull/729)
+  is merged, and the [Dev Container collections catalog](https://containers.dev/collections.html)
+  lists the LiquiLens Evidence Carrier Features collection.
+- [SchemaStore catalog #6238](https://github.com/SchemaStore/schemastore/pull/6238)
+  is merged for the Carrier and redacted-reference schemas.
+
+Fleet Brief v1 is not claimed as a SchemaStore listing; its follow-up entry
+waits for the canonical site schema to be deployed and verified.
+
+### Under external review
 
 These submissions are open for external review and are not described as live
 upstream listings:
@@ -229,13 +242,11 @@ upstream listings:
 - [Docker MCP Registry: Evidence Carrier #4766](https://github.com/docker/mcp-registry/pull/4766)
 - [Docker MCP Registry: Financial Evidence #4765](https://github.com/docker/mcp-registry/pull/4765)
 - [Awesome OpenBB #11](https://github.com/OpenBB-finance/awesome-openbb/pull/11)
-- [GitHub Awesome Copilot #2785](https://github.com/github/awesome-copilot/pull/2785)
-- [Dev Containers community index #729](https://github.com/devcontainers/devcontainers.github.io/pull/729)
 
-[SchemaStore catalog #6238](https://github.com/SchemaStore/schemastore/pull/6238)
-is merged for the Carrier and redacted-reference schemas. Fleet Brief v1 is not
-claimed as a SchemaStore listing; its follow-up entry waits for the canonical
-site schema to be deployed and verified.
+### Closed without listing
+
+- [GitHub Awesome Copilot #2785](https://github.com/github/awesome-copilot/pull/2785)
+  was closed without merge and is not represented as an upstream listing.
 
 Bloomberg, LSEG, FactSet, S&P Global, Nasdaq, and other proprietary financial
 platforms require their own entitlements, commercial validation, rights review,
