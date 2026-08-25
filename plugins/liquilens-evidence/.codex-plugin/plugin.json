@@ -1,6 +1,6 @@
 {
   "name": "liquilens-evidence",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Verify and rights-safely project local LiquiLens Evidence Carrier JSON.",
   "author": {
     "name": "LiquiLens",

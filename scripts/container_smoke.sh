@@ -2,7 +2,7 @@
 set -eu
 
 image_ref="${1:?usage: container_smoke.sh IMAGE [VERSION]}"
-expected_version="${2:-0.14.0}"
+expected_version="${2:-0.15.0}"
 smoke_dir="$(mktemp -d)"
 trap 'rm -rf -- "$smoke_dir"' EXIT HUP INT TERM
 chmod 0755 "$smoke_dir"
@@ -25,16 +25,43 @@ docker run --rm \
   verify carrier.json --as-of 2026-08-25T00:00:00Z \
   >"$smoke_dir/verification.json"
 
-python3 - "$smoke_dir/carrier.json" "$smoke_dir/verification.json" <<'PY'
+docker run --rm \
+  --network none \
+  --read-only \
+  --mount "type=bind,src=$smoke_dir,dst=/evidence,readonly" \
+  "$image_ref" \
+  issue-brief --liquilens carrier.json --as-of 2026-08-25T00:00:00Z \
+  >"$smoke_dir/fleet-brief.json"
+
+docker run --rm \
+  --network none \
+  --read-only \
+  --mount "type=bind,src=$smoke_dir,dst=/evidence,readonly" \
+  "$image_ref" \
+  verify-brief fleet-brief.json --as-of 2026-08-25T00:00:00Z \
+  >"$smoke_dir/brief-verification.json"
+
+python3 - \
+  "$smoke_dir/carrier.json" \
+  "$smoke_dir/verification.json" \
+  "$smoke_dir/brief-verification.json" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 carrier = json.loads(Path(sys.argv[1]).read_text())
 verification = json.loads(Path(sys.argv[2]).read_text())
+brief_verification = json.loads(Path(sys.argv[3]).read_text())
 assert carrier["carrier_id"].startswith("evidence_")
 assert verification["ok"] is True
 assert verification["export_disposition"] == "full"
+assert brief_verification["ok"] is True
+assert brief_verification["states"] == {
+    "liquilens": "full",
+    "seiche": "missing",
+    "undertow": "missing",
+    "palimpsest": "missing",
+}
 PY
 
 cat >"$smoke_dir/requests.ndjson" <<'EOF'
@@ -42,6 +69,7 @@ cat >"$smoke_dir/requests.ndjson" <<'EOF'
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"verify_carrier","arguments":{"path":"carrier.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"verify_fleet_brief","arguments":{"path":"fleet-brief.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
 EOF
 
 docker run --rm -i \
@@ -59,13 +87,14 @@ import sys
 from pathlib import Path
 
 responses = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
-assert [response["id"] for response in responses] == [1, 2, 3]
+assert [response["id"] for response in responses] == [1, 2, 3, 4]
 assert responses[0]["result"]["serverInfo"]["name"] == (
     "io.github.beepboop2025/liquilens-evidence-carrier"
 )
 assert [tool["name"] for tool in responses[1]["result"]["tools"]] == [
     "verify_carrier",
     "project_carrier",
+    "verify_fleet_brief",
 ]
 assert responses[2]["result"]["structuredContent"]["ok"] is True
 assert responses[2]["result"]["structuredContent"]["authority"] == {
@@ -74,6 +103,7 @@ assert responses[2]["result"]["structuredContent"]["authority"] == {
     "can_recommend": False,
     "is_credit_rating": False,
 }
+assert responses[3]["result"]["structuredContent"]["states"]["liquilens"] == "full"
 PY
 
 IMAGE_UNDER_TEST="$image_ref" EXPECTED_VERSION="$expected_version" python3 <<'PY'

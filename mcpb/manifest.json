@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "liquilens-evidence-carrier",
   "display_name": "LiquiLens Evidence Carrier",
-  "version": "0.14.0",
-  "description": "Offline, read-only verification and rights-bounded projection of local evidence carrier JSON.",
-  "long_description": "Verifies carrier identity, clocks, rights, and authority boundaries before producing transport-specific projections. It makes no network requests and cannot recommend, rate credit, or execute trades.",
+  "version": "0.15.0",
+  "description": "Offline, read-only verification of local evidence carriers and four-product fleet briefs.",
+  "long_description": "Verifies carrier and fleet-brief identities, clocks, rights, product boundaries, and authority boundaries before producing any existing transport projection. It makes no network requests and cannot recommend, rate credit, or execute trades.",
   "author": {
     "name": "LiquiLens",
     "url": "https://liquilens.in/protocol/"
@@ -45,6 +45,10 @@
     {
       "name": "project_carrier",
       "description": "Project one verified carrier through an existing rights-aware transport adapter."
+    },
+    {
+      "name": "verify_fleet_brief",
+      "description": "Verify one local content-addressed four-product fleet brief at its exact evaluation clock."
     }
   ],
   "tools_generated": false,
@@ -70,7 +74,7 @@
     "evidence_root": {
       "type": "directory",
       "title": "Evidence directory",
-      "description": "Directory containing carrier JSON files this read-only server may inspect.",
+      "description": "Directory containing carrier or fleet-brief JSON files this read-only server may inspect.",
       "required": true
     }
   }

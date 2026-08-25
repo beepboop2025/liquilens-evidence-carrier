@@ -463,39 +463,22 @@ def issue_evidence_carrier(
     return carrier
 
 
-def verify_evidence_carrier(
-    value: Mapping[str, Any],
+def _evaluate_disclosure(
+    carrier: Mapping[str, Any],
     *,
-    evaluated_at: datetime | None = None,
-    policy: EvidenceExportPolicy = STRICT_EXPORT_POLICY,
-) -> VerifiedEvidenceCarrier:
-    """Verify identity, clocks, rights, and the maximum safe disclosure."""
-
-    if not isinstance(policy, EvidenceExportPolicy):
-        raise TypeError("policy must be an EvidenceExportPolicy")
-    carrier = _mapping(value, "carrier")
-    _validate_shape(carrier)
-    digest = _carrier_digest(carrier)
-    if carrier["record_hash"] != digest:
-        raise EvidenceCarrierError("record_hash does not match the carrier payload")
-    if carrier["carrier_id"] != f"evidence_{digest[:24]}":
-        raise EvidenceCarrierError("carrier_id does not match record_hash")
-
-    instant = evaluated_at or datetime.now(UTC)
-    if not isinstance(instant, datetime):
-        raise TypeError("evaluated_at must be a datetime")
-    if instant.tzinfo is None or instant.utcoffset() is None:
-        raise ValueError("evaluated_at must be timezone-aware")
-    instant = instant.astimezone(UTC)
+    evaluated_at: datetime,
+    policy: EvidenceExportPolicy,
+) -> tuple[ExportDisposition, tuple[str, ...]]:
+    """Evaluate strict disclosure from fields retained by a carrier reference."""
 
     reasons: list[str] = []
     disposition = ExportDisposition.FULL
     knowledge_time = _utc(carrier["clocks"]["knowledge_time"], "clocks.knowledge_time")
     as_of = _utc(carrier["clocks"]["as_of"], "clocks.as_of")
-    if instant < knowledge_time:
+    if evaluated_at < knowledge_time:
         disposition = _more_restrictive(disposition, ExportDisposition.REJECT)
         reasons.append("evidence_not_yet_known")
-    elif instant < as_of:
+    elif evaluated_at < as_of:
         disposition = _more_restrictive(disposition, ExportDisposition.REJECT)
         reasons.append("evidence_as_of_in_future")
     rights = carrier["rights"]
@@ -533,11 +516,44 @@ def verify_evidence_carrier(
         reasons.append(f"claim_{carrier['claim']['status']}")
 
     expires_at_value = carrier["clocks"].get("expires_at")
-    if expires_at_value is not None and instant >= _utc(
+    if expires_at_value is not None and evaluated_at >= _utc(
         expires_at_value, "clocks.expires_at"
     ):
         disposition = _more_restrictive(disposition, policy.expired_disposition)
         reasons.append("evidence_expired")
+    return disposition, tuple(dict.fromkeys(reasons))
+
+
+def verify_evidence_carrier(
+    value: Mapping[str, Any],
+    *,
+    evaluated_at: datetime | None = None,
+    policy: EvidenceExportPolicy = STRICT_EXPORT_POLICY,
+) -> VerifiedEvidenceCarrier:
+    """Verify identity, clocks, rights, and the maximum safe disclosure."""
+
+    if not isinstance(policy, EvidenceExportPolicy):
+        raise TypeError("policy must be an EvidenceExportPolicy")
+    carrier = _mapping(value, "carrier")
+    _validate_shape(carrier)
+    digest = _carrier_digest(carrier)
+    if carrier["record_hash"] != digest:
+        raise EvidenceCarrierError("record_hash does not match the carrier payload")
+    if carrier["carrier_id"] != f"evidence_{digest[:24]}":
+        raise EvidenceCarrierError("carrier_id does not match record_hash")
+
+    instant = evaluated_at or datetime.now(UTC)
+    if not isinstance(instant, datetime):
+        raise TypeError("evaluated_at must be a datetime")
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("evaluated_at must be timezone-aware")
+    instant = instant.astimezone(UTC)
+
+    disposition, reasons = _evaluate_disclosure(
+        carrier,
+        evaluated_at=instant,
+        policy=policy,
+    )
 
     serialized = json.dumps(
         carrier,
@@ -549,7 +565,7 @@ def verify_evidence_carrier(
     return VerifiedEvidenceCarrier(
         carrier_json=serialized,
         disposition=disposition,
-        reason_codes=tuple(dict.fromkeys(reasons)),
+        reason_codes=reasons,
         policy_version=policy.version,
         _seal=_VERIFIED_CARRIER_SEAL,
     )

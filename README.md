@@ -1,7 +1,7 @@
 # LiquiLens Evidence Carrier
 
 [![CI](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml/badge.svg)](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v0.14.0)
+[![Release](https://img.shields.io/github/v/release/beepboop2025/liquilens-evidence-carrier)](https://github.com/beepboop2025/liquilens-evidence-carrier/releases)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 LiquiLens Evidence Carrier is a transport-neutral contract for moving financial
@@ -34,7 +34,12 @@ separately identified reference rather than silently upgraded.
 ## Install and verify
 
 ```bash
-python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl
+# Source checkout for the 0.15.0 release candidate
+uv sync --locked
+uv run liquilens-evidence --help
+
+# Available after the signed v0.15.0 release is published
+python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens_evidence-0.15.0-py3-none-any.whl
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
@@ -46,6 +51,7 @@ included for cross-language `liquilens-hash-tree-v1` identity checks:
 
 ```bash
 node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
+node protocol/verify_hash_tree_v1.mjs --artifact fleet-brief fleet-brief.json
 ```
 
 ## Canonical contracts
@@ -54,12 +60,39 @@ node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
 |---|---|
 | Full carrier | `https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json` |
 | Redacted reference | `https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json` |
+| Four-product fleet brief | `https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json` |
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` |
 
-The current protocol is v1 and the current public implementation release is
-`0.14.0`. Pin production integrations to a signed tag or release checksum; use
-the canonical URLs for schema identity and discovery.
+The current protocol is v1. This source tree is the `0.15.0` release candidate;
+it is not a public release until its signed tag, checksums, attestations, and
+served artifacts are verified. Pin production integrations to an actually
+published signed tag or release checksum; use the canonical URLs for schema
+identity and discovery.
+
+## Four-product fleet briefs
+
+`liquilens.fleet-brief.v1` bundles already-issued native carriers without
+flattening LiquiLens, Seiche, Undertow, and Palimpsest into one score. Each brief
+contains exactly one rights-aware section per product and explicitly preserves
+`full`, `metadata_only`, `unavailable`, `rejected`, or `missing` state.
+
+```bash
+liquilens-evidence issue-brief \
+  --liquilens ./liquilens.carrier.json \
+  --seiche ./seiche.carrier.json \
+  --undertow ./undertow.carrier.json \
+  --palimpsest ./palimpsest.carrier.json \
+  --as-of 2026-08-25T00:00:00Z > fleet-brief.json
+
+liquilens-evidence verify-brief fleet-brief.json \
+  --as-of 2026-08-25T00:00:00Z
+```
+
+Issuance performs no discovery or network fetch. A product mismatch, duplicate,
+unknown field, or tampered carrier fails closed. Rejected rights never disclose
+source metadata or payload. See
+[`docs/FLEET-BRIEF-V1.md`](docs/FLEET-BRIEF-V1.md) for the complete contract.
 
 ## Offline MCP server
 
@@ -79,17 +112,19 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The server exposes two read-only tools:
+The server exposes three read-only tools:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
 - `project_carrier` applies an existing rights-aware projection (`fdc3`,
   `cloudevent`, `otel`, `openlineage`, `jsonld`, `csl`, `flat`, or `arrow`).
+- `verify_fleet_brief` verifies one local four-product brief at its exact
+  recorded evaluation clock without returning embedded evidence bodies.
 
 It never fetches network data, expands restricted rights, recommends, rates
-credit, or executes a financial action. The GitHub release also carries a
-checksum-pinned
-[`liquilens-evidence-carrier-mcp-0.14.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens-evidence-carrier-mcp-0.14.0.mcpb)
+credit, or executes a financial action. Once published, the `v0.15.0` GitHub
+release is expected to carry the checksum-pinned
+[`liquilens-evidence-carrier-mcp-0.15.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens-evidence-carrier-mcp-0.15.0.mcpb)
 bundle for compatible desktop clients. Registry identity:
 `io.github.beepboop2025/liquilens-evidence-carrier`.
 
@@ -99,6 +134,8 @@ bundle for compatible desktop clients. Registry identity:
 
 - [`docs/EVIDENCE-CARRIER-V1.md`](docs/EVIDENCE-CARRIER-V1.md) defines the
   contract, rights routing, transports, and failure modes.
+- [`docs/FLEET-BRIEF-V1.md`](docs/FLEET-BRIEF-V1.md) defines deterministic,
+  rights-aware four-product briefs and their five explicit section states.
 - [`integrations/fdc3`](integrations/fdc3) contains the custom financial-desktop
   context schema.
 - [`integrations/openlineage`](integrations/openlineage) contains the custom
@@ -114,7 +151,7 @@ bundle for compatible desktop clients. Registry identity:
 Pin the reusable action to an exact release tag:
 
 ```yaml
-- uses: beepboop2025/liquilens-evidence-carrier@v0.14.0
+- uses: beepboop2025/liquilens-evidence-carrier@v0.15.0
   with:
     path: evidence/close.evidence.json
 ```
@@ -137,11 +174,12 @@ passes every matched file through `liquilens-evidence verify-files`.
 
 ## Provenance and license
 
-The four schemas in this repository are byte-identical to the artifacts in the
-signed LiquiLens Lab Engine `v0.13.5` release. Their SHA-256 values are recorded
-in [`protocol/catalog.json`](protocol/catalog.json). This public repository is
-the redistribution boundary for the carrier kit; private research code and
-datasets are not included.
+Protocol artifact SHA-256 values are recorded in
+[`protocol/catalog.json`](protocol/catalog.json). The original carrier,
+reference, FDC3, and OpenLineage contracts retain their established identities;
+the Fleet Brief v1 schema is additive. This public repository is the
+redistribution boundary for the carrier kit; private research code and datasets
+are not included.
 
 Code, schemas, documentation, and integration assets in this repository are
 licensed under [Apache‑2.0](LICENSE). Provider data carried inside an evidence

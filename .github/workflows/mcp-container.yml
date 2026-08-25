@@ -24,7 +24,7 @@ concurrency:
 env:
   BASE_DIGEST: sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1
   BASE_IMAGE: ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1
-  RELEASE_TAG: v0.14.0
+  RELEASE_TAG: v0.15.0
 
 jobs:
   dispatch-authority:
@@ -61,27 +61,45 @@ jobs:
             echo "revision=$(git rev-parse HEAD)"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >>"$GITHUB_OUTPUT"
-      - name: Build native smoke image
+      - name: Build source candidate CLI base
+        id: source_base
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
-          file: Dockerfile.mcp
           load: true
           platforms: linux/amd64
           push: false
-          tags: liquilens-evidence-carrier-mcp:smoke
+          tags: liquilens-evidence-carrier:pr-base
           build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-            BASE_DIGEST=${{ env.BASE_DIGEST }}
-            VERSION=0.14.0
-            BUILD_REVISION=${{ steps.source.outputs.revision }}
-            RELEASE_REVISION=8683351bd72c2a4b46d6913cd5e75c5536a410f1
+            VERSION=0.15.0
+            REVISION=${{ steps.source.outputs.revision }}
             CREATED=${{ steps.source.outputs.created }}
             README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
-          cache-from: type=gha,scope=mcp-container-pr
-          cache-to: type=gha,mode=max,scope=mcp-container-pr
+          cache-from: type=gha,scope=mcp-source-base-pr
+          cache-to: type=gha,mode=max,scope=mcp-source-base-pr
+      - name: Build native smoke MCP image from candidate base
+        id: candidate
+        run: |
+          base_digest="$(docker image inspect \
+            --format '{{.Id}}' liquilens-evidence-carrier:pr-base)"
+          docker build \
+            --file Dockerfile.mcp \
+            --build-arg BASE_IMAGE=liquilens-evidence-carrier:pr-base \
+            --build-arg BASE_DIGEST="$base_digest" \
+            --build-arg VERSION=0.15.0 \
+            --build-arg BUILD_REVISION=${{ steps.source.outputs.revision }} \
+            --build-arg RELEASE_REVISION=${{ steps.source.outputs.revision }} \
+            --build-arg CREATED=${{ steps.source.outputs.created }} \
+            --build-arg README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md \
+            --tag liquilens-evidence-carrier-mcp:smoke \
+            .
+          echo "base_digest=$base_digest" >>"$GITHUB_OUTPUT"
       - name: Exercise default offline MCP entrypoint
-        run: scripts/mcp_container_smoke.sh liquilens-evidence-carrier-mcp:smoke 0.14.0
+        env:
+          LIQUILENS_CLI_IMAGE: liquilens-evidence-carrier:pr-base
+          LIQUILENS_EXPECTED_BASE_DIGEST: ${{ steps.candidate.outputs.base_digest }}
+          LIQUILENS_EXPECTED_RELEASE_REVISION: ${{ steps.source.outputs.revision }}
+        run: scripts/mcp_container_smoke.sh liquilens-evidence-carrier-mcp:smoke 0.15.0
       - name: Build both release architectures
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -92,7 +110,7 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
             BASE_DIGEST=${{ env.BASE_DIGEST }}
-            VERSION=0.14.0
+            VERSION=0.15.0
             BUILD_REVISION=${{ steps.source.outputs.revision }}
             RELEASE_REVISION=8683351bd72c2a4b46d6913cd5e75c5536a410f1
             CREATED=${{ steps.source.outputs.created }}

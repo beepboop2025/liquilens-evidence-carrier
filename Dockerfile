@@ -1,19 +1,38 @@
-ARG VERSION="0.14.0"
+ARG VERSION="0.15.0"
 
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844 AS builder
 
 ARG VERSION
-ARG LIQUILENS_WHEEL_URL="https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl"
-ARG LIQUILENS_WHEEL_SHA256="f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24"
+ARG LIQUILENS_WHEEL_URL=""
+ARG LIQUILENS_WHEEL_SHA256=""
+
+WORKDIR /tmp/source
+COPY LICENSE NOTICE README.md pyproject.toml ./
+COPY docs ./docs
+COPY integrations ./integrations
+COPY protocol ./protocol
+COPY src ./src
 
 RUN set -eu; \
     wheel_path="/tmp/liquilens_evidence-${VERSION}-py3-none-any.whl"; \
-    wget --quiet --output-document="${wheel_path}" \
-      "${LIQUILENS_WHEEL_URL}"; \
-    printf '%s  %s\n' \
-      "${LIQUILENS_WHEEL_SHA256}" \
-      "${wheel_path}" \
-      | sha256sum -c; \
+    if test -n "${LIQUILENS_WHEEL_URL}"; then \
+      test -n "${LIQUILENS_WHEEL_SHA256}"; \
+      wget --quiet --output-document="${wheel_path}" \
+        "${LIQUILENS_WHEEL_URL}"; \
+      printf '%s  %s\n' \
+        "${LIQUILENS_WHEEL_SHA256}" \
+        "${wheel_path}" \
+        | sha256sum -c; \
+    else \
+      python -m pip wheel \
+        --disable-pip-version-check \
+        --no-cache-dir \
+        --no-deps \
+        --wheel-dir /tmp/wheels \
+        /tmp/source; \
+      cp "/tmp/wheels/liquilens_evidence-${VERSION}-py3-none-any.whl" \
+        "${wheel_path}"; \
+    fi; \
     python -m venv /opt/liquilens; \
     /opt/liquilens/bin/python -m pip install \
       --disable-pip-version-check \
@@ -32,7 +51,7 @@ ARG README_URL="https://raw.githubusercontent.com/beepboop2025/liquilens-evidenc
 ARG MAINTAINERS='[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]'
 
 LABEL org.opencontainers.image.title="LiquiLens Evidence Carrier" \
-      org.opencontainers.image.description="Offline verification and rights-bounded projection of financial evidence carriers." \
+      org.opencontainers.image.description="Offline verification of financial evidence carriers and four-product fleet briefs." \
       org.opencontainers.image.created="${CREATED}" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \

@@ -49,6 +49,7 @@ jobs:
           SOURCE_DATE_EPOCH="$source_date_epoch" uv build --out-dir dist
           cp protocol/liquilens-evidence-carrier-v1.schema.json dist/
           cp protocol/liquilens-evidence-carrier-reference-v1.schema.json dist/
+          cp protocol/liquilens-fleet-brief-v1.schema.json dist/
           cp integrations/fdc3/com.liquilens.evidence.schema.json dist/
           cp integrations/openlineage/liquilens-evidence-facet.schema.json dist/
           version="${GITHUB_REF_NAME#v}"

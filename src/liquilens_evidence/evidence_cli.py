@@ -25,6 +25,13 @@ from .evidence_carrier import (
     to_otel_log,
     verify_evidence_carrier,
 )
+from .fleet_brief import (
+    FLEET_BRIEF_MAX_BYTES,
+    FLEET_BRIEF_PRODUCTS,
+    VerifiedFleetBrief,
+    issue_fleet_brief,
+    verify_fleet_brief,
+)
 
 
 def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -36,22 +43,31 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def _read_json(path_text: str) -> dict[str, Any]:
+def _read_json(
+    path_text: str,
+    *,
+    max_bytes: int = EVIDENCE_CARRIER_MAX_BYTES,
+    artifact_name: str = "carrier",
+) -> dict[str, Any]:
     if path_text == "-":
-        raw = sys.stdin.buffer.read(EVIDENCE_CARRIER_MAX_BYTES + 1)
+        raw = sys.stdin.buffer.read(max_bytes + 1)
     else:
         path = Path(path_text)
         if not path.is_file():
             raise EvidenceCarrierError(f"JSON input is not a file: {path}")
-        if path.stat().st_size > EVIDENCE_CARRIER_MAX_BYTES:
-            raise EvidenceCarrierError("JSON input exceeds the carrier byte limit")
+        if path.stat().st_size > max_bytes:
+            raise EvidenceCarrierError(
+                f"JSON input exceeds the {artifact_name} byte limit"
+            )
         raw = path.read_bytes()
-    if len(raw) > EVIDENCE_CARRIER_MAX_BYTES:
-        raise EvidenceCarrierError("JSON input exceeds the carrier byte limit")
+    if len(raw) > max_bytes:
+        raise EvidenceCarrierError(f"JSON input exceeds the {artifact_name} byte limit")
     try:
         value = json.loads(raw, object_pairs_hook=_unique_object)
     except (json.JSONDecodeError, UnicodeDecodeError) as error:
-        raise EvidenceCarrierError("input is not valid unique-key UTF-8 JSON") from error
+        raise EvidenceCarrierError(
+            "input is not valid unique-key UTF-8 JSON"
+        ) from error
     if not isinstance(value, dict):
         raise EvidenceCarrierError("JSON input root must be an object")
     return value
@@ -141,9 +157,39 @@ def _verification_result(verified: VerifiedEvidenceCarrier) -> dict[str, Any]:
     }
 
 
-def _verify_paths(
-    path_texts: list[str], *, evaluated_at: datetime
+def _brief_verification_result(verified: VerifiedFleetBrief) -> dict[str, Any]:
+    brief = verified.brief
+    return {
+        "ok": True,
+        "brief_id": brief["brief_id"],
+        "record_hash": brief["record_hash"],
+        "evaluated_at": brief["evaluated_at"],
+        "states": verified.states,
+        "authority": brief["authority"],
+    }
+
+
+def _issue_brief_from_paths(
+    args: argparse.Namespace, evaluated_at: datetime
 ) -> dict[str, Any]:
+    carriers: dict[str, dict[str, Any] | None] = {}
+    for product in FLEET_BRIEF_PRODUCTS:
+        path_text = getattr(args, product)
+        if path_text is None:
+            carriers[product] = None
+            continue
+        if path_text == "-":
+            raise EvidenceCarrierError(
+                f"--{product} requires an explicit local carrier path, not stdin"
+            )
+        try:
+            carriers[product] = _read_json(path_text)
+        except EvidenceCarrierError as error:
+            raise EvidenceCarrierError(f"--{product} {path_text}: {error}") from error
+    return issue_fleet_brief(carriers=carriers, evaluated_at=evaluated_at)
+
+
+def _verify_paths(path_texts: list[str], *, evaluated_at: datetime) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     for path_text in path_texts:
         try:
@@ -198,16 +244,51 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     convert.add_argument("--as-of", help="UTC policy evaluation time ending in Z")
+
+    issue_brief = subcommands.add_parser(
+        "issue-brief",
+        help="issue a fleet brief from explicit local native carrier paths",
+    )
+    for product in FLEET_BRIEF_PRODUCTS:
+        issue_brief.add_argument(
+            f"--{product}",
+            metavar="PATH",
+            help=f"local {product} carrier JSON path; omit to record missing",
+        )
+    issue_brief.add_argument(
+        "--as-of",
+        required=True,
+        help="mandatory UTC policy evaluation time ending in Z",
+    )
+
+    verify_brief = subcommands.add_parser(
+        "verify-brief", help="verify a content-addressed fleet brief"
+    )
+    verify_brief.add_argument("input", help="fleet brief JSON path, or - for stdin")
+    verify_brief.add_argument(
+        "--as-of",
+        required=True,
+        help="UTC timestamp that must match the brief evaluation clock",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        if args.command == "verify-files":
-            output = _verify_paths(
-                args.inputs, evaluated_at=_evaluated_at(args.as_of)
+        if args.command == "issue-brief":
+            output = _issue_brief_from_paths(args, _evaluated_at(args.as_of))
+        elif args.command == "verify-brief":
+            brief = _read_json(
+                args.input,
+                max_bytes=FLEET_BRIEF_MAX_BYTES,
+                artifact_name="fleet brief",
             )
+            output = _brief_verification_result(
+                verify_fleet_brief(brief, evaluated_at=_evaluated_at(args.as_of))
+            )
+        elif args.command == "verify-files":
+            output = _verify_paths(args.inputs, evaluated_at=_evaluated_at(args.as_of))
         else:
             value = _read_json(args.input)
             if args.command == "issue":

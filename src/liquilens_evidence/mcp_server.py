@@ -32,6 +32,7 @@ from .evidence_carrier import (
     to_otel_log,
     verify_evidence_carrier,
 )
+from .fleet_brief import FLEET_BRIEF_MAX_BYTES, verify_fleet_brief
 from .protocol_resources import protocol_path
 
 MCP_PROTOCOL_VERSION = "2026-07-28"
@@ -43,7 +44,7 @@ _SERVER_INFO: dict[str, Any] = {
     "name": MCP_SERVER_NAME,
     "title": "LiquiLens Evidence Carrier",
     "version": __version__,
-    "description": "Offline verification and projection of local evidence carriers.",
+    "description": "Offline verification of local evidence carriers and fleet briefs.",
     "websiteUrl": "https://liquilens.in/protocol/",
 }
 _SERVER_CAPABILITIES: dict[str, Any] = {
@@ -51,10 +52,11 @@ _SERVER_CAPABILITIES: dict[str, Any] = {
     "tools": {"listChanged": False},
 }
 _INSTRUCTIONS = (
-    "Read-only and offline. Verify local carrier JSON before projection. "
+    "Read-only and offline. Verify local carrier or fleet-brief JSON. "
     "A valid carrier may still be non-exportable: preserve export_disposition, "
     "reason_codes, rights, clocks, and the all-false authority boundary. This "
-    "server does not fetch market data, recommend, rate credit, or execute trades."
+    "server does not fetch market data, combine product scores, recommend, rate "
+    "credit, or execute trades."
 )
 
 _PROJECTION_FORMATS = (
@@ -138,6 +140,39 @@ _TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "openWorldHint": False,
         },
     },
+    {
+        "name": "verify_fleet_brief",
+        "title": "Verify local LiquiLens fleet brief",
+        "description": (
+            "Verify one local, content-addressed fleet brief under the configured root. "
+            "Replays the exact recorded evaluation clock without fetching or mutating data."
+        ),
+        "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Fleet brief JSON path, relative to the allowed root or absolute within it.",
+                },
+                "evaluated_at": {
+                    "type": "string",
+                    "description": (
+                        "Required RFC 3339 UTC clock ending in Z; it must match the brief."
+                    ),
+                },
+            },
+            "required": ["path", "evaluated_at"],
+            "additionalProperties": False,
+        },
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    },
 ]
 
 _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
@@ -150,6 +185,11 @@ _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
         "Evidence Carrier reference schema",
         "liquilens-evidence-carrier-reference-v1.schema.json",
         "JSON Schema for rights-bounded metadata-only references.",
+    ),
+    "liquilens-evidence://protocol/fleet-brief-schema": (
+        "LiquiLens Fleet Brief schema",
+        "liquilens-fleet-brief-v1.schema.json",
+        "JSON Schema for four-product, rights-aware fleet briefs.",
     ),
     "liquilens-evidence://protocol/catalog": (
         "Evidence Carrier protocol catalog",
@@ -259,7 +299,13 @@ class EvidenceCarrierMCPServer:
         adapted = self._modern_result(result) if modern else self._legacy_result(result)
         return {"jsonrpc": "2.0", "id": request_id, "result": adapted}
 
-    def _resolve_carrier(self, path_value: Any) -> tuple[Path, dict[str, Any], int]:
+    def _resolve_json(
+        self,
+        path_value: Any,
+        *,
+        max_bytes: int,
+        artifact_name: str,
+    ) -> tuple[Path, dict[str, Any], int]:
         if not isinstance(path_value, str) or not path_value.strip():
             raise MCPInputError("path must be a non-blank string")
         if "\x00" in path_value:
@@ -269,32 +315,39 @@ class EvidenceCarrierMCPServer:
         try:
             resolved = candidate.resolve(strict=True)
         except OSError as error:
-            raise MCPInputError("carrier path is unavailable") from error
+            raise MCPInputError(f"{artifact_name} path is unavailable") from error
         if not resolved.is_relative_to(self.allowed_root):
-            raise MCPInputError("carrier path escapes the configured root")
+            raise MCPInputError(f"{artifact_name} path escapes the configured root")
         try:
             file_stat = resolved.stat()
         except OSError as error:
-            raise MCPInputError("carrier path cannot be inspected") from error
+            raise MCPInputError(f"{artifact_name} path cannot be inspected") from error
         if not stat.S_ISREG(file_stat.st_mode):
-            raise MCPInputError("carrier path is not a regular file")
-        if file_stat.st_size > EVIDENCE_CARRIER_MAX_BYTES:
-            raise MCPInputError("carrier JSON exceeds the one MiB byte limit")
+            raise MCPInputError(f"{artifact_name} path is not a regular file")
+        if file_stat.st_size > max_bytes:
+            raise MCPInputError(f"{artifact_name} JSON exceeds its byte limit")
         try:
             raw = resolved.read_bytes()
         except OSError as error:
-            raise MCPInputError("carrier JSON cannot be read") from error
-        if len(raw) > EVIDENCE_CARRIER_MAX_BYTES:
-            raise MCPInputError("carrier JSON exceeds the one MiB byte limit")
+            raise MCPInputError(f"{artifact_name} JSON cannot be read") from error
+        if len(raw) > max_bytes:
+            raise MCPInputError(f"{artifact_name} JSON exceeds its byte limit")
         try:
             value = json.loads(raw, object_pairs_hook=_unique_object)
         except (json.JSONDecodeError, UnicodeDecodeError) as error:
             raise MCPInputError(
-                "carrier input is not valid unique-key UTF-8 JSON"
+                f"{artifact_name} input is not valid unique-key UTF-8 JSON"
             ) from error
         if not isinstance(value, dict):
-            raise MCPInputError("carrier JSON root must be an object")
+            raise MCPInputError(f"{artifact_name} JSON root must be an object")
         return resolved, value, len(raw)
+
+    def _resolve_carrier(self, path_value: Any) -> tuple[Path, dict[str, Any], int]:
+        return self._resolve_json(
+            path_value,
+            max_bytes=EVIDENCE_CARRIER_MAX_BYTES,
+            artifact_name="carrier",
+        )
 
     def _verify_tool(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
         allowed = {"path", "evaluated_at"}
@@ -350,12 +403,44 @@ class EvidenceCarrierMCPServer:
             "authority": dict(verified.carrier["authority"]),
         }
 
+    def _verify_fleet_brief_tool(self, arguments: Mapping[str, Any]) -> dict[str, Any]:
+        allowed = {"path", "evaluated_at"}
+        extra = set(arguments) - allowed
+        if extra:
+            raise MCPInputError(
+                "verify_fleet_brief has unsupported arguments: "
+                + ", ".join(sorted(extra))
+            )
+        if "path" not in arguments or "evaluated_at" not in arguments:
+            raise MCPInputError("verify_fleet_brief requires path and evaluated_at")
+        if not isinstance(arguments["evaluated_at"], str):
+            raise MCPInputError("verify_fleet_brief evaluated_at must be explicit")
+        path, brief, byte_count = self._resolve_json(
+            arguments["path"],
+            max_bytes=FLEET_BRIEF_MAX_BYTES,
+            artifact_name="fleet brief",
+        )
+        evaluated_at = _evaluated_at(arguments["evaluated_at"])
+        verified = verify_fleet_brief(brief, evaluated_at=evaluated_at)
+        value = verified.brief
+        return {
+            "ok": True,
+            "brief_id": value["brief_id"],
+            "record_hash": value["record_hash"],
+            "states": verified.states,
+            "evaluated_at": value["evaluated_at"],
+            "source_path": str(path),
+            "source_bytes": byte_count,
+            "authority": dict(value["authority"]),
+        }
+
     def _tool_result(
         self, name: str, arguments: Mapping[str, Any]
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         handlers: dict[str, Callable[[Mapping[str, Any]], dict[str, Any]]] = {
             "project_carrier": self._project_tool,
             "verify_carrier": self._verify_tool,
+            "verify_fleet_brief": self._verify_fleet_brief_tool,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -367,7 +452,7 @@ class EvidenceCarrierMCPServer:
             return {
                 "resultType": "complete",
                 "content": [
-                    {"type": "text", "text": f"Carrier operation failed: {message}"}
+                    {"type": "text", "text": f"Evidence operation failed: {message}"}
                 ],
                 "structuredContent": {
                     "ok": False,
@@ -375,12 +460,15 @@ class EvidenceCarrierMCPServer:
                 },
                 "isError": True,
             }, None
-        summary = (
-            f"Verified {structured['carrier_id']}: "
-            f"export disposition {structured['export_disposition']}."
-        )
-        if name == "project_carrier":
-            summary += f" Projected as {structured['format']}."
+        if name == "verify_fleet_brief":
+            summary = f"Verified fleet brief {structured['brief_id']}."
+        else:
+            summary = (
+                f"Verified {structured['carrier_id']}: "
+                f"export disposition {structured['export_disposition']}."
+            )
+            if name == "project_carrier":
+                summary += f" Projected as {structured['format']}."
         return {
             "resultType": "complete",
             "content": [{"type": "text", "text": summary}],
@@ -649,7 +737,10 @@ class EvidenceCarrierMCPServer:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="liquilens-evidence-mcp",
-        description="Offline, read-only MCP server for local LiquiLens evidence carriers.",
+        description=(
+            "Offline, read-only MCP server for local LiquiLens evidence carriers "
+            "and fleet briefs."
+        ),
     )
     parser.add_argument(
         "--root",

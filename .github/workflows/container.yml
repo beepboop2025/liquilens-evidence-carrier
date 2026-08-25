@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Signed release tag to package, for example v0.14.0
+        description: Signed release tag to package, for example v0.15.0
         required: true
         type: string
 
@@ -69,14 +69,14 @@ jobs:
           push: false
           tags: liquilens-evidence-carrier:smoke
           build-args: |
-            VERSION=0.14.0
+            VERSION=0.15.0
             REVISION=${{ steps.source.outputs.revision }}
             CREATED=${{ steps.source.outputs.created }}
             README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
           cache-from: type=gha,scope=container-pr
           cache-to: type=gha,mode=max,scope=container-pr
       - name: Exercise offline CLI and MCP surfaces
-        run: scripts/container_smoke.sh liquilens-evidence-carrier:smoke 0.14.0
+        run: scripts/container_smoke.sh liquilens-evidence-carrier:smoke 0.15.0
       - name: Build both release architectures
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
@@ -84,7 +84,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           build-args: |
-            VERSION=0.14.0
+            VERSION=0.15.0
             REVISION=${{ steps.source.outputs.revision }}
             CREATED=${{ steps.source.outputs.created }}
             README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
@@ -203,7 +203,7 @@ jobs:
             README_URL=${{ steps.release.outputs.readme_url }}
           labels: |
             org.opencontainers.image.created=${{ steps.release.outputs.created }}
-            org.opencontainers.image.description=Offline verification and rights-bounded projection of financial evidence carriers.
+            org.opencontainers.image.description=Offline verification of financial evidence carriers and four-product fleet briefs.
             org.opencontainers.image.documentation=https://liquilens.in/protocol/
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
@@ -219,7 +219,7 @@ jobs:
             io.artifacthub.package.readme-url=${{ steps.release.outputs.readme_url }}
           annotations: |
             index:org.opencontainers.image.created=${{ steps.release.outputs.created }}
-            index:org.opencontainers.image.description=Offline verification and rights-bounded projection of financial evidence carriers.
+            index:org.opencontainers.image.description=Offline verification of financial evidence carriers and four-product fleet briefs.
             index:org.opencontainers.image.documentation=https://liquilens.in/protocol/
             index:org.opencontainers.image.licenses=Apache-2.0
             index:org.opencontainers.image.revision=${{ steps.release.outputs.revision }}

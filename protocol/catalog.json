@@ -1,6 +1,6 @@
 {
   "schema": "liquilens.evidence-carrier-catalog.v1",
-  "release": "0.14.0",
+  "release": "0.15.0",
   "license": "Apache-2.0",
   "artifacts": [
     {
@@ -14,6 +14,12 @@
       "path": "liquilens-evidence-carrier-reference-v1.schema.json",
       "canonical_url": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json",
       "sha256": "d54043bf11359749597bff7495b0fffe6ff8453a35144cee4a2bd69711fec7e8"
+    },
+    {
+      "name": "LiquiLens Fleet Brief v1",
+      "path": "liquilens-fleet-brief-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json",
+      "sha256": "aaf95337ff973dfbdda97e8ac63975a61b199e43854927404055fbeb52fc6058"
     },
     {
       "name": "LiquiLens FDC3 Evidence Context",

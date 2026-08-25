@@ -108,13 +108,23 @@
               --as-of 2026-08-24T12:00:00Z \
               > "$TMPDIR/verification.json"
             grep --fixed-strings '"ok": true' "$TMPDIR/verification.json"
+            liquilens-evidence issue-brief \
+              --liquilens "$TMPDIR/evidence/carrier.json" \
+              --as-of 2026-08-24T12:00:00Z \
+              > "$TMPDIR/evidence/fleet-brief.json"
+            liquilens-evidence verify-brief "$TMPDIR/evidence/fleet-brief.json" \
+              --as-of 2026-08-24T12:00:00Z \
+              > "$TMPDIR/brief-verification.json"
+            grep --fixed-strings '"seiche": "missing"' \
+              "$TMPDIR/brief-verification.json"
 
             printf '%s\n' \
-              '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"nix-flake-check","version":"0.14.0"}}}}' \
+              '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{},"io.modelcontextprotocol/clientInfo":{"name":"nix-flake-check","version":"0.15.0"}}}}' \
               | liquilens-evidence-mcp --root "$TMPDIR/evidence" \
               > "$TMPDIR/mcp-response.json"
             grep --fixed-strings '"verify_carrier"' "$TMPDIR/mcp-response.json"
             grep --fixed-strings '"project_carrier"' "$TMPDIR/mcp-response.json"
+            grep --fixed-strings '"verify_fleet_brief"' "$TMPDIR/mcp-response.json"
 
             touch "$out"
           '';

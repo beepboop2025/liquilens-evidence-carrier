@@ -258,6 +258,11 @@ export function verifyArtifactJson(text, artifactKind) {
     expectedHash = stringField(artifact, "record_hash");
     expectedId = stringField(artifact, "carrier_id");
     idPrefix = "evidence_";
+  } else if (artifactKind === "fleet-brief") {
+    payload = omitFields(artifact, new Set(["brief_id", "record_hash"]));
+    expectedHash = stringField(artifact, "record_hash");
+    expectedId = stringField(artifact, "brief_id");
+    idPrefix = "fleet_brief_";
   } else if (artifactKind === "value") {
     payload = artifact;
     expectedHash = null;

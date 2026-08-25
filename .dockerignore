@@ -1,2 +1,14 @@
 **
 !Dockerfile
+!LICENSE
+!NOTICE
+!README.md
+!pyproject.toml
+!docs/
+!docs/**
+!integrations/
+!integrations/**
+!protocol/
+!protocol/**
+!src/
+!src/**

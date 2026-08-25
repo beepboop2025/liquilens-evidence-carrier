@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ import jsonschema
 import pytest
 
 from liquilens_evidence.evidence_carrier import issue_evidence_carrier
+from liquilens_evidence.fleet_brief import issue_fleet_brief
 from liquilens_evidence.mcp_server import (
     MCP_LEGACY_PROTOCOL_VERSION,
     MCP_PROTOCOL_VERSION,
@@ -28,6 +30,18 @@ def _carrier_file(directory: Path, name: str = "carrier.json") -> Path:
     carrier = issue_evidence_carrier(**descriptor)
     path = directory / name
     path.write_text(json.dumps(carrier), encoding="utf-8")
+    return path
+
+
+def _brief_file(directory: Path, name: str = "fleet-brief.json") -> Path:
+    carrier_path = _carrier_file(directory, "fleet-brief-input.carrier.json")
+    carrier = json.loads(carrier_path.read_text())
+    brief = issue_fleet_brief(
+        carriers={"liquilens": carrier},
+        evaluated_at=datetime.fromisoformat(EVALUATED_AT),
+    )
+    path = directory / name
+    path.write_text(json.dumps(brief), encoding="utf-8")
     return path
 
 
@@ -65,6 +79,7 @@ def _result(response: dict[str, Any] | None) -> dict[str, Any]:
 
 def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
     carrier_path = _carrier_file(tmp_path)
+    brief_path = _brief_file(tmp_path)
     server = EvidenceCarrierMCPServer(tmp_path)
 
     discovered = _result(server.handle(_modern_request(1, "server/discover")))
@@ -82,6 +97,7 @@ def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
     assert [tool["name"] for tool in listed["tools"]] == [
         "verify_carrier",
         "project_carrier",
+        "verify_fleet_brief",
     ]
     assert all(tool["annotations"]["readOnlyHint"] for tool in listed["tools"])
     assert all(not tool["annotations"]["openWorldHint"] for tool in listed["tools"])
@@ -134,10 +150,34 @@ def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
     )
     assert projection["export_disposition"] == "full"
 
-    resources = _result(server.handle(_modern_request(5, "resources/list")))
-    assert len(resources["resources"]) == 3
+    brief_verified = _result(
+        server.handle(
+            _modern_request(
+                5,
+                "tools/call",
+                {
+                    "name": "verify_fleet_brief",
+                    "arguments": {
+                        "path": brief_path.name,
+                        "evaluated_at": EVALUATED_AT,
+                    },
+                },
+            )
+        )
+    )
+    assert brief_verified["isError"] is False
+    assert brief_verified["structuredContent"]["states"] == {
+        "liquilens": "full",
+        "seiche": "missing",
+        "undertow": "missing",
+        "palimpsest": "missing",
+    }
+    assert brief_verified["structuredContent"]["authority"]["can_execute"] is False
+
+    resources = _result(server.handle(_modern_request(6, "resources/list")))
+    assert len(resources["resources"]) == 4
     uri = resources["resources"][0]["uri"]
-    read = _result(server.handle(_modern_request(6, "resources/read", {"uri": uri})))
+    read = _result(server.handle(_modern_request(7, "resources/read", {"uri": uri})))
     assert json.loads(read["contents"][0]["text"])["$schema"].startswith(
         "https://json-schema.org/"
     )
@@ -170,7 +210,7 @@ def test_legacy_initialize_list_and_call(tmp_path: Path) -> None:
         server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     )
     assert "resultType" not in listed
-    assert len(listed["tools"]) == 2
+    assert len(listed["tools"]) == 3
 
     called = _result(
         server.handle(
@@ -236,6 +276,25 @@ def test_fail_closed_path_protocol_and_tool_errors(tmp_path: Path) -> None:
     assert unknown is not None
     assert unknown["error"]["code"] == -32602
 
+    brief_path = _brief_file(allowed_root)
+    implicit_clock = _result(
+        server.handle(
+            _modern_request(
+                5,
+                "tools/call",
+                {
+                    "name": "verify_fleet_brief",
+                    "arguments": {
+                        "path": brief_path.name,
+                        "evaluated_at": None,
+                    },
+                },
+            )
+        )
+    )
+    assert implicit_clock["isError"] is True
+    assert "must be explicit" in implicit_clock["content"][0]["text"]
+
 
 def test_stdio_is_newline_delimited_json_only(tmp_path: Path) -> None:
     carrier_path = _carrier_file(tmp_path)
@@ -284,7 +343,7 @@ def test_stdio_is_newline_delimited_json_only(tmp_path: Path) -> None:
 
 
 def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
-    first = tmp_path / "liquilens-evidence-carrier-mcp-0.14.0.mcpb"
+    first = tmp_path / "liquilens-evidence-carrier-mcp-0.15.0.mcpb"
     second = tmp_path / "second.mcpb"
     for output in (first, second):
         completed = subprocess.run(

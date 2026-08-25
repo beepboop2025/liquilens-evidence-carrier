@@ -25,8 +25,20 @@ from .evidence_carrier import (
     to_otel_log,
     verify_evidence_carrier,
 )
+from .fleet_brief import (
+    FLEET_BRIEF_CANONICALIZATION,
+    FLEET_BRIEF_MAX_BYTES,
+    FLEET_BRIEF_PRODUCTS,
+    FLEET_BRIEF_SCHEMA,
+    FLEET_BRIEF_SCHEMA_URL,
+    FleetBriefError,
+    FleetBriefState,
+    VerifiedFleetBrief,
+    issue_fleet_brief,
+    verify_fleet_brief,
+)
 
-__version__ = "0.14.0"
+__version__ = "0.15.0"
 
 __all__ = [
     "EVIDENCE_CARRIER_CANONICALIZATION",
@@ -36,12 +48,21 @@ __all__ = [
     "EVIDENCE_CARRIER_REFERENCE_SCHEMA_URL",
     "EVIDENCE_CARRIER_SCHEMA_URL",
     "EVIDENCE_CARRIER_SCHEMA_VERSION",
+    "FLEET_BRIEF_CANONICALIZATION",
+    "FLEET_BRIEF_MAX_BYTES",
+    "FLEET_BRIEF_PRODUCTS",
+    "FLEET_BRIEF_SCHEMA",
+    "FLEET_BRIEF_SCHEMA_URL",
     "STRICT_EXPORT_POLICY",
     "EvidenceCarrierError",
     "EvidenceExportPolicy",
     "ExportDisposition",
+    "FleetBriefError",
+    "FleetBriefState",
     "VerifiedEvidenceCarrier",
+    "VerifiedFleetBrief",
     "issue_evidence_carrier",
+    "issue_fleet_brief",
     "to_arrow_metadata",
     "to_cloudevent",
     "to_csl_json",
@@ -52,4 +73,5 @@ __all__ = [
     "to_openlineage_facet",
     "to_otel_log",
     "verify_evidence_carrier",
+    "verify_fleet_brief",
 ]

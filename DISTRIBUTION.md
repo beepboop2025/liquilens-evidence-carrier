@@ -5,9 +5,20 @@ called **live** only when an anonymous or otherwise public retrieval and a real
 runtime check have succeeded. An upstream pull request remains **under review**
 until its maintainer merges and deploys it.
 
-The immutable implementation release is `v0.14.0`. Later source revisions below
-add distribution adapters without changing that signed release. LiquiLens is
-not endorsed by the platforms or projects named here.
+The immutable public implementation release remains `v0.14.0`. This source tree
+is the `0.15.0` release candidate; its Fleet Brief contract and artifacts are
+**prepared, not published** until a signed tag, release checksums, registry
+updates, and runtime verification exist. LiquiLens is not endorsed by the
+platforms or projects named here.
+
+## Fleet Brief v1 release candidate
+
+`liquilens.fleet-brief.v1` adds one content-addressed section for each canonical
+producer without fetching native carriers or combining their scores. The
+package, CLI, and offline MCP server support local issuance/verification; the
+schema and examples are in `protocol/liquilens-fleet-brief-v1.schema.json` and
+`examples/fleet-brief/`. These source artifacts are not claimed as live on the
+public channels below until `v0.15.0` is actually released and verified.
 
 ## Python release and uvx
 

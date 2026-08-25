@@ -1,6 +1,6 @@
 # Run LiquiLens Evidence Carrier with Nix
 
-The repository is a directly runnable flake for the v0.14.0 verifier and
+The repository is a directly runnable flake for the v0.15.0 verifier and
 offline stdio MCP server. It requires no Python environment or package-registry
 account.
 
@@ -18,7 +18,7 @@ nix run github:beepboop2025/liquilens-evidence-carrier#mcp -- \
   --root /absolute/path/to/evidence
 ```
 
-Use the exact flake source that introduced the pinned v0.14.0 build for an
+Use the exact flake source that introduced the pinned v0.15.0 build for an
 immutable invocation:
 
 ```bash

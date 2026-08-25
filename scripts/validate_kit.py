@@ -45,7 +45,10 @@ def main() -> int:
         "https://liquilens.in/protocol/"
         "liquilens-evidence-carrier-reference-v1.schema.json"
     )
-    assert {full_url, reference_url} <= canonical_urls
+    fleet_brief_url = (
+        "https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json"
+    )
+    assert {full_url, reference_url, fleet_brief_url} <= canonical_urls
 
     for relative in (
         "integrations/fdc3/com.liquilens.evidence.schema.json",
@@ -69,6 +72,8 @@ def main() -> int:
     assert (
         f"releases/download/v{version}/liquilens_evidence-{version}-py3-none-any.whl"
     ) in readme
+    assert "liquilens.fleet-brief.v1" in readme
+    assert "liquilens-evidence issue-brief" in readme
     mcp_source = (ROOT / "src/liquilens_evidence/mcp_server.py").read_text(
         encoding="utf-8"
     )

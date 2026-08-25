@@ -13,12 +13,12 @@ test("the full release example receives exact identity proof", async () => {
   assert.equal(result.ok, true);
   assert.equal(result.kind, "full");
   assert.equal(result.proofLevel, "exact");
-  assert.equal(result.releaseVersion, "0.14.0");
+  assert.equal(result.releaseVersion, "0.15.0");
   assert.equal(result.disclosureAtDeclaredAsOf, "full");
   assert.equal(result.recordHash, result.computedHash);
   assert.equal(
     result.recordHash,
-    "0c1ba9b4c2184c6b1eb76ebfc8ffd1e85d3e040f0b2d348618292f71d119f376",
+    "efdf6ac07b022d2f41a292ba6b74be6548c07cc8a16b1a3223ca893c7c4b0a92",
   );
   assert.equal(result.checks.length, 6);
 });

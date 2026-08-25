@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liquilens-evidence"
-version = "0.14.0"
+version = "0.15.0"
 description = "Portable, fail-closed financial evidence provenance"
 readme = "README.md"
 license = "Apache-2.0"
@@ -58,7 +58,7 @@ liquilens_evidence = ["py.typed"]
 
 [tool.setuptools.data-files]
 "share/liquilens_evidence/protocol" = ["protocol/*.schema.json", "protocol/*.json", "protocol/*.mjs"]
-"share/liquilens_evidence/docs" = ["docs/EVIDENCE-CARRIER-V1.md"]
+"share/liquilens_evidence/docs" = ["docs/*.md"]
 "share/liquilens_evidence/integrations" = ["integrations/README.md"]
 "share/liquilens_evidence/integrations/dbt" = ["integrations/dbt/README.md", "integrations/dbt/dbt_project.yml"]
 "share/liquilens_evidence/integrations/dbt/macros" = ["integrations/dbt/macros/*.sql"]

@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json",
+  "title": "LiquiLens Fleet Brief v1",
+  "description": "A content-addressed, rights-aware envelope over independently issued native Evidence Carriers from the four canonical products. It contains no aggregate score and carries no financial authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "canonicalization",
+    "brief_id",
+    "record_hash",
+    "evaluated_at",
+    "sections",
+    "authority"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.fleet-brief.v1"},
+    "canonicalization": {"const": "liquilens-hash-tree-v1"},
+    "brief_id": {
+      "type": "string",
+      "pattern": "^fleet_brief_[0-9a-f]{24}$"
+    },
+    "record_hash": {"$ref": "#/$defs/sha256"},
+    "evaluated_at": {"$ref": "#/$defs/timestamp"},
+    "sections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["liquilens", "seiche", "undertow", "palimpsest"],
+      "properties": {
+        "liquilens": {
+          "allOf": [
+            {"$ref": "#/$defs/section"},
+            {"properties": {"product": {"const": "liquilens"}}}
+          ]
+        },
+        "seiche": {
+          "allOf": [
+            {"$ref": "#/$defs/section"},
+            {"properties": {"product": {"const": "seiche"}}}
+          ]
+        },
+        "undertow": {
+          "allOf": [
+            {"$ref": "#/$defs/section"},
+            {"properties": {"product": {"const": "undertow"}}}
+          ]
+        },
+        "palimpsest": {
+          "allOf": [
+            {"$ref": "#/$defs/section"},
+            {"properties": {"product": {"const": "palimpsest"}}}
+          ]
+        }
+      }
+    },
+    "authority": {"$ref": "#/$defs/authority"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "carrierId": {"type": "string", "pattern": "^evidence_[0-9a-f]{24}$"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "financial_authority",
+        "can_execute",
+        "can_recommend",
+        "is_credit_rating"
+      ],
+      "properties": {
+        "financial_authority": {"const": "none"},
+        "can_execute": {"const": false},
+        "can_recommend": {"const": false},
+        "is_credit_rating": {"const": false}
+      }
+    },
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "safeReference": {
+      "allOf": [
+        {
+          "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json"
+        },
+        {
+          "properties": {
+            "rights": {
+              "properties": {
+                "status": {"enum": ["licensed", "allowed", "metadata_only"]}
+              }
+            },
+            "policy_version": {"const": "liquilens-evidence-export-strict-v1"}
+          }
+        }
+      ]
+    },
+    "section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "state",
+        "carrier_id",
+        "record_hash",
+        "reason_codes",
+        "evidence"
+      ],
+      "properties": {
+        "product": {
+          "enum": ["liquilens", "seiche", "undertow", "palimpsest"]
+        },
+        "state": {
+          "enum": ["full", "metadata_only", "unavailable", "rejected", "missing"]
+        },
+        "carrier_id": {"type": ["string", "null"]},
+        "record_hash": {"type": ["string", "null"]},
+        "reason_codes": {"$ref": "#/$defs/reasonCodes"},
+        "evidence": {"type": ["object", "null"]}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "state": {"const": "full"},
+            "carrier_id": {"$ref": "#/$defs/carrierId"},
+            "record_hash": {"$ref": "#/$defs/sha256"},
+            "reason_codes": {"maxItems": 0},
+            "evidence": {
+              "$ref": "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
+            }
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "metadata_only"},
+            "carrier_id": {"$ref": "#/$defs/carrierId"},
+            "record_hash": {"$ref": "#/$defs/sha256"},
+            "reason_codes": {"minItems": 1},
+            "evidence": {
+              "allOf": [
+                {"$ref": "#/$defs/safeReference"},
+                {
+                  "properties": {
+                    "claim": {
+                      "properties": {
+                        "status": {
+                          "enum": [
+                            "observed",
+                            "derived",
+                            "structural",
+                            "research",
+                            "restricted"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "unavailable"},
+            "carrier_id": {"$ref": "#/$defs/carrierId"},
+            "record_hash": {"$ref": "#/$defs/sha256"},
+            "reason_codes": {
+              "minItems": 1,
+              "contains": {"const": "claim_unavailable"}
+            },
+            "evidence": {
+              "allOf": [
+                {"$ref": "#/$defs/safeReference"},
+                {
+                  "properties": {
+                    "claim": {
+                      "properties": {"status": {"const": "unavailable"}}
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "rejected"},
+            "carrier_id": {"$ref": "#/$defs/carrierId"},
+            "record_hash": {"$ref": "#/$defs/sha256"},
+            "reason_codes": {"minItems": 1},
+            "evidence": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "state": {"const": "missing"},
+            "carrier_id": {"type": "null"},
+            "record_hash": {"type": "null"},
+            "reason_codes": {
+              "prefixItems": [{"const": "carrier_missing"}],
+              "minItems": 1,
+              "maxItems": 1
+            },
+            "evidence": {"type": "null"}
+          }
+        }
+      ]
+    }
+  }
+}

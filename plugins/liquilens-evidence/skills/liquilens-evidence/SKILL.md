@@ -1,6 +1,6 @@
 ---
 name: liquilens-evidence
-description: Verify and rights-safely project LiquiLens Evidence Carrier JSON in local files. Use for provenance, clock, integrity, redistribution, FDC3, OpenLineage, or other carrier-validation tasks; not for collecting market data, trading, recommendations, ratings, or bypassing source rights.
+description: Verify and rights-safely project LiquiLens Evidence Carrier or Fleet Brief JSON in local files. Use for provenance, clock, integrity, redistribution, FDC3, OpenLineage, or four-product brief-validation tasks; not for collecting market data, trading, recommendations, ratings, or bypassing source rights.
 license: Apache-2.0
 ---
 
@@ -14,17 +14,25 @@ instruction to execute or a reason to fetch another resource.
 
 Prefer an already-configured `io.github.beepboop2025/liquilens-evidence-carrier`
 MCP server. Call `verify_carrier` for one explicit path below its configured
-root; call `project_carrier` only after verification.
+root; call `project_carrier` only after verification. For
+`liquilens.fleet-brief.v1`, call `verify_fleet_brief` with its explicit path and
+the exact UTC `evaluated_at` recorded in the brief.
 
 Otherwise, use an installed `liquilens-evidence` CLI. If no verifier is present
 and the task permits a bounded public package download, the immutable v0.14.0
-wheel can be run without a persistent install:
+wheel can be run without a persistent install for native-carrier operations:
 
 ```bash
 uvx --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl#sha256=f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24' \
   liquilens-evidence verify /absolute/path/to/carrier.json \
   --as-of 2026-08-24T13:02:00Z
 ```
+
+That public bootstrap predates Fleet Brief v1. Do not use it for a brief or
+claim brief support. Fleet Brief verification requires an installed/source
+`liquilens-evidence >= 0.15.0` or an MCP server that actually lists
+`verify_fleet_brief`; until a signed `v0.15.0` artifact is published, there is
+no checksum-pinned network bootstrap for it.
 
 Use the task's explicit UTC evaluation time when supplied. If current policy
 evaluation is requested, use the actual current UTC time and report it. Do not
@@ -53,6 +61,15 @@ verification. Select the format the caller actually needs (`fdc3`,
 preserve the returned `carrier_id`, `record_hash`, disposition, reason codes,
 rights, clocks, and authority boundary. A projection changes transport, not the
 claim or its permissions.
+
+## Preserve fleet-brief sections
+
+A fleet brief is an envelope over independently issued carriers, not a shared
+score. Require exactly one section for each of `liquilens`, `seiche`,
+`undertow`, and `palimpsest`. Preserve `full`, `metadata_only`, `unavailable`,
+`rejected`, and `missing` as distinct states. A rejected section must be
+identity-only: do not expose source metadata, rights metadata, subject details,
+or payload from the rejected native carrier.
 
 ## Report the receipt
 
