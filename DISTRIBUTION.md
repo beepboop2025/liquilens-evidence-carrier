@@ -66,11 +66,13 @@ disable network access:
 ```bash
 docker run --rm -i --network none --read-only \
   --mount "type=bind,src=$PWD/evidence,dst=/evidence,readonly" \
-  ghcr.io/beepboop2025/liquilens-evidence-carrier-mcp@sha256:d55f69e55e579603ae8b510de76b1191047427a92569424a17729ea7f7e3e2f7
+  ghcr.io/beepboop2025/liquilens-evidence-carrier-mcp@sha256:4e4ffb010b52375b3203b2dc43706c7fa508de2bf8368eca465f49d56392dcea
 ```
 
 Both indexes include `linux/amd64` and `linux/arm64` manifests, SBOMs, BuildKit
 provenance, OCI source metadata, and GitHub artifact attestations.
+The dedicated MCP index was published and smoke-tested without network access
+or a writable root in [run 32897003998](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/32897003998).
 
 ## MCP clients
 
