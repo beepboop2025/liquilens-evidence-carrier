@@ -19,20 +19,19 @@ root; call `project_carrier` only after verification. For
 the exact UTC `evaluated_at` recorded in the brief.
 
 Otherwise, use an installed `liquilens-evidence` CLI. If no verifier is present
-and the task permits a bounded public package download, the immutable v0.14.0
-wheel can be run without a persistent install for native-carrier operations:
+and the task permits a bounded public package download, the immutable v0.15.0
+wheel can be run without a persistent install for native-carrier or Fleet Brief
+operations:
 
 ```bash
-uvx --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl#sha256=f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24' \
+uvx --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens_evidence-0.15.0-py3-none-any.whl#sha256=5c7bddeb7a09668cc45fb81217126ee4a72192fa871c4cfe12fc9b688e0f59a0' \
   liquilens-evidence verify /absolute/path/to/carrier.json \
-  --as-of 2026-08-24T13:02:00Z
+  --as-of 2026-08-25T20:14:14Z
 ```
 
-That public bootstrap predates Fleet Brief v1. Do not use it for a brief or
-claim brief support. Fleet Brief verification requires an installed/source
-`liquilens-evidence >= 0.15.0` or an MCP server that actually lists
-`verify_fleet_brief`; until a signed `v0.15.0` artifact is published, there is
-no checksum-pinned network bootstrap for it.
+Fleet Brief verification requires `liquilens-evidence >= 0.15.0` or an MCP
+server that actually lists `verify_fleet_brief`. The command above is pinned to
+the signed release wheel and fails closed if its bytes change.
 
 Use the task's explicit UTC evaluation time when supplied. If current policy
 evaluation is requested, use the actual current UTC time and report it. Do not
