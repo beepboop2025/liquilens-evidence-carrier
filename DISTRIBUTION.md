@@ -5,29 +5,30 @@ called **live** only when an anonymous or otherwise public retrieval and a real
 runtime check have succeeded. An upstream pull request remains **under review**
 until its maintainer merges and deploys it.
 
-The immutable public implementation release remains `v0.14.0`. This source tree
-is the `0.15.0` release candidate; its Fleet Brief contract and artifacts are
-**prepared, not published** until a signed tag, release checksums, registry
-updates, and runtime verification exist. LiquiLens is not endorsed by the
-platforms or projects named here.
+The immutable public implementation release is `v0.15.0`, signed at commit
+`0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c`. Its release assets carry
+checksums and GitHub build-provenance attestations, and the official MCP
+Registry record is active and latest at `0.15.0`. LiquiLens is not endorsed by
+the platforms or projects named here.
 
-## Fleet Brief v1 release candidate
+## Fleet Brief v1
 
 `liquilens.fleet-brief.v1` adds one content-addressed section for each canonical
 producer without fetching native carriers or combining their scores. The
 package, CLI, and offline MCP server support local issuance/verification; the
 schema and examples are in `protocol/liquilens-fleet-brief-v1.schema.json` and
-`examples/fleet-brief/`. These source artifacts are not claimed as live on the
-public channels below until `v0.15.0` is actually released and verified.
+`examples/fleet-brief/`. They are published in the signed `v0.15.0` release.
+That makes the contract available; it does not claim that every product already
+emits a native carrier or that every downstream directory has indexed it.
 
 ## Python release and uvx
 
 The release wheel has SHA-256
-`f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24`.
+`5c7bddeb7a09668cc45fb81217126ee4a72192fa871c4cfe12fc9b688e0f59a0`.
 
 ```bash
 uvx --no-cache \
-  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl#sha256=f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24' \
+  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens_evidence-0.15.0-py3-none-any.whl#sha256=5c7bddeb7a09668cc45fb81217126ee4a72192fa871c4cfe12fc9b688e0f59a0' \
   liquilens-evidence --help
 ```
 
@@ -54,7 +55,7 @@ The CLI image is a public multi-platform image:
 
 ```bash
 docker run --rm \
-  ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1 \
+  ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a \
   --help
 ```
 
@@ -74,9 +75,9 @@ provenance, OCI source metadata, and GitHub artifact attestations.
 ## MCP clients
 
 The official MCP Registry entry is
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.14.0).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.15.0).
 The signed release also includes a checksum-pinned
-[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens-evidence-carrier-mcp-0.14.0.mcpb).
+[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens-evidence-carrier-mcp-0.15.0.mcpb).
 
 For direct stdio configuration:
 
@@ -203,8 +204,8 @@ offline verifier for caller-supplied JSON, not a market-data provider.
 ## Repository-native enforcement
 
 - Pin the GitHub Action with
-  `uses: beepboop2025/liquilens-evidence-carrier@v0.14.0`.
-- Configure the signed `v0.14.0` hook in `.pre-commit-config.yaml` to verify
+  `uses: beepboop2025/liquilens-evidence-carrier@v0.15.0`.
+- Configure the signed `v0.15.0` hook in `.pre-commit-config.yaml` to verify
   `*.evidence.json` and `*.carrier.json` before a commit lands.
 - Use the dbt project directly from a pinned Git revision until its dbt Hub
   submission is accepted.
@@ -215,7 +216,6 @@ These submissions are open for external review and are not described as live
 upstream listings:
 
 - [conda-forge staged recipe #34616](https://github.com/conda-forge/staged-recipes/pull/34616)
-- [SchemaStore catalog #6238](https://github.com/SchemaStore/schemastore/pull/6238)
 - [FINOS Labs FDC3 App Directory #40](https://github.com/finos-labs/FDC3-App-Directory/pull/40)
 - [dbt HubCap #446](https://github.com/dbt-labs/hubcap/pull/446)
 - [Docker MCP Registry: Evidence Carrier #4766](https://github.com/docker/mcp-registry/pull/4766)
@@ -223,6 +223,11 @@ upstream listings:
 - [Awesome OpenBB #11](https://github.com/OpenBB-finance/awesome-openbb/pull/11)
 - [GitHub Awesome Copilot #2785](https://github.com/github/awesome-copilot/pull/2785)
 - [Dev Containers community index #729](https://github.com/devcontainers/devcontainers.github.io/pull/729)
+
+[SchemaStore catalog #6238](https://github.com/SchemaStore/schemastore/pull/6238)
+is merged for the Carrier and redacted-reference schemas. Fleet Brief v1 is not
+claimed as a SchemaStore listing; its follow-up entry waits for the canonical
+site schema to be deployed and verified.
 
 Bloomberg, LSEG, FactSet, S&P Global, Nasdaq, and other proprietary financial
 platforms require their own entitlements, commercial validation, rights review,

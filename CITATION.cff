@@ -3,7 +3,7 @@ title: LiquiLens Evidence Carrier
 message: "If this protocol supports your research or infrastructure, cite this repository and the exact release."
 type: software
 version: 0.15.0
-date-released: 2026-08-24
+date-released: 2026-08-25
 authors:
   - name: LiquiLens
 repository-code: "https://github.com/beepboop2025/liquilens-evidence-carrier"
