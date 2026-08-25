@@ -3,9 +3,9 @@ set -eu
 
 image_ref="${1:?usage: mcp_container_smoke.sh MCP_IMAGE [VERSION]}"
 expected_version="${2:-0.15.0}"
-cli_image="${LIQUILENS_CLI_IMAGE:-ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1}"
-expected_base_digest="${LIQUILENS_EXPECTED_BASE_DIGEST:-sha256:9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1}"
-expected_release_revision="${LIQUILENS_EXPECTED_RELEASE_REVISION:-8683351bd72c2a4b46d6913cd5e75c5536a410f1}"
+cli_image="${LIQUILENS_CLI_IMAGE:-ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a}"
+expected_base_digest="${LIQUILENS_EXPECTED_BASE_DIGEST:-sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a}"
+expected_release_revision="${LIQUILENS_EXPECTED_RELEASE_REVISION:-0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c}"
 smoke_dir="$(mktemp -d)"
 trap 'rm -rf -- "$smoke_dir"' EXIT HUP INT TERM
 chmod 0755 "$smoke_dir"

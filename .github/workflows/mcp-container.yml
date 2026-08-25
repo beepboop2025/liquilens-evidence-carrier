@@ -288,6 +288,9 @@ jobs:
       - name: Smoke the published MCP digest
         env:
           EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+          LIQUILENS_CLI_IMAGE: ${{ env.BASE_IMAGE }}
+          LIQUILENS_EXPECTED_BASE_DIGEST: ${{ env.BASE_DIGEST }}
+          LIQUILENS_EXPECTED_RELEASE_REVISION: ${{ steps.release.outputs.release_revision }}
         run: |
           docker pull --platform linux/amd64 "$IMAGE@$EXPECTED_DIGEST"
           scripts/mcp_container_smoke.sh \
