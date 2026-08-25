@@ -94,14 +94,20 @@ For direct stdio configuration:
 
 ## Coding agents
 
-The public skill is pinned by the signed `skill-v0.14.0` tag:
+The Fleet-Brief-aware public skill is pinned by the signed `skill-v0.15.0` tag:
 
 ```bash
 npx --yes skills@1.5.23 add \
-  https://github.com/beepboop2025/liquilens-evidence-carrier/tree/skill-v0.14.0/skills/liquilens-evidence \
+  https://github.com/beepboop2025/liquilens-evidence-carrier/tree/skill-v0.15.0/skills/liquilens-evidence \
   --skill liquilens-evidence --agent codex --copy --yes
 ```
 
+An anonymous `skills@1.5.23` discovery found exactly one skill, and a clean
+project install matched SHA-256
+`adef1a05e047457b752543633536b4e857532b194bf83396175f3f625bc87379`.
+The source tag resolves to commit
+`afeb5ad9f7ab795a23882a9e714156c6aafd59c0`; the corresponding public CI
+receipt is [run 32896092859](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/32896092859).
 It is also discoverable on
 [`skills.sh`](https://skills.sh/beepboop2025/liquilens-evidence-carrier/liquilens-evidence).
 The skill verifies and rights-checks caller-supplied carriers; it does not
