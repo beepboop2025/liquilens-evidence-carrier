@@ -343,7 +343,8 @@ def test_stdio_is_newline_delimited_json_only(tmp_path: Path) -> None:
 
 
 def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
-    first = tmp_path / "liquilens-evidence-carrier-mcp-0.15.0.mcpb"
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    first = tmp_path / f"liquilens-evidence-carrier-mcp-{version}.mcpb"
     second = tmp_path / "second.mcpb"
     for output in (first, second):
         completed = subprocess.run(
@@ -366,6 +367,8 @@ def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
     with zipfile.ZipFile(first) as archive:
         assert "manifest.json" in archive.namelist()
         assert "src/liquilens_evidence/mcp_server.py" in archive.namelist()
+        assert json.loads(archive.read("manifest.json"))["version"] == version
+        assert f"versioned for `v{version}`" in archive.read("README.md").decode()
         archive.extractall(extracted)
     carrier_path = _carrier_file(tmp_path, "bundle-carrier.json")
     environment = dict(os.environ)

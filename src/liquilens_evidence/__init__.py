@@ -38,7 +38,7 @@ from .fleet_brief import (
     verify_fleet_brief,
 )
 
-__version__ = "0.15.0"
+__version__ = "0.16.0"
 
 __all__ = [
     "EVIDENCE_CARRIER_CANONICALIZATION",

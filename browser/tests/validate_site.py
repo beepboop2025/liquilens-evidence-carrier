@@ -124,11 +124,14 @@ def main() -> int:
     assert "prefers-reduced-motion" in stylesheet
     assert ":focus-visible" in stylesheet
 
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    source_version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     catalog = json.loads((ROOT / "protocol/catalog.json").read_text(encoding="utf-8"))
-    assert version == "0.15.0" == catalog["release"]
-    assert f'RELEASE_VERSION = "{version}"' in (SITE / "verifier.mjs").read_text()
-    assert re.search(rf"Release\s+{re.escape(version)}", text)
+    published_version = "0.15.0"
+    assert catalog["release"] == source_version
+    assert f'RELEASE_VERSION = "{published_version}"' in (
+        SITE / "verifier.mjs"
+    ).read_text()
+    assert re.search(rf"Release\s+{re.escape(published_version)}", text)
     assert (SITE / ".nojekyll").is_file()
     return 0
 

@@ -1,4 +1,4 @@
-ARG VERSION="0.15.0"
+ARG VERSION="0.16.0"
 
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844 AS builder
 
@@ -7,7 +7,7 @@ ARG LIQUILENS_WHEEL_URL=""
 ARG LIQUILENS_WHEEL_SHA256=""
 
 WORKDIR /tmp/source
-COPY LICENSE NOTICE README.md pyproject.toml ./
+COPY LICENSE NOTICE README.md CHANGELOG.md pyproject.toml ./
 COPY docs ./docs
 COPY integrations ./integrations
 COPY protocol ./protocol
@@ -45,9 +45,9 @@ RUN set -eu; \
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844
 
 ARG VERSION
-ARG REVISION="8683351bd72c2a4b46d6913cd5e75c5536a410f1"
-ARG CREATED="2026-08-24T12:43:34Z"
-ARG README_URL="https://raw.githubusercontent.com/beepboop2025/liquilens-evidence-carrier/8683351bd72c2a4b46d6913cd5e75c5536a410f1/README.md"
+ARG REVISION="source-checkout"
+ARG CREATED="1970-01-01T00:00:00Z"
+ARG README_URL="https://github.com/beepboop2025/liquilens-evidence-carrier#readme"
 ARG MAINTAINERS='[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]'
 
 LABEL org.opencontainers.image.title="LiquiLens Evidence Carrier" \

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liquilens-evidence"
-version = "0.15.0"
-description = "Portable, fail-closed financial evidence provenance"
+version = "0.16.0"
+description = "Portable, fail-closed financial evidence and fleet-brief provenance"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
@@ -13,7 +13,9 @@ authors = [{name = "LiquiLens"}]
 keywords = [
     "financial-evidence",
     "fdc3",
+    "fleet-brief",
     "lineage",
+    "mcp",
     "provenance",
     "openlineage",
 ]
@@ -35,6 +37,7 @@ Homepage = "https://liquilens.in/protocol/"
 Documentation = "https://github.com/beepboop2025/liquilens-evidence-carrier#readme"
 Repository = "https://github.com/beepboop2025/liquilens-evidence-carrier"
 Issues = "https://github.com/beepboop2025/liquilens-evidence-carrier/issues"
+Changelog = "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/main/CHANGELOG.md"
 
 [project.scripts]
 liquilens-evidence = "liquilens_evidence.evidence_cli:main"
@@ -58,7 +61,7 @@ liquilens_evidence = ["py.typed"]
 
 [tool.setuptools.data-files]
 "share/liquilens_evidence/protocol" = ["protocol/*.schema.json", "protocol/*.json", "protocol/*.mjs"]
-"share/liquilens_evidence/docs" = ["docs/*.md"]
+"share/liquilens_evidence/docs" = ["CHANGELOG.md", "docs/*.md"]
 "share/liquilens_evidence/integrations" = ["integrations/README.md"]
 "share/liquilens_evidence/integrations/dbt" = ["integrations/dbt/README.md", "integrations/dbt/dbt_project.yml"]
 "share/liquilens_evidence/integrations/dbt/macros" = ["integrations/dbt/macros/*.sql"]

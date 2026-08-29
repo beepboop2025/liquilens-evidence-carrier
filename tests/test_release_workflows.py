@@ -1,5 +1,6 @@
 """Release smoke tests bind to the same immutable carrier identity."""
 
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,3 +33,57 @@ def test_mcp_defaults_match_the_released_v015_base():
             "9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1"
             not in content
         )
+
+
+def test_candidate_container_smokes_take_version_from_source():
+    for relative in (
+        ".github/workflows/container.yml",
+        ".github/workflows/mcp-container.yml",
+    ):
+        workflow = (ROOT / relative).read_text(encoding="utf-8")
+        assert "echo \"version=$(cat VERSION)\"" in workflow
+        assert "${{ steps.source.outputs.version }}" in workflow
+
+
+def test_container_context_carries_every_root_package_input():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    data_files = project["tool"]["setuptools"]["data-files"]
+    root_package_data = {
+        pattern
+        for patterns in data_files.values()
+        for pattern in patterns
+        if "/" not in pattern
+    }
+    required = {
+        "LICENSE",
+        "NOTICE",
+        "README.md",
+        "pyproject.toml",
+        *root_package_data,
+    }
+
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    allowed = {
+        line.removeprefix("!")
+        for line in dockerignore.splitlines()
+        if line.startswith("!")
+    }
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    copied_to_source = {
+        source
+        for line in dockerfile.splitlines()
+        if line.startswith("COPY ") and line.endswith(" ./")
+        for source in line.removeprefix("COPY ").removesuffix(" ./").split()
+    }
+
+    assert required <= allowed
+    assert required <= copied_to_source
+
+
+def test_ci_and_release_replay_the_declared_mcpb_bytes():
+    for relative in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
+        workflow = (ROOT / relative).read_text(encoding="utf-8")
+        assert workflow.count("scripts/build_mcpb.py") >= 2
+        assert "--output \"$artifact\"" in workflow
+        assert "--output \"$replay\"" in workflow
+        assert "cmp --silent \"$artifact\" \"$replay\"" in workflow

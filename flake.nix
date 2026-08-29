@@ -44,7 +44,7 @@
           meta = {
             description = "Portable, fail-closed financial evidence provenance";
             homepage = "https://liquilens.in/protocol/";
-            changelog = "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/tag/v${version}";
+            changelog = "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/main/CHANGELOG.md";
             license = pkgs.lib.licenses.asl20;
             mainProgram = "liquilens-evidence";
             platforms = systems;

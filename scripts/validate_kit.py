@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
+import re
 import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED_VERSION = "0.15.0"
+PUBLISHED_REVISION = "0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c"
 
 
 def _json(path: Path) -> dict:
@@ -22,10 +26,82 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _package_version() -> str:
+    source = ROOT / "src/liquilens_evidence/__init__.py"
+    tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
+    versions = [
+        node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "__version__"
+            for target in node.targets
+        )
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    ]
+    assert len(versions) == 1, "expected one literal __version__ assignment"
+    return versions[0]
+
+
 def main() -> int:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     version = project["project"]["version"]
     assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == version
+    assert _package_version() == version
+
+    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+    local_packages = [
+        package
+        for package in lock["package"]
+        if package.get("name") == "liquilens-evidence"
+        and package.get("source") == {"editable": "."}
+    ]
+    assert len(local_packages) == 1
+    assert local_packages[0]["version"] == version
+
+    manifest = _json(ROOT / "mcpb/manifest.json")
+    registry = _json(ROOT / "server.json")
+    plugin = _json(ROOT / "plugins/liquilens-evidence/.codex-plugin/plugin.json")
+    assert manifest["version"] == version
+    assert registry["version"] == version
+    assert plugin["version"] == version
+    expected_mcpb = f"liquilens-evidence-carrier-mcp-{version}.mcpb"
+    package = registry["packages"][0]
+    assert package["identifier"] == (
+        "https://github.com/beepboop2025/liquilens-evidence-carrier/"
+        f"releases/download/v{version}/{expected_mcpb}"
+    )
+    assert re.fullmatch(r"[0-9a-f]{64}", package["fileSha256"])
+    assert registry["_meta"][
+        "io.modelcontextprotocol.registry/publisher-provided"
+    ] == {
+        "protocolVersions": ["2026-07-28", "2025-11-25"],
+        "networkAccess": False,
+        "financialAuthority": "none",
+    }
+    assert any(tool.get("name") == "verify_fleet_brief" for tool in manifest["tools"])
+    assert "fleet-brief" in manifest["keywords"]
+    assert "mcpServers" not in plugin
+    assert "fleet-brief" in plugin["keywords"]
+    assert "Fleet Brief verification" in plugin["interface"]["capabilities"]
+    assert any(
+        "Fleet Brief" in prompt for prompt in plugin["interface"]["defaultPrompt"]
+    )
+    assert (
+        ROOT / "skills/liquilens-evidence/SKILL.md"
+    ).read_bytes() == (
+        ROOT / "plugins/liquilens-evidence/skills/liquilens-evidence/SKILL.md"
+    ).read_bytes()
+
+    citation = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
+    assert re.search(rf"^version: {re.escape(version)}$", citation, re.MULTILINE)
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert dockerfile.startswith(f'ARG VERSION="{version}"\n')
+    assert 'ARG REVISION="source-checkout"' in dockerfile
+    assert 'ARG CREATED="1970-01-01T00:00:00Z"' in dockerfile
+    devcontainer = _json(ROOT / ".devcontainer/devcontainer.json")
+    assert devcontainer["build"]["args"] == {"VERSION": version}
 
     catalog = _json(ROOT / "protocol/catalog.json")
     assert catalog["release"] == version
@@ -69,11 +145,32 @@ def main() -> int:
     ).read_bytes()
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert "https://pypi.org/project/liquilens-evidence/" not in readme
-    assert (
-        f"releases/download/v{version}/liquilens_evidence-{version}-py3-none-any.whl"
-    ) in readme
+    published_wheel = (
+        f"releases/download/v{PUBLISHED_VERSION}/"
+        f"liquilens_evidence-{PUBLISHED_VERSION}-py3-none-any.whl"
+    )
+    assert published_wheel in readme
+    assert f"This source tree is versioned for `v{version}`" in readme
+    assert "a source version alone is not\npublication proof" in readme
+    assert PUBLISHED_REVISION in readme
+    if version != PUBLISHED_VERSION:
+        candidate_wheel = (
+            f"releases/download/v{version}/"
+            f"liquilens_evidence-{version}-py3-none-any.whl"
+        )
+        assert candidate_wheel not in readme
     assert "liquilens.fleet-brief.v1" in readme
     assert "liquilens-evidence issue-brief" in readme
+    distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
+    assert f"immutable public implementation release is `v{PUBLISHED_VERSION}`" in (
+        distribution
+    )
+    assert f"source is preparing `v{version}`" in distribution
+    assert PUBLISHED_REVISION in distribution
+    assert (ROOT / "CHANGELOG.md").is_file()
+    assert project["tool"]["setuptools"]["data-files"][
+        "share/liquilens_evidence/docs"
+    ] == ["CHANGELOG.md", "docs/*.md"]
     mcp_source = (ROOT / "src/liquilens_evidence/mcp_server.py").read_text(
         encoding="utf-8"
     )
@@ -91,6 +188,8 @@ def main() -> int:
         encoding="utf-8"
     )
     assert "! -name '.*' ! -name SHA256SUMS" in release_workflow
+    assert "cmp --silent" in release_workflow
+    assert "LICENSE NOTICE README.md CHANGELOG.md server.json" in release_workflow
     return 0
 
 
