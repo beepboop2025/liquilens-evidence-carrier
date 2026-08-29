@@ -34,11 +34,11 @@ separately identified reference rather than silently upgraded.
 ## Install and verify
 
 ```bash
-# Source checkout for the 0.15.0 release candidate
+# Source checkout for the published 0.15.0 line
 uv sync --locked
 uv run liquilens-evidence --help
 
-# Available after the signed v0.15.0 release is published
+# Signed v0.15.0 release
 python -m pip install https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens_evidence-0.15.0-py3-none-any.whl
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
@@ -64,11 +64,12 @@ node protocol/verify_hash_tree_v1.mjs --artifact fleet-brief fleet-brief.json
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` |
 
-The current protocol is v1. This source tree is the `0.15.0` release candidate;
-it is not a public release until its signed tag, checksums, attestations, and
-served artifacts are verified. Pin production integrations to an actually
-published signed tag or release checksum; use the canonical URLs for schema
-identity and discovery.
+The current protocol is v1. The immutable `v0.15.0` release is published at
+commit `0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c` with checksums,
+attestations, and an active official MCP Registry record. This branch also
+contains later documentation and verification-state updates, so production
+integrations should still pin the signed tag or an exact release checksum; use
+the canonical URLs for schema identity and discovery.
 
 ## Four-product fleet briefs
 
@@ -122,11 +123,11 @@ The server exposes three read-only tools:
   recorded evaluation clock without returning embedded evidence bodies.
 
 It never fetches network data, expands restricted rights, recommends, rates
-credit, or executes a financial action. Once published, the `v0.15.0` GitHub
-release is expected to carry the checksum-pinned
+credit, or executes a financial action. The published `v0.15.0` GitHub release
+carries the checksum-pinned
 [`liquilens-evidence-carrier-mcp-0.15.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens-evidence-carrier-mcp-0.15.0.mcpb)
 bundle for compatible desktop clients. Registry identity:
-`io.github.beepboop2025/liquilens-evidence-carrier`.
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.15.0).
 
 <!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
