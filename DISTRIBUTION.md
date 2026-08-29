@@ -5,16 +5,16 @@ called **live** only when an anonymous or otherwise public retrieval and a real
 runtime check have succeeded. An upstream pull request remains **under review**
 until its maintainer merges and deploys it.
 
-The immutable public implementation release is `v0.15.0`, signed at commit
-`0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c`. Its release assets carry
+The current core implementation release is `v0.16.0`, signed at commit
+`410f7d91114fba715e9a9ae830faa775064a4502`. Its release assets carry
 checksums and GitHub build-provenance attestations. At the 2026-08-29 evidence
 checkpoint, the official MCP Registry record was verified active and latest at
-`0.15.0`. LiquiLens is not endorsed by the platforms or projects named here.
+`0.16.0`.
 
-The repository source is preparing `v0.16.0`, but no `v0.16.0` tag, release
-asset, Registry version, container, skill tag, or plugin tag is claimed live by
-this document. The matrix below intentionally continues to describe the
-independently verified `v0.15.0` channels until those release gates pass.
+Core publication does not automatically update the independently released OCI,
+Nix, browser, Agent Skill, Codex-plugin, or external-directory channels. The
+matrix below keeps each channel at its own receipt-backed version. LiquiLens is
+not endorsed by the platforms or projects named here.
 
 ## Fleet Brief v1
 
@@ -22,18 +22,18 @@ independently verified `v0.15.0` channels until those release gates pass.
 producer without fetching native carriers or combining their scores. The
 package, CLI, and offline MCP server support local issuance/verification; the
 schema and examples are in `protocol/liquilens-fleet-brief-v1.schema.json` and
-`examples/fleet-brief/`. They are published in the signed `v0.15.0` release.
+`examples/fleet-brief/`. They are included in the signed `v0.16.0` release.
 That makes the contract available; it does not claim that every product already
 emits a native carrier or that every downstream directory has indexed it.
 
 ## Python release and uvx
 
-The release wheel has SHA-256
-`5c7bddeb7a09668cc45fb81217126ee4a72192fa871c4cfe12fc9b688e0f59a0`.
+The `v0.16.0` release wheel has SHA-256
+`317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11`.
 
 ```bash
 uvx --no-cache \
-  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens_evidence-0.15.0-py3-none-any.whl#sha256=5c7bddeb7a09668cc45fb81217126ee4a72192fa871c4cfe12fc9b688e0f59a0' \
+  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens_evidence-0.16.0-py3-none-any.whl#sha256=317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11' \
   liquilens-evidence --help
 ```
 
@@ -82,9 +82,9 @@ or a writable root in [run 32897003998](https://github.com/beepboop2025/liquilen
 ## MCP clients
 
 The official MCP Registry entry is
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.15.0).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.16.0).
 The signed release also includes a checksum-pinned
-[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.15.0/liquilens-evidence-carrier-mcp-0.15.0.mcpb).
+[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens-evidence-carrier-mcp-0.16.0.mcpb).
 
 For direct stdio configuration:
 
@@ -217,8 +217,8 @@ offline verifier for caller-supplied JSON, not a market-data provider.
 ## Repository-native enforcement
 
 - Pin the GitHub Action with
-  `uses: beepboop2025/liquilens-evidence-carrier@v0.15.0`.
-- Configure the signed `v0.15.0` hook in `.pre-commit-config.yaml` to verify
+  `uses: beepboop2025/liquilens-evidence-carrier@v0.16.0`.
+- Configure the signed `v0.16.0` hook in `.pre-commit-config.yaml` to verify
   `*.evidence.json` and `*.carrier.json` before a commit lands.
 - Use the dbt project directly from a pinned Git revision until its dbt Hub
   submission is accepted.
