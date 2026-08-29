@@ -30,12 +30,16 @@ def _version() -> str:
     return version
 
 
-def _archive_files() -> list[tuple[Path, str]]:
+def _archive_files(version: str) -> list[tuple[Path, str]]:
+    # A release README is part of the immutable MCPB byte contract. Keep it
+    # separate from the repository README so truthful post-release status
+    # updates do not silently redefine an already-published bundle.
+    release_readme = ROOT / "mcpb/release-readmes" / f"{version}.md"
     files: list[tuple[Path, str]] = [
         (ROOT / "mcpb/manifest.json", "manifest.json"),
         (ROOT / "LICENSE", "LICENSE"),
         (ROOT / "NOTICE", "NOTICE"),
-        (ROOT / "README.md", "README.md"),
+        (release_readme, "README.md"),
     ]
     files.extend(
         (path, path.relative_to(ROOT).as_posix())
@@ -66,7 +70,7 @@ def build(output: Path) -> str:
     with zipfile.ZipFile(
         output, mode="w", compression=zipfile.ZIP_DEFLATED, compresslevel=9
     ) as archive:
-        for source, archive_name in _archive_files():
+        for source, archive_name in _archive_files(version):
             info = zipfile.ZipInfo(archive_name, date_time=FIXED_ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.create_system = 3

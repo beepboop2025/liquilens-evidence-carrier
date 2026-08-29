@@ -11,8 +11,18 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PUBLISHED_VERSION = "0.15.0"
-PUBLISHED_REVISION = "0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c"
+PUBLISHED_VERSION = "0.16.0"
+PUBLISHED_REVISION = "410f7d91114fba715e9a9ae830faa775064a4502"
+PUBLISHED_WORKFLOW = "33261143612"
+PUBLISHED_WHEEL_SHA256 = (
+    "317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11"
+)
+PUBLISHED_MCPB_SHA256 = (
+    "c44b13b2efc4622a8ecfc06848f32358982dd2a9458a271e1ed77d646791961a"
+)
+PUBLISHED_README_SHA256 = (
+    "10706d94c666c9376bd212ec31bb9206b7e1b697ed6529ac2b6dc647c9f4b28d"
+)
 
 
 def _json(path: Path) -> dict:
@@ -153,6 +163,14 @@ def main() -> int:
     assert f"This source tree is versioned for `v{version}`" in readme
     assert "a source version alone is not\npublication proof" in readme
     assert PUBLISHED_REVISION in readme
+    assert PUBLISHED_WORKFLOW in readme
+    assert PUBLISHED_WHEEL_SHA256 in readme
+    assert PUBLISHED_MCPB_SHA256 in readme
+    assert (
+        f"registry.modelcontextprotocol.io/v0.1/servers/"
+        "io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/"
+        f"{PUBLISHED_VERSION}"
+    ) in readme
     if version != PUBLISHED_VERSION:
         candidate_wheel = (
             f"releases/download/v{version}/"
@@ -162,12 +180,27 @@ def main() -> int:
     assert "liquilens.fleet-brief.v1" in readme
     assert "liquilens-evidence issue-brief" in readme
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
-    assert f"immutable public implementation release is `v{PUBLISHED_VERSION}`" in (
+    assert f"current core implementation release is `v{PUBLISHED_VERSION}`" in (
         distribution
     )
-    assert f"source is preparing `v{version}`" in distribution
     assert PUBLISHED_REVISION in distribution
-    assert (ROOT / "CHANGELOG.md").is_file()
+    assert PUBLISHED_WHEEL_SHA256 in distribution
+    assert f"versions/{PUBLISHED_VERSION}" in distribution
+    release_record = (ROOT / f"docs/RELEASE-{PUBLISHED_VERSION}.md").read_text(
+        encoding="utf-8"
+    )
+    assert "signed, published, attested, and active" in release_record
+    assert PUBLISHED_REVISION in release_record
+    assert PUBLISHED_WORKFLOW in release_record
+    assert PUBLISHED_WHEEL_SHA256 in release_record
+    assert PUBLISHED_MCPB_SHA256 in release_record
+    assert "not tagged, published, or registered" not in release_record
+    release_readme = ROOT / "mcpb/release-readmes" / f"{PUBLISHED_VERSION}.md"
+    assert _sha256(release_readme) == PUBLISHED_README_SHA256
+    assert release_readme.read_bytes() != (ROOT / "README.md").read_bytes()
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## [{PUBLISHED_VERSION}] - 2026-08-29" in changelog
+    assert PUBLISHED_REVISION in changelog
     assert project["tool"]["setuptools"]["data-files"][
         "share/liquilens_evidence/docs"
     ] == ["CHANGELOG.md", "docs/*.md"]
