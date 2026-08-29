@@ -1,5 +1,6 @@
 """Release smoke tests bind to the same immutable carrier identity."""
 
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,6 +43,41 @@ def test_candidate_container_smokes_take_version_from_source():
         workflow = (ROOT / relative).read_text(encoding="utf-8")
         assert "echo \"version=$(cat VERSION)\"" in workflow
         assert "${{ steps.source.outputs.version }}" in workflow
+
+
+def test_container_context_carries_every_root_package_input():
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    data_files = project["tool"]["setuptools"]["data-files"]
+    root_package_data = {
+        pattern
+        for patterns in data_files.values()
+        for pattern in patterns
+        if "/" not in pattern
+    }
+    required = {
+        "LICENSE",
+        "NOTICE",
+        "README.md",
+        "pyproject.toml",
+        *root_package_data,
+    }
+
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
+    allowed = {
+        line.removeprefix("!")
+        for line in dockerignore.splitlines()
+        if line.startswith("!")
+    }
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+    copied_to_source = {
+        source
+        for line in dockerfile.splitlines()
+        if line.startswith("COPY ") and line.endswith(" ./")
+        for source in line.removeprefix("COPY ").removesuffix(" ./").split()
+    }
+
+    assert required <= allowed
+    assert required <= copied_to_source
 
 
 def test_ci_and_release_replay_the_declared_mcpb_bytes():

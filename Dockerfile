@@ -7,7 +7,7 @@ ARG LIQUILENS_WHEEL_URL=""
 ARG LIQUILENS_WHEEL_SHA256=""
 
 WORKDIR /tmp/source
-COPY LICENSE NOTICE README.md pyproject.toml ./
+COPY LICENSE NOTICE README.md CHANGELOG.md pyproject.toml ./
 COPY docs ./docs
 COPY integrations ./integrations
 COPY protocol ./protocol
