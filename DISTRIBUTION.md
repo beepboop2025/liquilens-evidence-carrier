@@ -7,9 +7,14 @@ until its maintainer merges and deploys it.
 
 The immutable public implementation release is `v0.15.0`, signed at commit
 `0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c`. Its release assets carry
-checksums and GitHub build-provenance attestations, and the official MCP
-Registry record is active and latest at `0.15.0`. LiquiLens is not endorsed by
-the platforms or projects named here.
+checksums and GitHub build-provenance attestations. At the 2026-08-29 evidence
+checkpoint, the official MCP Registry record was verified active and latest at
+`0.15.0`. LiquiLens is not endorsed by the platforms or projects named here.
+
+The repository source is preparing `v0.16.0`, but no `v0.16.0` tag, release
+asset, Registry version, container, skill tag, or plugin tag is claimed live by
+this document. The matrix below intentionally continues to describe the
+independently verified `v0.15.0` channels until those release gates pass.
 
 ## Fleet Brief v1
 

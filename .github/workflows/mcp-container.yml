@@ -60,6 +60,7 @@ jobs:
           {
             echo "revision=$(git rev-parse HEAD)"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "version=$(cat VERSION)"
           } >>"$GITHUB_OUTPUT"
       - name: Build source candidate CLI base
         id: source_base
@@ -71,7 +72,7 @@ jobs:
           push: false
           tags: liquilens-evidence-carrier:pr-base
           build-args: |
-            VERSION=0.15.0
+            VERSION=${{ steps.source.outputs.version }}
             REVISION=${{ steps.source.outputs.revision }}
             CREATED=${{ steps.source.outputs.created }}
             README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
@@ -86,7 +87,7 @@ jobs:
             --file Dockerfile.mcp \
             --build-arg BASE_IMAGE=liquilens-evidence-carrier:pr-base \
             --build-arg BASE_DIGEST="$base_digest" \
-            --build-arg VERSION=0.15.0 \
+            --build-arg VERSION=${{ steps.source.outputs.version }} \
             --build-arg BUILD_REVISION=${{ steps.source.outputs.revision }} \
             --build-arg RELEASE_REVISION=${{ steps.source.outputs.revision }} \
             --build-arg CREATED=${{ steps.source.outputs.created }} \
@@ -99,7 +100,9 @@ jobs:
           LIQUILENS_CLI_IMAGE: liquilens-evidence-carrier:pr-base
           LIQUILENS_EXPECTED_BASE_DIGEST: ${{ steps.candidate.outputs.base_digest }}
           LIQUILENS_EXPECTED_RELEASE_REVISION: ${{ steps.source.outputs.revision }}
-        run: scripts/mcp_container_smoke.sh liquilens-evidence-carrier-mcp:smoke 0.15.0
+        run: >-
+          scripts/mcp_container_smoke.sh liquilens-evidence-carrier-mcp:smoke
+          ${{ steps.source.outputs.version }}
       - name: Build both release architectures
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:

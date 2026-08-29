@@ -2,7 +2,7 @@
 set -eu
 
 image_ref="${1:?usage: container_smoke.sh IMAGE [VERSION]}"
-expected_version="${2:-0.15.0}"
+expected_version="${2:-$(tr -d '\r\n' < VERSION)}"
 smoke_dir="$(mktemp -d)"
 trap 'rm -rf -- "$smoke_dir"' EXIT HUP INT TERM
 chmod 0755 "$smoke_dir"

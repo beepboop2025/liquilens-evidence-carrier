@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "liquilens-evidence-carrier",
   "display_name": "LiquiLens Evidence Carrier",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "description": "Offline, read-only verification of local evidence carriers and four-product fleet briefs.",
   "long_description": "Verifies carrier and fleet-brief identities, clocks, rights, product boundaries, and authority boundaries before producing any existing transport projection. It makes no network requests and cannot recommend, rate credit, or execute trades.",
   "author": {
@@ -55,6 +55,7 @@
   "keywords": [
     "evidence",
     "financial-infrastructure",
+    "fleet-brief",
     "offline",
     "provenance",
     "read-only"

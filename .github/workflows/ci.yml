@@ -78,9 +78,15 @@ jobs:
           jsonschema.Draft7Validator(schema).validate(manifest)
           PY
           version="$(cat VERSION)"
+          artifact="dist/liquilens-evidence-carrier-mcp-${version}.mcpb"
+          replay="/tmp/liquilens-evidence-carrier-mcp-${version}.mcpb"
           uv run --locked --extra dev python scripts/build_mcpb.py \
-            --output "dist/liquilens-evidence-carrier-mcp-${version}.mcpb" \
+            --output "$artifact" \
             --check-registry-metadata
+          uv run --locked --extra dev python scripts/build_mcpb.py \
+            --output "$replay" \
+            --check-registry-metadata
+          cmp --silent "$artifact" "$replay"
           curl --fail --location --silent --show-error \
             --output /tmp/mcp-publisher.tar.gz \
             https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz

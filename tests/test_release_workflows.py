@@ -32,3 +32,22 @@ def test_mcp_defaults_match_the_released_v015_base():
             "9ec0646269357e971a67e88c8076c3c52c1561b094c1f2093ee19882a33294d1"
             not in content
         )
+
+
+def test_candidate_container_smokes_take_version_from_source():
+    for relative in (
+        ".github/workflows/container.yml",
+        ".github/workflows/mcp-container.yml",
+    ):
+        workflow = (ROOT / relative).read_text(encoding="utf-8")
+        assert "echo \"version=$(cat VERSION)\"" in workflow
+        assert "${{ steps.source.outputs.version }}" in workflow
+
+
+def test_ci_and_release_replay_the_declared_mcpb_bytes():
+    for relative in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
+        workflow = (ROOT / relative).read_text(encoding="utf-8")
+        assert workflow.count("scripts/build_mcpb.py") >= 2
+        assert "--output \"$artifact\"" in workflow
+        assert "--output \"$replay\"" in workflow
+        assert "cmp --silent \"$artifact\" \"$replay\"" in workflow
