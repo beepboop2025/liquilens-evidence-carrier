@@ -107,6 +107,54 @@ def test_gateway_pr_multiarch_build_installs_the_pinned_qemu_before_buildx():
     assert smoke.index(qemu) < smoke.index(buildx)
 
 
+def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
+    workflow = (ROOT / ".github/workflows/gateway-container.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '"trade-safety-gateway-v[0-9]*"' in workflow
+    assert 'test "$(git cat-file -t "$tag_name")" = "tag"' in workflow
+    assert 'verify-tag --raw "$tag_name"' in workflow
+    assert 'verify-commit --raw "$release_commit"' in workflow
+    assert 'git merge-base --is-ancestor "$release_commit" origin/main' in workflow
+    assert (
+        "^trade-safety-gateway-v([0-9]+\\.[0-9]+\\.[0-9]+)$" in workflow
+    )
+    assert 'test "$source_gateway_version" = "$tag_gateway_version"' in workflow
+    assert 'EXPECTED_GATEWAY_VERSION: "0.1.3"' in workflow
+    assert 'EXPECTED_GATEWAY_CORE_VERSION: "0.19.0"' in workflow
+    assert 'test "$source_core_version" = "$EXPECTED_GATEWAY_CORE_VERSION"' in (
+        workflow
+    )
+    assert "Reject pre-existing immutable gateway artifact tags" in workflow
+    assert "immutable gateway tag already exists" in workflow
+    assert "${IMAGE}:signed-tag-${release_tag_object}" in workflow
+    assert "provenance: mode=max" in workflow
+    assert "sbom: true" in workflow
+    assert "actions/attest-build-provenance" in workflow
+
+    gateway_case = workflow.split("trade-safety-gateway-v*)", maxsplit=1)[1].split(
+        ";;", maxsplit=1
+    )[0]
+    assert "${IMAGE}:latest" not in gateway_case
+    assert "${IMAGE}:core-${core_version}" not in gateway_case
+
+
+def test_gateway_release_documentation_preserves_core_tag_identity():
+    guide = (
+        ROOT / "integrations/trade-safety-gateway/README.md"
+    ).read_text(encoding="utf-8")
+    for token in (
+        "trade-safety-gateway-v0.1.3",
+        "immutable core `v0.19.0` tag",
+        "lightweight or unsigned tag",
+        "`origin/main`",
+        "no floating",
+        "provenance",
+        "SBOM",
+    ):
+        assert token in guide
+
+
 def test_typescript_tarball_manifest_carries_root_license_and_notice():
     package = json.loads(
         (ROOT / "integrations/typescript/package.json").read_text(encoding="utf-8")

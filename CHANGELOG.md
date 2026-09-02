@@ -18,6 +18,10 @@ authority.
 - Fail typed unavailable on producer-unavailable, malformed, mismatched,
   tampered, stale, incomplete-rights, or unverified-proof responses, while
   keeping observe/paper-only and no execution, routing, custody, or settlement.
+- Add the independently signed `trade-safety-gateway-v0.1.3` release lane,
+  pinned to core `0.19.0`, with main-ancestry and target-commit verification,
+  immutable OCI identity checks, provenance, SBOM, and no floating gateway-only
+  image aliases.
 
 ## [0.19.0] - 2026-09-02
 

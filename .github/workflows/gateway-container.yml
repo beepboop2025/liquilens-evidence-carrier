@@ -11,12 +11,13 @@ on:
   push:
     tags:
       - "v[0-9]*"
+      - "trade-safety-gateway-v[0-9]*"
 
 permissions:
   contents: read
 
 concurrency:
-  group: gateway-container-${{ github.workflow }}-${{ github.ref }}
+  group: gateway-container-${{ github.workflow }}-${{ github.event_name == 'push' && 'release' || github.ref }}
   cancel-in-progress: false
 
 env:
@@ -86,7 +87,10 @@ jobs:
             CORE_VERSION=${{ steps.source.outputs.core_version }}
 
   publish:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.event_name == 'push' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+      startsWith(github.ref, 'refs/tags/trade-safety-gateway-v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
@@ -101,25 +105,76 @@ jobs:
           persist-credentials: false
       - name: Verify signed release and resolve versions
         id: release
+        env:
+          EXPECTED_GATEWAY_CORE_VERSION: "0.19.0"
+          EXPECTED_GATEWAY_VERSION: "0.1.3"
         run: |
           signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
+          tag_name="$GITHUB_REF_NAME"
+          test "$(git cat-file -t "$tag_name")" = "tag"
           git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
-            verify-tag --raw "$GITHUB_REF_NAME"
-          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+            verify-tag --raw "$tag_name"
+          release_tag_object="$(git rev-parse "${tag_name}^{tag}")"
+          release_commit="$(git rev-parse "${tag_name}^{commit}")"
           git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
             verify-commit --raw "$release_commit"
           git fetch origin main --no-tags
           git merge-base --is-ancestor "$release_commit" origin/main
-          core_version="${GITHUB_REF_NAME#v}"
-          test "$(cat VERSION)" = "$core_version"
-          gateway_version="$(python3 -c \
+          source_core_version="$(cat VERSION)"
+          source_gateway_version="$(python3 -c \
             'import tomllib; print(tomllib.load(open("integrations/trade-safety-gateway/pyproject.toml", "rb"))["project"]["version"])')"
-          test "$gateway_version" = "0.1.3"
+          case "$tag_name" in
+            trade-safety-gateway-v*)
+              [[ "$tag_name" =~ ^trade-safety-gateway-v([0-9]+\.[0-9]+\.[0-9]+)$ ]]
+              tag_gateway_version="${BASH_REMATCH[1]}"
+              test "$source_gateway_version" = "$tag_gateway_version"
+              test "$source_gateway_version" = "$EXPECTED_GATEWAY_VERSION"
+              test "$source_core_version" = "$EXPECTED_GATEWAY_CORE_VERSION"
+              release_kind="gateway"
+              gateway_version="$source_gateway_version"
+              core_version="$source_core_version"
+              image_tags="$(printf '%s\n' \
+                "${IMAGE}:${gateway_version}" \
+                "${IMAGE}:sha-${release_commit}" \
+                "${IMAGE}:signed-tag-${release_tag_object}")"
+              immutable_tags="$(printf '%s\n' \
+                "$gateway_version" \
+                "sha-${release_commit}" \
+                "signed-tag-${release_tag_object}")"
+              ;;
+            v*)
+              [[ "$tag_name" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]
+              tag_core_version="${BASH_REMATCH[1]}"
+              test "$source_core_version" = "$tag_core_version"
+              test "$source_gateway_version" = "$EXPECTED_GATEWAY_VERSION"
+              release_kind="core"
+              gateway_version="$source_gateway_version"
+              core_version="$source_core_version"
+              image_tags="$(printf '%s\n' \
+                "${IMAGE}:${gateway_version}" \
+                "${IMAGE}:core-${core_version}" \
+                "${IMAGE}:sha-${release_commit}" \
+                "${IMAGE}:latest")"
+              immutable_tags=""
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
           {
             echo "revision=$release_commit"
+            echo "release_tag=$tag_name"
+            echo "release_tag_object=$release_tag_object"
+            echo "release_kind=$release_kind"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "core_version=$core_version"
             echo "gateway_version=$gateway_version"
+            echo "image_tags<<EOF"
+            printf '%s\n' "$image_tags"
+            echo "EOF"
+            echo "immutable_tags<<EOF"
+            printf '%s\n' "$immutable_tags"
+            echo "EOF"
           } >>"$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
@@ -128,6 +183,36 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Reject pre-existing immutable gateway artifact tags
+        if: steps.release.outputs.release_kind == 'gateway'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMMUTABLE_TAGS: ${{ steps.release.outputs.immutable_tags }}
+        run: |
+          owner="${GITHUB_REPOSITORY%%/*}"
+          owner_type="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.owner.type')"
+          case "$owner_type" in
+            Organization)
+              endpoint="orgs/$owner/packages/container/liquilens-trade-safety-gateway/versions"
+              ;;
+            User)
+              endpoint="users/$owner/packages/container/liquilens-trade-safety-gateway/versions"
+              ;;
+            *)
+              exit 1
+              ;;
+          esac
+          existing_tags="$(mktemp)"
+          trap 'rm -f "$existing_tags"' EXIT
+          gh api --paginate "$endpoint?per_page=100" \
+            --jq '.[].metadata.container.tags[]?' >"$existing_tags"
+          while IFS= read -r immutable_tag; do
+            test -n "$immutable_tag"
+            if grep -Fqx -- "$immutable_tag" "$existing_tags"; then
+              echo "::error::immutable gateway tag already exists: $immutable_tag"
+              exit 1
+            fi
+          done <<<"$IMMUTABLE_TAGS"
       - name: Build and publish attested multi-architecture sandbox
         id: push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
@@ -136,11 +221,7 @@ jobs:
           file: integrations/trade-safety-gateway/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ${{ env.IMAGE }}:${{ steps.release.outputs.gateway_version }}
-            ${{ env.IMAGE }}:core-${{ steps.release.outputs.core_version }}
-            ${{ env.IMAGE }}:sha-${{ steps.release.outputs.revision }}
-            ${{ env.IMAGE }}:latest
+          tags: ${{ steps.release.outputs.image_tags }}
           build-args: |
             SOURCE_REVISION=${{ steps.release.outputs.revision }}
             CREATED=${{ steps.release.outputs.created }}
@@ -154,6 +235,8 @@ jobs:
             org.opencontainers.image.title=LiquiLens Trade Safety Gateway
             org.opencontainers.image.version=${{ steps.release.outputs.gateway_version }}
             io.liquilens.evidence.core.version=${{ steps.release.outputs.core_version }}
+            io.liquilens.release.tag=${{ steps.release.outputs.release_tag }}
+            io.liquilens.release.tag-object=${{ steps.release.outputs.release_tag_object }}
             io.liquilens.trade-safety.authority=read-only-hash-only-sandbox
           annotations: |
             index:org.opencontainers.image.created=${{ steps.release.outputs.created }}
@@ -164,6 +247,8 @@ jobs:
             index:org.opencontainers.image.title=LiquiLens Trade Safety Gateway
             index:org.opencontainers.image.version=${{ steps.release.outputs.gateway_version }}
             index:io.liquilens.evidence.core.version=${{ steps.release.outputs.core_version }}
+            index:io.liquilens.release.tag=${{ steps.release.outputs.release_tag }}
+            index:io.liquilens.release.tag-object=${{ steps.release.outputs.release_tag_object }}
             index:io.liquilens.trade-safety.authority=read-only-hash-only-sandbox
           provenance: mode=max
           sbom: true
@@ -179,6 +264,8 @@ jobs:
           EXPECTED_REVISION: ${{ steps.release.outputs.revision }}
           EXPECTED_CORE_VERSION: ${{ steps.release.outputs.core_version }}
           EXPECTED_GATEWAY_VERSION: ${{ steps.release.outputs.gateway_version }}
+          EXPECTED_RELEASE_TAG: ${{ steps.release.outputs.release_tag }}
+          EXPECTED_RELEASE_TAG_OBJECT: ${{ steps.release.outputs.release_tag_object }}
         run: |
           docker buildx imagetools inspect --raw "$IMAGE@$EXPECTED_DIGEST" >gateway-index.json
           python3 - <<'PY'
@@ -195,6 +282,8 @@ jobs:
           assert labels["org.opencontainers.image.revision"] == os.environ["EXPECTED_REVISION"]
           assert labels["org.opencontainers.image.version"] == os.environ["EXPECTED_GATEWAY_VERSION"]
           assert labels["io.liquilens.evidence.core.version"] == os.environ["EXPECTED_CORE_VERSION"]
+          assert labels["io.liquilens.release.tag"] == os.environ["EXPECTED_RELEASE_TAG"]
+          assert labels["io.liquilens.release.tag-object"] == os.environ["EXPECTED_RELEASE_TAG_OBJECT"]
           assert labels["io.liquilens.trade-safety.authority"] == "read-only-hash-only-sandbox"
           PY
           docker pull --platform linux/amd64 "$IMAGE@$EXPECTED_DIGEST"

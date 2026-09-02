@@ -128,6 +128,18 @@ GHCR. That registry artifact is distribution, not a hosted deployment or an
 order-authorizing service; it retains the same read-only, hash-only sandbox
 boundary and must be operated by the adopter.
 
+Gateway `0.1.3` has an independent release identity so publishing it does not
+move or reuse the immutable core `v0.19.0` tag. After the release commit has
+landed on `origin/main`, an allowlisted release owner may create and push the
+annotated, signed tag `trade-safety-gateway-v0.1.3`. The workflow rejects a
+lightweight or unsigned tag, an unsigned target commit, a target outside
+`origin/main`, a gateway/tag version mismatch, or any core `VERSION` other than
+`0.19.0`. It also rejects pre-existing gateway version, source-commit, or signed
+tag-object OCI tags before publishing. The gateway-only lane emits no floating
+`latest` or `core-*` alias; its multi-architecture image retains maximum build
+provenance, an SBOM, a separate GitHub provenance attestation, and the signed
+Git tag object in its OCI metadata.
+
 ## Focused tests
 
 The tests inject byte-exact fake upstream responses and cover:
