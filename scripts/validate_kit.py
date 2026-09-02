@@ -11,30 +11,45 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANDIDATE_VERSION = "0.18.0"
-CANDIDATE_MCPB_SHA256 = (
+SOURCE_VERSION = "0.18.0"
+SOURCE_MCPB_SHA256 = (
     "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
 )
-CANDIDATE_GATEWAY_VERSION = "0.1.1"
-PUBLISHED_VERSION = "0.17.1"
-PUBLISHED_REVISION = "a74274236e177404c2d254541e6a4110a4ce8a0d"
-PUBLISHED_TAG_OBJECT = "8844ee4556d59472a587cb9ceb412112c23543db"
-PUBLISHED_PREFLIGHT = "33589423934"
-PUBLISHED_WORKFLOW = "33589489958"
-PUBLISHED_CONTAINER_WORKFLOW = "33589489966"
+GATEWAY_VERSION = "0.1.1"
+PUBLISHED_VERSION = "0.18.0"
+PUBLISHED_REVISION = "906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
+PUBLISHED_TREE = "0065206e14a21bb01ce25caed60bf14c9570d12f"
+PUBLISHED_TAG_OBJECT = "42dd412ef27b470841b71b8bc73c0ed63a5e4a6b"
+PUBLISHED_PREFLIGHT = "33593756967"
+PUBLISHED_WORKFLOW = "33593840364"
+PUBLISHED_CONTAINER_WORKFLOW = "33593840346"
 PUBLISHED_SHA256SUMS = (
-    "666924e261c7760bc598713598390be6b1ca7d0854b5746811fb990cf951cf46"
+    "71c2c884d16fd3315a21c263ec8254b0f9578c8150f4a424c296228668d89953"
 )
 PUBLISHED_WHEEL_SHA256 = (
-    "dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea"
+    "9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef"
 )
 PUBLISHED_MCPB_SHA256 = (
-    "4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1"
+    "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+)
+PUBLISHED_GATEWAY_WHEEL_SHA256 = (
+    "103cde79c006074eaabe5083fec212ba237fcf3a42f01b0600e0faf0328a05a8"
 )
 PUBLISHED_OCI_DIGEST = (
-    "bd9b92f25fa8666ea1f43afc4047261ad82213f3c121da87f4dcb9f2e401776d"
+    "293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e"
 )
 PUBLISHED_README_SHA256 = (
+    "3cc9705a2c1aa0471342199f54509b2aa66a02a2c84d89287732a89cd026018a"
+)
+PUBLISHED_RELEASE_ATTESTATION = "44605007"
+PUBLISHED_CONTAINER_ATTESTATION = "44605376"
+PREVIOUS_VERSION = "0.17.1"
+PREVIOUS_REVISION = "a74274236e177404c2d254541e6a4110a4ce8a0d"
+PREVIOUS_TAG_OBJECT = "8844ee4556d59472a587cb9ceb412112c23543db"
+PREVIOUS_RELEASE_RECORD_SHA256 = (
+    "c089ee719ac4e6eba99936f4daf50681b045694b63aba7effea307aa48e93dd8"
+)
+PREVIOUS_README_SHA256 = (
     "8422e21dc715443c22c8d18e1991fa8427136292a06ee45068db4a1a26029c9e"
 )
 CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
@@ -73,7 +88,7 @@ def _package_version() -> str:
 def main() -> int:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     version = project["project"]["version"]
-    assert version == CANDIDATE_VERSION
+    assert version == SOURCE_VERSION
     assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == version
     assert _package_version() == version
 
@@ -100,7 +115,7 @@ def main() -> int:
         f"releases/download/v{version}/{expected_mcpb}"
     )
     assert re.fullmatch(r"[0-9a-f]{64}", package["fileSha256"])
-    assert package["fileSha256"] == CANDIDATE_MCPB_SHA256
+    assert package["fileSha256"] == SOURCE_MCPB_SHA256
     assert registry["_meta"][
         "io.modelcontextprotocol.registry/publisher-provided"
     ] == {
@@ -225,14 +240,18 @@ def main() -> int:
         f"current signed and published core release is `v{PUBLISHED_VERSION}`"
         in readme
     )
-    assert f"source checkpoint prepares `v{CANDIDATE_VERSION}`" in readme
-    assert "not yet tagged, published, or registered" in normalized_readme
+    assert "not yet tagged, published, or registered" not in normalized_readme
     assert PUBLISHED_REVISION in readme
+    assert PUBLISHED_TREE in readme
     assert PUBLISHED_TAG_OBJECT in readme
     assert PUBLISHED_PREFLIGHT in readme
     assert PUBLISHED_WORKFLOW in readme
     assert PUBLISHED_WHEEL_SHA256 in readme
     assert PUBLISHED_MCPB_SHA256 in readme
+    assert PUBLISHED_SHA256SUMS in readme
+    assert PUBLISHED_OCI_DIGEST in readme
+    assert "immutable: false" in readme
+    assert "21288366" in readme
     assert (
         f"registry.modelcontextprotocol.io/v0.1/servers/"
         "io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/"
@@ -240,7 +259,7 @@ def main() -> int:
     ) in readme
     assert CANONICAL_SITE_REVISION in readme
     assert CANONICAL_SITE_WORKFLOW in readme
-    assert CANDIDATE_MCPB_SHA256 in readme
+    assert SOURCE_MCPB_SHA256 in readme
     assert "liquilens.fleet-brief.v1" in readme
     assert "liquilens-evidence issue-brief" in readme
     assert "liquilens.trade-safety-receipt.v1" in readme
@@ -250,10 +269,9 @@ def main() -> int:
     assert f"current core implementation release is `v{PUBLISHED_VERSION}`" in (
         distribution
     )
-    assert f"source now prepares core `v{CANDIDATE_VERSION}`" in distribution
     assert CANONICAL_SITE_REVISION in distribution
     assert CANONICAL_SITE_WORKFLOW in distribution
-    assert CANDIDATE_MCPB_SHA256 in distribution
+    assert SOURCE_MCPB_SHA256 in distribution
     assert PUBLISHED_REVISION in distribution
     assert PUBLISHED_TAG_OBJECT in distribution
     assert PUBLISHED_PREFLIGHT in distribution
@@ -261,13 +279,19 @@ def main() -> int:
     assert PUBLISHED_CONTAINER_WORKFLOW in distribution
     assert PUBLISHED_WHEEL_SHA256 in distribution
     assert PUBLISHED_MCPB_SHA256 in distribution
+    assert PUBLISHED_GATEWAY_WHEEL_SHA256 in distribution
+    assert PUBLISHED_SHA256SUMS in distribution
     assert PUBLISHED_OCI_DIGEST in distribution
+    assert PUBLISHED_RELEASE_ATTESTATION in distribution
+    assert PUBLISHED_CONTAINER_ATTESTATION in distribution
+    assert "immutable: false" in distribution
     assert f"versions/{PUBLISHED_VERSION}" in distribution
     release_record = (ROOT / f"docs/RELEASE-{PUBLISHED_VERSION}.md").read_text(
         encoding="utf-8"
     )
     assert "signed, published, attested, and active" in release_record
     assert PUBLISHED_REVISION in release_record
+    assert PUBLISHED_TREE in release_record
     assert PUBLISHED_TAG_OBJECT in release_record
     assert PUBLISHED_PREFLIGHT in release_record
     assert PUBLISHED_WORKFLOW in release_record
@@ -275,7 +299,11 @@ def main() -> int:
     assert PUBLISHED_SHA256SUMS in release_record
     assert PUBLISHED_WHEEL_SHA256 in release_record
     assert PUBLISHED_MCPB_SHA256 in release_record
+    assert PUBLISHED_GATEWAY_WHEEL_SHA256 in release_record
     assert PUBLISHED_OCI_DIGEST in release_record
+    assert PUBLISHED_RELEASE_ATTESTATION in release_record
+    assert PUBLISHED_CONTAINER_ATTESTATION in release_record
+    assert "immutable: false" in release_record
     assert "not tagged, published, or registered" not in release_record
     release_readme = ROOT / "mcpb/release-readmes" / f"{PUBLISHED_VERSION}.md"
     assert _sha256(release_readme) == PUBLISHED_README_SHA256
@@ -285,24 +313,29 @@ def main() -> int:
     assert current_release_readme.read_bytes() != (ROOT / "README.md").read_bytes()
     candidate_readme = current_release_readme.read_text(encoding="utf-8")
     normalized_candidate_readme = " ".join(candidate_readme.split())
-    assert f"bytes prepared for the v{CANDIDATE_VERSION} MCPB candidate" in (
+    assert f"bytes prepared for the v{SOURCE_VERSION} MCPB candidate" in (
         normalized_candidate_readme
     )
     assert "No such publication receipt is asserted" in candidate_readme
-    candidate_record = (ROOT / f"docs/RELEASE-{CANDIDATE_VERSION}.md").read_text(
+    current_record = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
         encoding="utf-8"
     )
-    assert "prepared source; not tagged, published, registered, or" in (
-        candidate_record
-    )
-    assert "No v0.18.0 tag object" in candidate_record
-    assert CANONICAL_SITE_REVISION in candidate_record
-    assert CANONICAL_SITE_WORKFLOW in candidate_record
-    assert CANDIDATE_MCPB_SHA256 in candidate_record
+    assert "signed, published, attested, and active/latest" in current_record
+    assert "No v0.18.0 tag object" not in current_record
+    assert CANONICAL_SITE_REVISION in current_record
+    assert CANONICAL_SITE_WORKFLOW in current_record
+    assert SOURCE_MCPB_SHA256 in current_record
+    previous_record = ROOT / f"docs/RELEASE-{PREVIOUS_VERSION}.md"
+    assert _sha256(previous_record) == PREVIOUS_RELEASE_RECORD_SHA256
+    previous_text = previous_record.read_text(encoding="utf-8")
+    assert PREVIOUS_REVISION in previous_text
+    assert PREVIOUS_TAG_OBJECT in previous_text
+    previous_readme = ROOT / "mcpb/release-readmes" / f"{PREVIOUS_VERSION}.md"
+    assert _sha256(previous_readme) == PREVIOUS_README_SHA256
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [{CANDIDATE_VERSION}] - 2026-09-02" in changelog
-    assert "No `v0.18.0` tag, GitHub release" in changelog
-    assert CANDIDATE_MCPB_SHA256 in changelog
+    assert f"## [{SOURCE_VERSION}] - 2026-09-02" in changelog
+    assert "No `v0.18.0` tag, GitHub release" not in changelog
+    assert SOURCE_MCPB_SHA256 in changelog
     assert f"## [{PUBLISHED_VERSION}] - 2026-09-02" in changelog
     assert PUBLISHED_REVISION in changelog
     assert PUBLISHED_TAG_OBJECT in changelog
@@ -311,7 +344,11 @@ def main() -> int:
     assert PUBLISHED_CONTAINER_WORKFLOW in changelog
     assert PUBLISHED_WHEEL_SHA256 in changelog
     assert PUBLISHED_MCPB_SHA256 in changelog
+    assert PUBLISHED_GATEWAY_WHEEL_SHA256 in changelog
+    assert PUBLISHED_SHA256SUMS in changelog
     assert PUBLISHED_OCI_DIGEST in changelog
+    assert PUBLISHED_RELEASE_ATTESTATION in changelog
+    assert PUBLISHED_CONTAINER_ATTESTATION in changelog
     assert project["tool"]["setuptools"]["data-files"][
         "share/liquilens_evidence/docs"
     ] == ["CHANGELOG.md", "docs/*.md"]
@@ -352,7 +389,7 @@ def main() -> int:
     assert f"liquilens-evidence=={version}" in gateway_project["project"][
         "dependencies"
     ]
-    assert gateway_project["project"]["version"] == CANDIDATE_GATEWAY_VERSION
+    assert gateway_project["project"]["version"] == GATEWAY_VERSION
     assert "fastapi>=0.141.1,<0.142" in gateway_project["project"]["dependencies"]
     assert "starlette>=1.3.1,<2" in gateway_project["project"]["dependencies"]
     assert "pytest>=9.0.3,<10" in gateway_project["project"][
@@ -381,7 +418,7 @@ def main() -> int:
     }
     assert gateway_versions == {
         "fastapi": "0.141.1",
-        "liquilens-trade-safety-gateway": CANDIDATE_GATEWAY_VERSION,
+        "liquilens-trade-safety-gateway": GATEWAY_VERSION,
         "pytest": "9.1.1",
         "starlette": "1.6.0",
     }
@@ -395,10 +432,10 @@ def main() -> int:
     gateway_dockerfile = (
         ROOT / "integrations/trade-safety-gateway/Dockerfile"
     ).read_text(encoding="utf-8")
-    assert f'__version__ = "{CANDIDATE_GATEWAY_VERSION}"' in gateway_init
-    assert f'SERVICE_VERSION = "{CANDIDATE_GATEWAY_VERSION}"' in gateway_app
+    assert f'__version__ = "{GATEWAY_VERSION}"' in gateway_init
+    assert f'SERVICE_VERSION = "{GATEWAY_VERSION}"' in gateway_app
     assert (
-        f'org.opencontainers.image.version="{CANDIDATE_GATEWAY_VERSION}"'
+        f'org.opencontainers.image.version="{GATEWAY_VERSION}"'
         in gateway_dockerfile
     )
     golden = _json(ROOT / "examples/trade-safety/receipt.paper.pass.json")

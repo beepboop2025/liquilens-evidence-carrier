@@ -6,35 +6,47 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CANDIDATE_VERSION = "0.18.0"
-CANDIDATE_MCPB_SHA256 = (
+SOURCE_VERSION = "0.18.0"
+SOURCE_MCPB_SHA256 = (
     "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
 )
-CANDIDATE_README_SHA256 = (
-    "3cc9705a2c1aa0471342199f54509b2aa66a02a2c84d89287732a89cd026018a"
-)
-CANDIDATE_GATEWAY_VERSION = "0.1.1"
+GATEWAY_VERSION = "0.1.1"
 CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
 CANONICAL_SITE_WORKFLOW = "33592149926"
-RELEASE_VERSION = "0.17.1"
-RELEASE_CANDIDATE = "a74274236e177404c2d254541e6a4110a4ce8a0d"
-RELEASE_TAG_OBJECT = "8844ee4556d59472a587cb9ceb412112c23543db"
-RELEASE_PREFLIGHT = "33589423934"
-RELEASE_WORKFLOW = "33589489958"
-RELEASE_CONTAINER_WORKFLOW = "33589489966"
+RELEASE_VERSION = "0.18.0"
+RELEASE_CANDIDATE = "906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
+RELEASE_TREE = "0065206e14a21bb01ce25caed60bf14c9570d12f"
+RELEASE_TAG_OBJECT = "42dd412ef27b470841b71b8bc73c0ed63a5e4a6b"
+RELEASE_PREFLIGHT = "33593756967"
+RELEASE_WORKFLOW = "33593840364"
+RELEASE_CONTAINER_WORKFLOW = "33593840346"
 RELEASE_SHA256SUMS = (
-    "666924e261c7760bc598713598390be6b1ca7d0854b5746811fb990cf951cf46"
+    "71c2c884d16fd3315a21c263ec8254b0f9578c8150f4a424c296228668d89953"
 )
 RELEASE_WHEEL_SHA256 = (
-    "dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea"
+    "9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef"
 )
 RELEASE_MCPB_SHA256 = (
-    "4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1"
+    "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+)
+RELEASE_GATEWAY_WHEEL_SHA256 = (
+    "103cde79c006074eaabe5083fec212ba237fcf3a42f01b0600e0faf0328a05a8"
 )
 RELEASE_OCI_DIGEST = (
-    "bd9b92f25fa8666ea1f43afc4047261ad82213f3c121da87f4dcb9f2e401776d"
+    "293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e"
 )
 RELEASE_README_SHA256 = (
+    "3cc9705a2c1aa0471342199f54509b2aa66a02a2c84d89287732a89cd026018a"
+)
+RELEASE_ATTESTATION = "44605007"
+RELEASE_CONTAINER_ATTESTATION = "44605376"
+PREVIOUS_VERSION = "0.17.1"
+PREVIOUS_CANDIDATE = "a74274236e177404c2d254541e6a4110a4ce8a0d"
+PREVIOUS_TAG_OBJECT = "8844ee4556d59472a587cb9ceb412112c23543db"
+PREVIOUS_RELEASE_RECORD_SHA256 = (
+    "c089ee719ac4e6eba99936f4daf50681b045694b63aba7effea307aa48e93dd8"
+)
+PREVIOUS_README_SHA256 = (
     "8422e21dc715443c22c8d18e1991fa8427136292a06ee45068db4a1a26029c9e"
 )
 FAILED_VERSION = "0.17.0"
@@ -61,7 +73,7 @@ PRIOR_README_SHA256 = (
 )
 
 
-def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
+def test_main_facing_docs_record_published_v0180_and_preserve_history():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     release_receipt = (
         ROOT / f"docs/RELEASE-{RELEASE_VERSION}.md"
@@ -72,8 +84,8 @@ def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
     failed_release = (
         ROOT / f"docs/RELEASE-{FAILED_VERSION}.md"
     ).read_text(encoding="utf-8")
-    candidate_release = (
-        ROOT / f"docs/RELEASE-{CANDIDATE_VERSION}.md"
+    previous_release = (
+        ROOT / f"docs/RELEASE-{PREVIOUS_VERSION}.md"
     ).read_text(encoding="utf-8")
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -86,6 +98,7 @@ def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
         assert RELEASE_MCPB_SHA256 in text
 
     for text in (readme, release_receipt, distribution):
+        assert RELEASE_TREE in text
         assert RELEASE_TAG_OBJECT in text
         assert RELEASE_PREFLIGHT in text
         assert RELEASE_WHEEL_SHA256 in text
@@ -93,6 +106,9 @@ def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
     for text in (release_receipt, distribution, changelog):
         assert RELEASE_CONTAINER_WORKFLOW in text
         assert RELEASE_OCI_DIGEST in text
+        assert RELEASE_GATEWAY_WHEEL_SHA256 in text
+        assert RELEASE_ATTESTATION in text
+        assert RELEASE_CONTAINER_ATTESTATION in text
 
     assert f"current signed and published core release is `v{RELEASE_VERSION}`" in (
         readme
@@ -104,26 +120,23 @@ def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
     assert f"## [{RELEASE_VERSION}] - 2026-09-02" in changelog
     assert f"## [{PRIOR_VERSION}] - 2026-08-29" in changelog
     assert RELEASE_SHA256SUMS in release_receipt
-    assert "attestations/44596593" in release_receipt
+    assert f"attestations/{RELEASE_ATTESTATION}" in release_receipt
     assert "reports `active` and `isLatest: true`" in normalized_release
     assert "not a hosted Trade Safety gateway" in normalized_release
+    assert "immutable: false" in release_receipt
+    assert "21288366" in release_receipt
     assert "canonical URL not hosted yet" not in normalized_readme
     assert "returned HTTP 404" not in normalized_readme
-    assert "returned HTTP\n404" in release_receipt
-    for text in (readme, distribution, changelog, candidate_release):
+    for text in (readme, distribution, changelog, release_receipt):
         assert CANONICAL_SITE_REVISION in text
         assert CANONICAL_SITE_WORKFLOW in text
-        assert CANDIDATE_MCPB_SHA256 in text
+        assert SOURCE_MCPB_SHA256 in text
 
-    normalized_candidate = " ".join(candidate_release.split())
-    assert f"source checkpoint prepares `v{CANDIDATE_VERSION}`" in readme
-    assert "not yet tagged, published, or registered" in normalized_readme
-    assert "prepared source; not tagged, published, registered, or deployed" in (
-        normalized_candidate
-    )
-    assert "No v0.18.0 tag object" in candidate_release
-    assert "not a hosted Trade Safety gateway" in candidate_release
-    assert f"## [{CANDIDATE_VERSION}] - 2026-09-02" in changelog
+    assert f"source checkpoint prepares `v{SOURCE_VERSION}`" not in readme
+    assert "not yet tagged, published, or registered" not in normalized_readme
+    assert "No v0.18.0 tag object" not in release_receipt
+    assert f"## [{SOURCE_VERSION}] - 2026-09-02" in changelog
+    assert "No `v0.18.0` tag, GitHub release" not in changelog
 
     for text in (readme, failed_release):
         assert FAILED_TAG_OBJECT in text
@@ -134,56 +147,57 @@ def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
     assert "GitHub has no v0.17.0 release record" in failed_release
     assert "must not be deleted, force-moved, or recreated" in failed_release
     assert "not publication proof" in release_bundle_readme
-    assert "local and remote absence of `v0.17.1` before tag creation" in (
+    assert "local and remote absence of `v0.18.0` before tag creation" in (
         release_receipt
     )
     assert "two byte-identical deterministic MCPB builds" in release_receipt
-    assert "The GitHub release makes all Trade Safety contracts" in release_receipt
     normalized_failed = " ".join(failed_release.split())
     assert "stable unversioned protocol filenames remain intentionally reusable" in (
         normalized_failed
     )
     assert "A later recovery release may publish" in failed_release
     assert "The release can publish" not in failed_release
-    assert "Published release `v0.17.1` provides" in readme
+    assert "Published release `v0.18.0` provides" in readme
 
     published_record = f"{release_receipt}\n{distribution}"
     for stale_claim in (
         "not tagged, published, or registered",
-        f"future `v{RELEASE_VERSION}` asset URL",
-        (
-            "latest signed,\ndownloadable, and Registry-listed release was immutable "
-            "`v0.15.0`"
-        ),
-        "The immutable public implementation release is `v0.15.0`",
-        f"The repository source is preparing `v{RELEASE_VERSION}`",
+        "No v0.18.0 tag object",
+        "candidate metadata, not a downloadable release receipt",
     ):
         assert stale_claim not in published_record
 
+    previous_path = ROOT / f"docs/RELEASE-{PREVIOUS_VERSION}.md"
+    assert hashlib.sha256(previous_path.read_bytes()).hexdigest() == (
+        PREVIOUS_RELEASE_RECORD_SHA256
+    )
+    assert PREVIOUS_CANDIDATE in previous_release
+    assert PREVIOUS_TAG_OBJECT in previous_release
 
-def test_candidate_registry_metadata_tracks_source_version():
+
+def test_published_registry_metadata_tracks_source_version():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
     version = project["project"]["version"]
     package = server["packages"][0]
 
-    assert version == CANDIDATE_VERSION
+    assert version == SOURCE_VERSION
     assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == version
     assert server["version"] == version
     assert package["identifier"].endswith(
         f"/v{version}/liquilens-evidence-carrier-mcp-{version}.mcpb"
     )
-    assert package["fileSha256"] == CANDIDATE_MCPB_SHA256
+    assert package["fileSha256"] == SOURCE_MCPB_SHA256
 
 
-def test_candidate_gateway_identity_and_security_floors_are_consistent():
+def test_published_gateway_identity_and_security_floors_are_consistent():
     gateway_root = ROOT / "integrations/trade-safety-gateway"
     project = tomllib.loads((gateway_root / "pyproject.toml").read_text())
     lock = tomllib.loads((gateway_root / "uv.lock").read_text())
     dependencies = project["project"]["dependencies"]
 
-    assert project["project"]["version"] == CANDIDATE_GATEWAY_VERSION
-    assert f"liquilens-evidence=={CANDIDATE_VERSION}" in dependencies
+    assert project["project"]["version"] == GATEWAY_VERSION
+    assert f"liquilens-evidence=={SOURCE_VERSION}" in dependencies
     assert "fastapi>=0.141.1,<0.142" in dependencies
     assert "starlette>=1.3.1,<2" in dependencies
     assert "pytest>=9.0.3,<10" in project["project"]["optional-dependencies"][
@@ -204,8 +218,8 @@ def test_candidate_gateway_identity_and_security_floors_are_consistent():
     }
     assert versions == {
         "fastapi": "0.141.1",
-        "liquilens-evidence": CANDIDATE_VERSION,
-        "liquilens-trade-safety-gateway": CANDIDATE_GATEWAY_VERSION,
+        "liquilens-evidence": SOURCE_VERSION,
+        "liquilens-trade-safety-gateway": GATEWAY_VERSION,
         "pytest": "9.1.1",
         "starlette": "1.6.0",
     }
@@ -235,25 +249,25 @@ def test_published_v016_records_and_embedded_readme_stay_reproducible():
     assert '(release_readme, "README.md")' in builder
 
 
-def test_published_v0171_embedded_readme_stays_reproducible():
+def test_published_v0180_embedded_readme_stays_reproducible():
     frozen = ROOT / "mcpb/release-readmes" / f"{RELEASE_VERSION}.md"
     assert hashlib.sha256(frozen.read_bytes()).hexdigest() == RELEASE_README_SHA256
+    frozen_text = frozen.read_text(encoding="utf-8")
+    normalized_frozen = " ".join(frozen_text.split())
+    assert "bytes prepared for the v0.18.0 MCPB candidate" in normalized_frozen
+    assert "not publication proof" in frozen_text
+    assert "No such publication receipt is asserted" in normalized_frozen
+    assert frozen.read_bytes() != (ROOT / "README.md").read_bytes()
+
+
+def test_published_v0171_embedded_readme_stays_reproducible():
+    frozen = ROOT / "mcpb/release-readmes" / f"{PREVIOUS_VERSION}.md"
+    assert hashlib.sha256(frozen.read_bytes()).hexdigest() == PREVIOUS_README_SHA256
     frozen_text = frozen.read_text(encoding="utf-8")
     normalized_frozen = " ".join(frozen_text.split())
     assert "bytes prepared for the v0.17.1 MCPB" in normalized_frozen
     assert "not publication proof" in frozen_text
     assert frozen.read_bytes() != (ROOT / "README.md").read_bytes()
-
-
-def test_candidate_v0180_embedded_readme_matches_registry_digest_input():
-    candidate = ROOT / "mcpb/release-readmes" / f"{CANDIDATE_VERSION}.md"
-    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == (
-        CANDIDATE_README_SHA256
-    )
-    normalized = " ".join(candidate.read_text(encoding="utf-8").split())
-    assert "bytes prepared for the v0.18.0 MCPB candidate" in normalized
-    assert "No such publication receipt is asserted" in normalized
-    assert candidate.read_bytes() != (ROOT / "README.md").read_bytes()
 
 
 def test_failed_v0170_embedded_readme_stays_reproducible():
