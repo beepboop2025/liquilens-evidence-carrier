@@ -71,7 +71,7 @@ jobs:
           done
           docker exec "$container_id" python -c \
             "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/v1/capabilities')); assert value['state']=='read_only_sandbox'; assert value['receipt_integrity']=='sha256'; assert value['authority']['can_execute'] is False; assert value['authority']['has_order_submission'] is False"
-          test "$(docker inspect --format '{{.Config.Labels.io.liquilens.trade-safety.authority}}' "$container_id")" = \
+          test "$(docker inspect --format '{{index .Config.Labels "io.liquilens.trade-safety.authority"}}' "$container_id")" = \
             "read-only-hash-only-sandbox"
       - name: Build both target architectures
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
