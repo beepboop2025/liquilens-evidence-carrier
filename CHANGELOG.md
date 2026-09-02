@@ -25,13 +25,28 @@ authority.
   at site revision `3ec660175c81c5b282715ee400eea2f771dc2610`, without
   representing it as a hosted gateway or core v0.18.0 release.
 
-This source is a candidate only. No `v0.18.0` tag, GitHub release, checksum
-manifest, attestation, official MCP Registry version, or v0.18.0 container
-receipt exists yet. The current production pin remains `v0.17.1`; publication
-facts must be added only after the controlled signed-tag workflows succeed.
-The deterministic candidate MCPB currently hashes to
-`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`;
-this is prepared-source identity, not publication proof.
+Published from allowlisted SSH-signed candidate
+`906ca033a96ea862ab813c64db2a6b01c5ce8c4f`, tree
+`0065206e14a21bb01ce25caed60bf14c9570d12f`, after green
+[preflight run 33593756967](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593756967).
+Signed annotated tag object `42dd412ef27b470841b71b8bc73c0ed63a5e4a6b`
+and [release run 33593840364](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593840364)
+published 19 assets at `2026-09-02T05:14:06Z`. The `SHA256SUMS` SHA-256 is
+`71c2c884d16fd3315a21c263ec8254b0f9578c8150f4a424c296228668d89953`;
+the root wheel, MCPB, and gateway 0.1.1 wheel SHA-256 values are respectively
+`9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef`,
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`,
+and `103cde79c006074eaabe5083fec212ba237fcf3a42f01b0600e0faf0328a05a8`.
+[Attestation 44605007](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44605007)
+covers the 18 manifest subjects. The official MCP Registry version 0.18.0 is
+active/latest. Separately,
+[container run 33593840346](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593840346)
+published and smoke-tested the multi-platform CLI index at
+`sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e`;
+[attestation 44605376](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44605376)
+binds it to the same candidate. GitHub reports the Release record as
+`immutable: false`; protected version tags and current checksum/transparency
+receipts do not make the Release assets platform-enforced immutable.
 
 ## [0.17.1] - 2026-09-02
 

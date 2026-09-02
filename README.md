@@ -13,29 +13,33 @@ The carrier is infrastructure for inspection and reproducibility. It is not an
 order, recommendation, credit rating, market-data entitlement, or endorsement
 by Bloomberg, LSEG, FactSet, FINOS, or any other platform.
 
-The current signed and published core release is `v0.17.1`. Annotated tag
-object `8844ee4556d59472a587cb9ceb412112c23543db` targets the allowlisted
-SSH-signed candidate `a74274236e177404c2d254541e6a4110a4ce8a0d`, which is an ancestor of
-protected `main` at `9a79c3e0c907fd0d698c934ab426ea0a8106303a`. The candidate passed
-[preflight run 33589423934](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589423934),
-and [release run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958)
-published checksum- and provenance-attested assets on 2026-09-02. The official
-MCP Registry record is active/latest at 0.17.1 with the exact published MCPB
-digest.
+The current signed and published core release is `v0.18.0`. Annotated tag
+object `42dd412ef27b470841b71b8bc73c0ed63a5e4a6b` targets the allowlisted
+SSH-signed candidate `906ca033a96ea862ab813c64db2a6b01c5ce8c4f`, tree
+`0065206e14a21bb01ce25caed60bf14c9570d12f`, which is an ancestor of protected
+`main` at `a4ec5d444cfe5b22b388b2e19e79de0d0cb0427c`. The candidate passed
+[preflight run 33593756967](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593756967),
+and [release run 33593840364](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593840364)
+published 19 assets at `2026-09-02T05:14:06Z`. The `SHA256SUMS` file covers the
+other 18 assets, matches their strict provenance subjects, and hashes to
+`71c2c884d16fd3315a21c263ec8254b0f9578c8150f4a424c296228668d89953`.
+The official MCP Registry record is active/latest at 0.18.0 and pins the
+published MCPB SHA-256
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`.
 
-This source checkpoint prepares `v0.18.0`; it is not yet tagged, published, or
-registered. The candidate adds authenticated sync/async paper-order gateways
-around the low-level `before_order` verification boundary, while keeping live
-submission held and the MCP server read-only. It also prepares Trade Safety
-gateway `0.1.1` with a patched Starlette floor and updated FastAPI/test
-constraints. Until the complete candidate passes protected-main preflight and
-the controlled signed-tag release,
-`v0.17.1` remains the production pin. See
-[`docs/RELEASE-0.18.0.md`](docs/RELEASE-0.18.0.md) for the candidate gates; no
-v0.18.0 publication receipt is asserted here. The prepared deterministic MCPB
-SHA-256 is
-`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`;
-that local candidate identity is not evidence that the future asset URL exists.
+Release `v0.18.0` adds authenticated sync/async paper-order gateways around the
+low-level `before_order` verification boundary while keeping live submission
+held and the MCP server read-only. It also publishes Trade Safety gateway
+`0.1.1` with a patched Starlette floor and updated FastAPI/test constraints.
+[Container run 33593840346](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593840346)
+published and smoke-tested the multi-platform CLI index at
+`sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e`.
+See [`docs/RELEASE-0.18.0.md`](docs/RELEASE-0.18.0.md) for the complete release,
+Registry, attestation, and container receipt. GitHub currently reports the
+Release record itself as `immutable: false`; version-tag ruleset `21288366`
+blocks `v*` tag update and deletion with no bypass, and the current assets are
+checksum- and transparency-attested, but they are not described here as
+platform-enforced immutable assets.
 
 The immutable annotated `v0.17.0` tag object
 `cb85e527c2b74abf476fd9a01b73b2235ce976b7` targets protected-main merge
@@ -43,7 +47,7 @@ The immutable annotated `v0.17.0` tag object
 [release run 33585764285](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33585764285)
 failed at the commit-signature gate before any artifact was built, attested, or
 published. There is no v0.17.0 GitHub release or official MCP Registry record.
-See [`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) for the complete current
+See [`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) for the unchanged recovery
 receipt and [`docs/RELEASE-0.17.0.md`](docs/RELEASE-0.17.0.md) for the unchanged
 failed-attempt record.
 
@@ -72,14 +76,14 @@ separately identified reference rather than silently upgraded.
 uv sync --locked
 uv run liquilens-evidence --help
 
-# Signed v0.17.1 wheel; checksum verified against the release manifest
-python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens_evidence-0.17.1-py3-none-any.whl#sha256=dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea'
+# Signed v0.18.0 wheel; checksum verified against the release manifest
+python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.18.0/liquilens_evidence-0.18.0-py3-none-any.whl#sha256=9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef'
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
 ```
 
-Published release `v0.17.1` provides a wheel and checksum manifest. The Python
+Published release `v0.18.0` provides a wheel and checksum manifest. The Python
 runtime has no third-party dependencies. A Node.js verifier is also
 included for cross-language `liquilens-hash-tree-v1` identity checks:
 
@@ -96,11 +100,11 @@ node protocol/verify_hash_tree_v1.mjs --artifact trade-safety-receipt receipt.js
 | Full carrier | `https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json` | Published and hosted |
 | Redacted reference | `https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json` | Published and hosted |
 | Four-product fleet brief | `https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json` | Published and hosted |
-| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
-| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
-| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
-| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
-| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | Published v0.17.1 release asset and canonically hosted |
+| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | Published v0.18.0 release asset and canonically hosted |
+| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | Published v0.18.0 release asset and canonically hosted |
+| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | Published v0.18.0 release asset and canonically hosted |
+| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | Published v0.18.0 release asset and canonically hosted |
+| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | Published v0.18.0 release asset and canonically hosted |
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` | Published and hosted |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` | Published and hosted |
 
@@ -110,18 +114,18 @@ succeeded at 2026-09-02T04:49:12Z for site revision
 `3ec660175c81c5b282715ee400eea2f771dc2610`; its post-deploy gate retrieved all
 five URLs over HTTPS and matched their exact bytes to the hashes in
 [`protocol/catalog.json`](protocol/catalog.json). This is schema-hosting proof,
-not a hosted Trade Safety gateway or a v0.18.0 publication receipt.
+not a hosted Trade Safety gateway or live-order activation receipt.
 
-The current contracts are v1. Release `v0.17.1` adds Trade Safety without
-changing the previously published Carrier or Fleet Brief semantics. Candidate
+The current contracts are v1. Release `v0.17.1` added Trade Safety without
+changing the previously published Carrier or Fleet Brief semantics. Release
 `v0.18.0` preserves the v1 schema bytes and adds a Python enforcement adapter;
-it does not create a new protocol identity. The v0.17.1 signed release workflow is
-[run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958),
+it does not create a new protocol identity. The v0.18.0 signed release workflow is
+[run 33593840364](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33593840364),
 the wheel SHA-256 is
-`dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea`, and
+`9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef`, and
 the MCPB SHA-256 is
-`4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1`.
-Production integrations can pin `v0.17.1`; separately released container,
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`.
+Production integrations can pin `v0.18.0`; separately released container,
 skill, plugin, browser, and package-manager channels retain their own verified
 versions. The canonical URLs are now available for public schema discovery.
 
@@ -208,8 +212,7 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The published `v0.17.1` release and prepared `v0.18.0` candidate expose the same
-four read-only tools:
+The published `v0.18.0` release exposes four read-only tools:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
@@ -222,11 +225,11 @@ four read-only tools:
   inside the tenant boundary.
 
 It never fetches network data, expands restricted rights, recommends, rates
-credit, or executes a financial action. The published `v0.17.1` GitHub release
+credit, or executes a financial action. The published `v0.18.0` GitHub release
 carries the checksum-pinned
-[`liquilens-evidence-carrier-mcp-0.17.1.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens-evidence-carrier-mcp-0.17.1.mcpb)
+[`liquilens-evidence-carrier-mcp-0.18.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.18.0/liquilens-evidence-carrier-mcp-0.18.0.mcpb)
 bundle for compatible desktop clients. Registry identity:
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.17.1).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.18.0).
 
 <!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
@@ -240,9 +243,9 @@ bundle for compatible desktop clients. Registry identity:
   strict order, policy, evidence, broker-preview, receipt and verification
   semantics; the companion adoption plan separates discovery from enforcement.
 - [`CHANGELOG.md`](CHANGELOG.md), the
-  [`v0.18.0 candidate gate`](docs/RELEASE-0.18.0.md), and the immutable
-  [`v0.17.1 publication receipt`](docs/RELEASE-0.17.1.md) separate prepared
-  source from live release and independently versioned distribution channels.
+  [`v0.18.0 publication receipt`](docs/RELEASE-0.18.0.md), and the unchanged
+  [`v0.17.1 recovery receipt`](docs/RELEASE-0.17.1.md) separate current release
+  facts from immutable history and independently versioned channels.
 - [`integrations/fdc3`](integrations/fdc3) contains the custom financial-desktop
   context schema.
 - [`integrations/openlineage`](integrations/openlineage) contains the custom
@@ -258,7 +261,7 @@ bundle for compatible desktop clients. Registry identity:
 Pin the reusable action to an exact release tag:
 
 ```yaml
-- uses: beepboop2025/liquilens-evidence-carrier@v0.17.1
+- uses: beepboop2025/liquilens-evidence-carrier@v0.18.0
   with:
     path: evidence/close.evidence.json
 ```
