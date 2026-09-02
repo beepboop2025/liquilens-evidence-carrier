@@ -14,11 +14,23 @@ authority.
   fail-closed release and runtime corrections.
 - Require successful tag and allowlisted candidate-commit signature checks plus
   protected-main ancestry verification before any build, attestation, GitHub
-  publication, Registry publication, or deployment claim.
+  publication, or Registry publication.
 
-Prepared source entry only. `v0.17.1` is not tagged, published, registered, or
-deployed. The latest signed, downloadable, and Registry-listed core release
-remains `v0.16.0`.
+Published from allowlisted SSH-signed candidate
+`a74274236e177404c2d254541e6a4110a4ce8a0d` after green
+[preflight run 33589423934](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589423934).
+Signed annotated tag object `8844ee4556d59472a587cb9ceb412112c23543db`
+and [release run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958)
+produced the GitHub release, checksummed and attested 18 manifest assets, and an
+active/latest official MCP Registry 0.17.1 record. The wheel SHA-256 is
+`dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea`;
+the MCPB SHA-256 is
+`4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1`.
+Separately, [container run 33589489966](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489966)
+published the multi-platform CLI index at
+`sha256:bd9b92f25fa8666ea1f43afc4047261ad82213f3c121da87f4dcb9f2e401776d`.
+No hosted gateway or canonical-site deployment is claimed by these release
+receipts.
 
 ## [0.17.0] - 2026-09-02
 

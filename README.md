@@ -13,21 +13,25 @@ The carrier is infrastructure for inspection and reproducibility. It is not an
 order, recommendation, credit rating, market-data entitlement, or endorsement
 by Bloomberg, LSEG, FactSet, FINOS, or any other platform.
 
-This source tree is versioned for `v0.17.1`; a source version alone is not
-publication proof. It is not published as `v0.17.1`. The immutable annotated
-`v0.17.0` tag object
+The current signed and published core release is `v0.17.1`. Annotated tag
+object `8844ee4556d59472a587cb9ceb412112c23543db` targets the allowlisted
+SSH-signed candidate `a74274236e177404c2d254541e6a4110a4ce8a0d`, which is an ancestor of
+protected `main` at `9a79c3e0c907fd0d698c934ab426ea0a8106303a`. The candidate passed
+[preflight run 33589423934](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589423934),
+and [release run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958)
+published checksum- and provenance-attested assets on 2026-09-02. The official
+MCP Registry record is active/latest at 0.17.1 with the exact published MCPB
+digest.
+
+The immutable annotated `v0.17.0` tag object
 `cb85e527c2b74abf476fd9a01b73b2235ce976b7` targets protected-main merge
 `edde9b92ad9851d2974b91326a8c3877f4386d3a`, but its
 [release run 33585764285](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33585764285)
 failed at the commit-signature gate before any artifact was built, attested, or
 published. There is no v0.17.0 GitHub release or official MCP Registry record.
-The latest signed, published core release therefore remains `v0.16.0`, released
-on 2026-08-29 from reviewed commit
-`410f7d91114fba715e9a9ae830faa775064a4502`. See
-[`docs/RELEASE-0.16.0.md`](docs/RELEASE-0.16.0.md) for its exact receipts,
-[`docs/RELEASE-0.17.0.md`](docs/RELEASE-0.17.0.md) for the failed attempt, and
-[`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) for the recovery candidate
-boundary.
+See [`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) for the complete current
+receipt and [`docs/RELEASE-0.17.0.md`](docs/RELEASE-0.17.0.md) for the unchanged
+failed-attempt record.
 
 ## Why it travels
 
@@ -54,14 +58,14 @@ separately identified reference rather than silently upgraded.
 uv sync --locked
 uv run liquilens-evidence --help
 
-# Signed v0.16.0 wheel; checksum verified against the release manifest
-python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens_evidence-0.16.0-py3-none-any.whl#sha256=317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11'
+# Signed v0.17.1 wheel; checksum verified against the release manifest
+python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens_evidence-0.17.1-py3-none-any.whl#sha256=dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea'
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
 ```
 
-Published release `v0.16.0` provides a wheel and checksum manifest. The Python
+Published release `v0.17.1` provides a wheel and checksum manifest. The Python
 runtime has no third-party dependencies. A Node.js verifier is also
 included for cross-language `liquilens-hash-tree-v1` identity checks:
 
@@ -78,27 +82,29 @@ node protocol/verify_hash_tree_v1.mjs --artifact trade-safety-receipt receipt.js
 | Full carrier | `https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json` | Published and hosted |
 | Redacted reference | `https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json` | Published and hosted |
 | Four-product fleet brief | `https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json` | Published and hosted |
-| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | v0.17.1 candidate; not hosted yet |
-| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | v0.17.1 candidate; not hosted yet |
-| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | v0.17.1 candidate; not hosted yet |
-| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | v0.17.1 candidate; not hosted yet |
-| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | v0.17.1 candidate; not hosted yet |
+| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
+| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
+| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
+| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
+| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` | Published and hosted |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` | Published and hosted |
 
-The candidate identities above are stable schema `$id` values, not evidence of
-public retrieval. Treat them as hosted only after the exact tagged bytes are
+The five Trade Safety identities above are stable schema `$id` values and their
+exact bytes are downloadable from the signed release. They are not evidence of
+canonical-site retrieval: all five URLs returned HTTP 404 during the 2026-09-02
+post-release check. Treat them as hosted only after the tagged bytes are
 deployed to LiquiLens Pages and independently retrieved from those URLs.
 
-The current contracts are v1. Source candidate `v0.17.1` adds Trade Safety
-without changing the previously published Carrier or Fleet Brief semantics.
-Release `v0.16.0` remains the production pin. Its signed release
-workflow is [run 33261143612](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33261143612),
+The current contracts are v1. Release `v0.17.1` adds Trade Safety without
+changing the previously published Carrier or Fleet Brief semantics. Its signed
+release workflow is
+[run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958),
 the wheel SHA-256 is
-`317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11`, and
+`dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea`, and
 the MCPB SHA-256 is
-`c44b13b2efc4622a8ecfc06848f32358982dd2a9458a271e1ed77d646791961a`.
-Production integrations can pin `v0.16.0`; separately released container,
+`4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1`.
+Production integrations can pin `v0.17.1`; separately released container,
 skill, plugin, browser, and package-manager channels retain their own verified
 versions. Use the canonical URLs as schema identities; use them for public
 discovery only after their availability row says they are hosted.
@@ -177,7 +183,7 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The `v0.17.1` source candidate exposes four read-only tools:
+The `v0.17.1` release exposes four read-only tools:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
@@ -190,11 +196,11 @@ The `v0.17.1` source candidate exposes four read-only tools:
   inside the tenant boundary.
 
 It never fetches network data, expands restricted rights, recommends, rates
-credit, or executes a financial action. The published `v0.16.0` GitHub release
+credit, or executes a financial action. The published `v0.17.1` GitHub release
 carries the checksum-pinned
-[`liquilens-evidence-carrier-mcp-0.16.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens-evidence-carrier-mcp-0.16.0.mcpb)
+[`liquilens-evidence-carrier-mcp-0.17.1.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens-evidence-carrier-mcp-0.17.1.mcpb)
 bundle for compatible desktop clients. Registry identity:
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.16.0).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.17.1).
 
 <!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
@@ -208,7 +214,7 @@ bundle for compatible desktop clients. Registry identity:
   strict order, policy, evidence, broker-preview, receipt and verification
   semantics; the companion adoption plan separates discovery from enforcement.
 - [`CHANGELOG.md`](CHANGELOG.md) and
-  [`docs/RELEASE-0.16.0.md`](docs/RELEASE-0.16.0.md) record the published core
+  [`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) record the published core
   release, exact receipts, and separately versioned distribution channels.
 - [`integrations/fdc3`](integrations/fdc3) contains the custom financial-desktop
   context schema.
@@ -225,7 +231,7 @@ bundle for compatible desktop clients. Registry identity:
 Pin the reusable action to an exact release tag:
 
 ```yaml
-- uses: beepboop2025/liquilens-evidence-carrier@v0.16.0
+- uses: beepboop2025/liquilens-evidence-carrier@v0.17.1
   with:
     path: evidence/close.evidence.json
 ```
