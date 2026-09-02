@@ -35,10 +35,10 @@
           '';
           build-system = [ pkgs.python3Packages.setuptools ];
 
-          nativeCheckInputs = with pkgs.python3Packages; [
+          nativeCheckInputs = [ pkgs.nodejs ] ++ (with pkgs.python3Packages; [
             jsonschema
             pytestCheckHook
-          ];
+          ]);
           pythonImportsCheck = [ "liquilens_evidence" ];
 
           meta = {
