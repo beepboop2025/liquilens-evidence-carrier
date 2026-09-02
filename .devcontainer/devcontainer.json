@@ -4,7 +4,7 @@
     "dockerfile": "../Dockerfile",
     "context": "..",
     "args": {
-      "VERSION": "0.17.0"
+      "VERSION": "0.17.1"
     }
   },
   "containerUser": "liquilens",

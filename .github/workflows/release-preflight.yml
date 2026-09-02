@@ -1,0 +1,90 @@
+name: Release preflight
+run-name: Release preflight v${{ inputs.version }} @ ${{ inputs.candidate_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: Exact allowlisted SSH-signed candidate commit
+        required: true
+        type: string
+      version:
+        description: Release version without the v prefix
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-before-tag:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: main
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Require the protected-main controller
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_WORKFLOW_REF" = \
+            "$GITHUB_REPOSITORY/.github/workflows/release-preflight.yml@refs/heads/main"
+      - name: Verify candidate before immutable tag creation
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python scripts/verify_release_candidate.py \
+            --commit "$CANDIDATE_SHA" \
+            --version "$RELEASE_VERSION"
+      - name: Materialize the exact candidate tree
+        id: candidate
+        env:
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        run: |
+          candidate_root="$(mktemp -d "$RUNNER_TEMP/liquilens-preflight.XXXXXX")"
+          candidate_path="$candidate_root/candidate"
+          git worktree add --detach "$candidate_path" "$CANDIDATE_SHA"
+          printf 'path=%s\n' "$candidate_path" >> "$GITHUB_OUTPUT"
+      - name: Install the locked candidate environment
+        env:
+          CANDIDATE_PATH: ${{ steps.candidate.outputs.path }}
+        run: |
+          python -m pip install uv==0.12.5
+          uv sync --directory "$CANDIDATE_PATH" --locked --extra dev
+      - name: Replay release-critical gates before tagging
+        env:
+          CANDIDATE_PATH: ${{ steps.candidate.outputs.path }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          cd "$CANDIDATE_PATH"
+          uv run --locked --extra dev pytest -q
+          uv run --locked --extra dev python scripts/validate_kit.py
+          uv sync --project integrations/trade-safety-gateway --locked --extra test
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            pytest -q integrations/trade-safety-gateway/tests
+
+          source_date_epoch="$(git show -s --format=%ct "$CANDIDATE_SHA")"
+          mkdir -p "$RUNNER_TEMP/release-build"
+          SOURCE_DATE_EPOCH="$source_date_epoch" \
+            uv build --out-dir "$RUNNER_TEMP/release-build"
+          SOURCE_DATE_EPOCH="$source_date_epoch" \
+            uv build --project integrations/trade-safety-gateway \
+              --out-dir "$RUNNER_TEMP/release-build"
+
+          mkdir -p "$RUNNER_TEMP/mcpb-one" "$RUNNER_TEMP/mcpb-two"
+          artifact="$RUNNER_TEMP/mcpb-one/liquilens-evidence-carrier-mcp-${RELEASE_VERSION}.mcpb"
+          replay="$RUNNER_TEMP/mcpb-two/liquilens-evidence-carrier-mcp-${RELEASE_VERSION}.mcpb"
+          uv run --locked --extra dev python scripts/build_mcpb.py \
+            --output "$artifact" \
+            --check-registry-metadata
+          uv run --locked --extra dev python scripts/build_mcpb.py \
+            --output "$replay" \
+            --check-registry-metadata
+          cmp --silent "$artifact" "$replay"
+          sha256sum "$artifact"

@@ -252,7 +252,7 @@ def _receipt(*, mode: str = "observe") -> dict:
         },
         "issuer": {
             "name": "liquilens-trade-safety",
-            "version": "0.17.0-conformance",
+            "version": "0.17.1-conformance",
             "endpoint": "https://liquilens.in/protocol/",
         },
         "integrity": {

@@ -126,3 +126,52 @@ def test_release_publishes_and_attests_trade_safety_assets():
 
     publish_step = workflow.split("- name: Publish public release", maxsplit=1)[1]
     assert 'gh release create "$GITHUB_REF_NAME" dist/*' in publish_step
+
+
+def test_release_preflight_runs_before_any_immutable_tag_is_created():
+    workflow = (ROOT / ".github/workflows/release-preflight.yml").read_text(
+        encoding="utf-8"
+    )
+    script = (ROOT / "scripts/verify_release_candidate.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "workflow_dispatch:" in workflow
+    assert "run-name: Release preflight v${{ inputs.version }}" in workflow
+    assert "contents: read" in workflow
+    assert "contents: write" not in workflow
+    assert "verify_release_candidate.py" in workflow
+    assert "ref: main" in workflow
+    assert 'test "$GITHUB_REF" = "refs/heads/main"' in workflow
+    assert workflow.count("scripts/build_mcpb.py") == 2
+    assert workflow.count("--check-registry-metadata") == 2
+    assert 'cmp --silent "$artifact" "$replay"' in workflow
+    for invariant in (
+        "verify-commit",
+        "merge-base",
+        "validate_candidate_metadata",
+        "fileSha256",
+        "ls-remote",
+    ):
+        assert invariant in script
+
+    controller = (ROOT / "scripts/create_release_tag.py").read_text(
+        encoding="utf-8"
+    )
+    for binding in (
+        "preflight_run_id",
+        "display_title",
+        '"conclusion": "success"',
+        '"head_branch": "main"',
+        '"path": ".github/workflows/release-preflight.yml"',
+        '"git", "tag", "-s"',
+        'f"refs/tags/{tag}:refs/tags/{tag}"',
+        "TAG_PUSH_PUBLIC_KEY_PATH",
+        "GITHUB_HTTPS_REPOSITORY",
+        "GITHUB_SSH_REPOSITORY",
+        "TAG_CREATION_RULESET_ID",
+        "IMMUTABLE_TAG_RULESET_ID",
+        "TAG_PUSH_DEPLOY_KEY_ID",
+        "validate_repository_tag_policy",
+    ):
+        assert binding in controller

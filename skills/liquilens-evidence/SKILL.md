@@ -35,7 +35,7 @@ uvx --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/
 Fleet Brief verification requires `liquilens-evidence >= 0.15.0` or an MCP
 server that actually lists `verify_fleet_brief`. The command above is pinned to
 the signed release wheel and fails closed if its bytes change.
-Trade Safety Receipt verification requires `liquilens-evidence >= 0.17.0` or
+Trade Safety Receipt verification requires `liquilens-evidence >= 0.17.1` or
 an MCP server that actually lists `verify_trade_safety_receipt`.
 
 Use the task's explicit UTC evaluation time when supplied. If current policy

@@ -25,7 +25,7 @@ classifiers = [
 dependencies = [
     "fastapi>=0.116.1,<0.117",
     "httpx>=0.28.1,<0.29",
-    "liquilens-evidence==0.17.0",
+    "liquilens-evidence==0.17.1",
     "uvicorn>=0.35.0,<0.36",
 ]
 
