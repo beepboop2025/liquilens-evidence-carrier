@@ -54,12 +54,16 @@ def _command(
 
 def validate_preflight_run(
     run: dict[str, Any], *, version: str, commit: str, protected_head: str
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Bind a successful protected-main workflow run to version and commit."""
 
+    expected_title = f"Release preflight v{version} @ {commit}"
     expected = {
-        "name": "Release preflight",
-        "display_title": f"Release preflight v{version} @ {commit}",
+        # GitHub currently exposes a workflow's configured `run-name` in both
+        # fields on the workflow-run REST resource. The static workflow name is
+        # checked independently against the workflow resource below.
+        "name": expected_title,
+        "display_title": expected_title,
         "event": "workflow_dispatch",
         "head_branch": "main",
         "path": ".github/workflows/release-preflight.yml",
@@ -73,6 +77,7 @@ def validate_preflight_run(
             )
     head_sha = run.get("head_sha")
     url = run.get("html_url")
+    workflow_id = run.get("workflow_id")
     if not isinstance(head_sha, str) or re.fullmatch(r"[0-9a-f]{40}", head_sha) is None:
         raise PreflightError("preflight run head_sha is not an exact commit SHA")
     if head_sha != protected_head:
@@ -83,7 +88,47 @@ def validate_preflight_run(
         f"https://github.com/{GITHUB_REPOSITORY}/actions/runs/"
     ):
         raise PreflightError("preflight run URL is not from the release repository")
-    return {"controller_commit": head_sha, "url": url}
+    if (
+        not isinstance(workflow_id, int)
+        or isinstance(workflow_id, bool)
+        or workflow_id <= 0
+    ):
+        raise PreflightError("preflight run workflow_id must be a positive integer")
+    return {
+        "controller_commit": head_sha,
+        "url": url,
+        "workflow_id": workflow_id,
+    }
+
+
+def validate_preflight_workflow(
+    workflow: dict[str, Any], *, workflow_id: int
+) -> dict[str, Any]:
+    """Bind the run to the active, static workflow definition on protected main."""
+
+    expected = {
+        "id": workflow_id,
+        "name": "Release preflight",
+        "path": ".github/workflows/release-preflight.yml",
+        "state": "active",
+        "html_url": (
+            f"https://github.com/{GITHUB_REPOSITORY}/blob/main/"
+            ".github/workflows/release-preflight.yml"
+        ),
+    }
+    for field, expected_value in expected.items():
+        actual = workflow.get(field)
+        if actual != expected_value:
+            raise PreflightError(
+                f"preflight workflow {field} is {actual!r}; "
+                f"expected {expected_value!r}"
+            )
+    return {
+        "id": workflow_id,
+        "name": expected["name"],
+        "path": expected["path"],
+        "url": expected["html_url"],
+    }
 
 
 def validate_remote_tag_refs(
@@ -139,6 +184,18 @@ def _github_run(repository: Path, run_id: str) -> dict[str, Any]:
     )
     if not isinstance(value, dict):
         raise PreflightError("GitHub preflight response must be an object")
+    return value
+
+
+def _github_workflow(repository: Path, workflow_id: int) -> dict[str, Any]:
+    if workflow_id <= 0:
+        raise PreflightError("preflight workflow ID must be positive")
+    value = _github_api(
+        repository,
+        f"repos/{GITHUB_REPOSITORY}/actions/workflows/{workflow_id}",
+    )
+    if not isinstance(value, dict):
+        raise PreflightError("GitHub preflight workflow response must be an object")
     return value
 
 
@@ -318,6 +375,11 @@ def create_release_tag(
         commit=commit,
         protected_head=receipt["protected_head"],
     )
+    workflow = _github_workflow(repository, run_receipt["workflow_id"])
+    workflow_receipt = validate_preflight_workflow(
+        workflow,
+        workflow_id=run_receipt["workflow_id"],
+    )
     policy_receipt, expected_push_public = _repository_tag_policy(
         repository,
         protected_head=receipt["protected_head"],
@@ -326,6 +388,7 @@ def create_release_tag(
         return {
             **receipt,
             "preflight_run": run_receipt,
+            "preflight_workflow": workflow_receipt,
             "tag_policy": policy_receipt,
             "tag_created": False,
             "tag_pushed": False,
@@ -411,6 +474,7 @@ def create_release_tag(
     return {
         **receipt,
         "preflight_run": run_receipt,
+        "preflight_workflow": workflow_receipt,
         "tag_policy": policy_receipt,
         "tag_object": tag_object,
         "tag_created": True,

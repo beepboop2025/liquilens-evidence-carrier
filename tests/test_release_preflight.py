@@ -3,6 +3,7 @@
 import runpy
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 TAG_CONTROLLER = runpy.run_path(str(ROOT / "scripts/create_release_tag.py"))
 TagPreflightError = TAG_CONTROLLER["PreflightError"]
 validate_preflight_run = TAG_CONTROLLER["validate_preflight_run"]
+validate_preflight_workflow = TAG_CONTROLLER["validate_preflight_workflow"]
 validate_remote_tag_refs = TAG_CONTROLLER["validate_remote_tag_refs"]
 validate_repository_tag_policy = TAG_CONTROLLER["validate_repository_tag_policy"]
 
@@ -92,14 +94,15 @@ def test_git_like_inputs_fail_before_any_network_call(field, value, message):
         verify_release_candidate(ROOT, **arguments)
 
 
-def _successful_run() -> dict[str, str]:
+def _successful_run() -> dict[str, Any]:
     commit = "a" * 40
     return {
-        "name": "Release preflight",
+        "name": f"Release preflight v0.17.1 @ {commit}",
         "display_title": f"Release preflight v0.17.1 @ {commit}",
         "event": "workflow_dispatch",
         "head_branch": "main",
         "head_sha": "b" * 40,
+        "workflow_id": 348081695,
         "path": ".github/workflows/release-preflight.yml",
         "conclusion": "success",
         "html_url": (
@@ -118,6 +121,7 @@ def test_tag_controller_binds_successful_run_to_exact_candidate():
         protected_head="b" * 40,
     )
     assert receipt["controller_commit"] == "b" * 40
+    assert receipt["workflow_id"] == 348081695
 
 
 @pytest.mark.parametrize(
@@ -126,6 +130,7 @@ def test_tag_controller_binds_successful_run_to_exact_candidate():
         ("conclusion", "failure"),
         ("head_branch", "feature"),
         ("path", ".github/workflows/other.yml"),
+        ("name", "Release preflight"),
         ("display_title", "Release preflight v0.17.1 @ " + "c" * 40),
     ),
 )
@@ -133,6 +138,45 @@ def test_tag_controller_rejects_unbound_or_failed_run(field, value):
     run = _successful_run()
     run[field] = value
     with pytest.raises(TagPreflightError, match=field):
+        validate_preflight_run(
+            run,
+            version="0.17.1",
+            commit="a" * 40,
+            protected_head="b" * 40,
+        )
+
+
+def test_tag_controller_binds_run_to_static_active_workflow():
+    workflow = {
+        "id": 348081695,
+        "name": "Release preflight",
+        "path": ".github/workflows/release-preflight.yml",
+        "state": "active",
+        "html_url": (
+            "https://github.com/beepboop2025/liquilens-evidence-carrier/"
+            "blob/main/.github/workflows/release-preflight.yml"
+        ),
+    }
+    receipt = validate_preflight_workflow(workflow, workflow_id=348081695)
+    assert receipt["name"] == "Release preflight"
+
+    for field, value in (
+        ("id", 7),
+        ("name", "Other workflow"),
+        ("path", ".github/workflows/other.yml"),
+        ("state", "disabled_manually"),
+        ("html_url", "https://example.invalid/workflow"),
+    ):
+        changed = dict(workflow)
+        changed[field] = value
+        with pytest.raises(TagPreflightError, match=field):
+            validate_preflight_workflow(changed, workflow_id=348081695)
+
+
+def test_tag_controller_rejects_invalid_run_workflow_id():
+    run = _successful_run()
+    run["workflow_id"] = 0
+    with pytest.raises(TagPreflightError, match="workflow_id"):
         validate_preflight_run(
             run,
             version="0.17.1",
