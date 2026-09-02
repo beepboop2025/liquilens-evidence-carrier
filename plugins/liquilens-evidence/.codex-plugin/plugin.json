@@ -1,6 +1,6 @@
 {
   "name": "liquilens-evidence",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "description": "Verify local Evidence Carrier, Fleet Brief, or Trade Safety Receipt JSON without widening authority.",
   "author": {
     "name": "LiquiLens",

@@ -814,6 +814,12 @@ def trade_safety_request_hash(value: Mapping[str, Any]) -> str:
     return _hash_object(validate_trade_safety_request(value))
 
 
+def trade_safety_policy_hash(value: Mapping[str, Any]) -> str:
+    """Return the canonical hash used to pin an operator-approved policy."""
+
+    return _hash_object(validate_trade_safety_policy(value))
+
+
 def _append_reason(reasons: list[str], reason: str) -> None:
     if reason not in reasons:
         reasons.append(reason)
@@ -1404,6 +1410,7 @@ __all__ = [
     "TradeSafetyOutcome",
     "VerifiedTradeSafetyReceipt",
     "issue_trade_safety_receipt",
+    "trade_safety_policy_hash",
     "trade_safety_request_hash",
     "validate_broker_preview_reference",
     "validate_trade_safety_evidence",

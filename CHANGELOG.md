@@ -5,6 +5,34 @@ public merely because it appears in this file: the signed GitHub release,
 checksums, attestations, and distribution receipts remain the publication
 authority.
 
+## [0.18.0] - 2026-09-02
+
+- Add synchronous and asynchronous authenticated paper-order gateways that bind
+  one exact request, account, policy, issuer, execution identity, current clock,
+  and one-time receipt claim before a private submit callback can run.
+- Keep live and observation submission fail-closed, keep the MCP server
+  read-only, and require durable idempotency plus uncertain-outcome
+  reconciliation before any separately reviewed live adapter may be activated.
+- Preserve all Trade Safety v1 schema identities and bytes; this is an additive
+  Python enforcement boundary, not a new protocol version.
+- Prepare the separately packaged Trade Safety gateway as `0.1.1`, with
+  FastAPI `>=0.141.1,<0.142`, direct Starlette `>=1.3.1,<2`, and pytest
+  `>=9.0.3,<10`. The regenerated lock resolves Starlette 1.6.0 and pytest 9.1.1,
+  clearing three high, three moderate, and one low dependency-alert ranges.
+- Record the independent canonical Trade Safety schema publication proven by
+  LiquiLens Pages run
+  [33592149926](https://github.com/beepboop2025/liquilens-site/actions/runs/33592149926)
+  at site revision `3ec660175c81c5b282715ee400eea2f771dc2610`, without
+  representing it as a hosted gateway or core v0.18.0 release.
+
+This source is a candidate only. No `v0.18.0` tag, GitHub release, checksum
+manifest, attestation, official MCP Registry version, or v0.18.0 container
+receipt exists yet. The current production pin remains `v0.17.1`; publication
+facts must be added only after the controlled signed-tag workflows succeed.
+The deterministic candidate MCPB currently hashes to
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`;
+this is prepared-source identity, not publication proof.
+
 ## [0.17.1] - 2026-09-02
 
 - Recover the Trade Safety release under a new version identity without moving,

@@ -93,10 +93,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.1.0 .
+  -t liquilens-trade-safety-gateway:0.1.1 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.1.0
+  -p 8080:8080 liquilens-trade-safety-gateway:0.1.1
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the

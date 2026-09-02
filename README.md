@@ -23,6 +23,20 @@ published checksum- and provenance-attested assets on 2026-09-02. The official
 MCP Registry record is active/latest at 0.17.1 with the exact published MCPB
 digest.
 
+This source checkpoint prepares `v0.18.0`; it is not yet tagged, published, or
+registered. The candidate adds authenticated sync/async paper-order gateways
+around the low-level `before_order` verification boundary, while keeping live
+submission held and the MCP server read-only. It also prepares Trade Safety
+gateway `0.1.1` with a patched Starlette floor and updated FastAPI/test
+constraints. Until the complete candidate passes protected-main preflight and
+the controlled signed-tag release,
+`v0.17.1` remains the production pin. See
+[`docs/RELEASE-0.18.0.md`](docs/RELEASE-0.18.0.md) for the candidate gates; no
+v0.18.0 publication receipt is asserted here. The prepared deterministic MCPB
+SHA-256 is
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`;
+that local candidate identity is not evidence that the future asset URL exists.
+
 The immutable annotated `v0.17.0` tag object
 `cb85e527c2b74abf476fd9a01b73b2235ce976b7` targets protected-main merge
 `edde9b92ad9851d2974b91326a8c3877f4386d3a`, but its
@@ -82,23 +96,26 @@ node protocol/verify_hash_tree_v1.mjs --artifact trade-safety-receipt receipt.js
 | Full carrier | `https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json` | Published and hosted |
 | Redacted reference | `https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json` | Published and hosted |
 | Four-product fleet brief | `https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json` | Published and hosted |
-| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
-| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
-| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
-| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
-| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | Published v0.17.1 release asset; canonical URL not hosted yet |
+| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
+| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
+| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
+| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` | Published v0.17.1 release asset and canonically hosted |
+| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` | Published v0.17.1 release asset and canonically hosted |
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` | Published and hosted |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` | Published and hosted |
 
-The five Trade Safety identities above are stable schema `$id` values and their
-exact bytes are downloadable from the signed release. They are not evidence of
-canonical-site retrieval: all five URLs returned HTTP 404 during the 2026-09-02
-post-release check. Treat them as hosted only after the tagged bytes are
-deployed to LiquiLens Pages and independently retrieved from those URLs.
+The five Trade Safety identities above are stable schema `$id` values. LiquiLens
+Pages [run 33592149926](https://github.com/beepboop2025/liquilens-site/actions/runs/33592149926)
+succeeded at 2026-09-02T04:49:12Z for site revision
+`3ec660175c81c5b282715ee400eea2f771dc2610`; its post-deploy gate retrieved all
+five URLs over HTTPS and matched their exact bytes to the hashes in
+[`protocol/catalog.json`](protocol/catalog.json). This is schema-hosting proof,
+not a hosted Trade Safety gateway or a v0.18.0 publication receipt.
 
 The current contracts are v1. Release `v0.17.1` adds Trade Safety without
-changing the previously published Carrier or Fleet Brief semantics. Its signed
-release workflow is
+changing the previously published Carrier or Fleet Brief semantics. Candidate
+`v0.18.0` preserves the v1 schema bytes and adds a Python enforcement adapter;
+it does not create a new protocol identity. The v0.17.1 signed release workflow is
 [run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958),
 the wheel SHA-256 is
 `dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea`, and
@@ -106,8 +123,7 @@ the MCPB SHA-256 is
 `4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1`.
 Production integrations can pin `v0.17.1`; separately released container,
 skill, plugin, browser, and package-manager channels retain their own verified
-versions. Use the canonical URLs as schema identities; use them for public
-discovery only after their availability row says they are hosted.
+versions. The canonical URLs are now available for public schema discovery.
 
 ## Order-bound Trade Safety Receipts
 
@@ -140,6 +156,15 @@ credit-rating, and executable-quote authority false. See
 [`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md), the
 [`adoption plan`](docs/TRADE-SAFETY-ADOPTION-PLAN.md), and the
 [`read-only sandbox gateway`](integrations/trade-safety-gateway/README.md).
+
+Python broker and agent runtimes can place the fail-closed, paper-only
+[`before_order` guard](docs/TRADE-SAFETY-ORDER-GUARD.md) around their only
+submit callable. Its agent-facing gateway requires tenant-authenticated HMAC
+receipts, so a missing, expired, mismatched, cross-account, or non-pass receipt
+never reaches broker code. A configured claim store blocks receipt replay; use a
+durable operator-owned store outside local paper/demo runs. Live submission
+remains held until the broker idempotency and uncertain-outcome reconciliation
+gates are complete.
 
 ## Four-product fleet briefs
 
@@ -183,7 +208,8 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The `v0.17.1` release exposes four read-only tools:
+The published `v0.17.1` release and prepared `v0.18.0` candidate expose the same
+four read-only tools:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
@@ -213,9 +239,10 @@ bundle for compatible desktop clients. Registry identity:
 - [`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md) defines
   strict order, policy, evidence, broker-preview, receipt and verification
   semantics; the companion adoption plan separates discovery from enforcement.
-- [`CHANGELOG.md`](CHANGELOG.md) and
-  [`docs/RELEASE-0.17.1.md`](docs/RELEASE-0.17.1.md) record the published core
-  release, exact receipts, and separately versioned distribution channels.
+- [`CHANGELOG.md`](CHANGELOG.md), the
+  [`v0.18.0 candidate gate`](docs/RELEASE-0.18.0.md), and the immutable
+  [`v0.17.1 publication receipt`](docs/RELEASE-0.17.1.md) separate prepared
+  source from live release and independently versioned distribution channels.
 - [`integrations/fdc3`](integrations/fdc3) contains the custom financial-desktop
   context schema.
 - [`integrations/openlineage`](integrations/openlineage) contains the custom

@@ -15,6 +15,17 @@ before the tag was created. The tag-triggered
 published checksummed, GitHub-attested assets, and the official MCP Registry
 record was independently verified active/latest at 0.17.1.
 
+Repository source now prepares core `v0.18.0` and Trade Safety gateway `0.1.1`,
+but neither candidate is a live distribution. The candidate adds an
+authenticated paper-order guard, preserves the v1 protocol bytes, keeps live
+submission held, and refreshes the gateway dependency floor beyond the known
+Starlette and pytest advisory ranges. `v0.17.1` remains the current published
+core pin until the v0.18.0 protected-main preflight, controlled signed tag,
+attested release, Registry activation, and container verification all succeed.
+The prepared v0.18.0 MCPB SHA-256 is
+`f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`;
+it is candidate metadata, not a downloadable release receipt.
+
 Core publication does not automatically update the independently released OCI,
 Nix, browser, Agent Skill, Codex-plugin, or external-directory channels. The
 matrix below keeps each channel at its own receipt-backed version. LiquiLens is
@@ -26,10 +37,13 @@ Release `v0.17.1` carries strict Trade Safety request, policy, broker-preview
 and receipt contracts, local CLI/MCP verification, cross-language vectors,
 FDC3 assets, and separately packaged read-only sandbox-gateway wheels/source.
 The release and official Registry publication are live; a hosted gateway is
-not. The five new canonical Trade Safety schema/FDC3 URLs still returned HTTP
-404 during the 2026-09-02 post-release check. Production consumers can pin the
-release for local or tenant-hosted use, but must not infer canonical-site or
-gateway deployment from artifact publication.
+not. The five canonical Trade Safety schema/FDC3 URLs became live with exact
+tagged bytes in LiquiLens Pages
+[run 33592149926](https://github.com/beepboop2025/liquilens-site/actions/runs/33592149926),
+which succeeded at 2026-09-02T04:49:12Z for site revision
+`3ec660175c81c5b282715ee400eea2f771dc2610`. Production consumers can pin
+v0.17.1 for local or tenant-hosted use, but must not infer gateway deployment
+or v0.18.0 publication from schema hosting.
 
 ### Immutable v0.17.0 failed attempt
 

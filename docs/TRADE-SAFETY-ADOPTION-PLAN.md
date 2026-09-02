@@ -272,6 +272,16 @@ Deliver Python and TypeScript SDKs, OpenBB provider, LEAN custom data/risk model
 Alpaca paper wrapper, IBKR preview composer, FDC3 app record, examples and
 framework-neutral `before_order` middleware.
 
+The Python `before_order`, paper-only synchronous and asynchronous gateways,
+sealed authorization object, immutable execution binding, and bounded local
+replay consumers are implemented in `liquilens_evidence.order_guard`. The
+agent-facing gateway owns its clock and pins account, tenant, operator, agent,
+runtime, strategy, policy hash, issuer, and integrity-key identity. The
+protected callback also requires tenant-authenticated HMAC integrity;
+hash-only receipts remain conformance artifacts. Live routing remains held until
+a durable broker-idempotency and uncertain-outcome reconciliation state machine
+is specified and independently reviewed.
+
 Gate: each consumer test installs from a pinned artifact in a clean environment
 and proves a missing/expired/mismatched receipt blocks its paper order path.
 
