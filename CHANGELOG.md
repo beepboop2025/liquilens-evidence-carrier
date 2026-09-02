@@ -19,17 +19,39 @@ authority.
   outside the analytics router.
 - Expose the conformance corpus through the protocol catalog and offline MCP
   resources, and add repeatable Node/package gates to CI and release preflight.
-- Prepare read-only Trade Safety gateway 0.1.2 against core 0.19.0 without a
+- Publish read-only Trade Safety gateway 0.1.2 against core 0.19.0 without a
   broker route, hosted deployment, or live-money activation.
-- Prepare signed-release workflows for attested amd64/arm64 dedicated MCP and
-  gateway OCI packages. The latter remains a read-only, hash-only sandbox and
-  the workflows publish registry artifacts only, not hosted services.
+- Publish attested amd64/arm64 core CLI and gateway OCI indexes. The gateway
+  remains a read-only, hash-only sandbox; the separately controlled v0.19.0
+  dedicated MCP image workflow has not been dispatched.
 
-No `v0.19.0` tag, GitHub release, Registry publication, or deployment receipt
-exists at this source checkpoint. Version 0.18.0 remains the production pin.
-The reproducible local MCPB candidate SHA-256 is
-`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`;
-it is not a download receipt.
+Published from allowlisted SSH-signed release commit
+`8f5738c9e77cc95b9a68543d478b9521f5595d61`, tree
+`acca6fa7aab75ebc91bf044e153c6468cd6f9c0c`, after green
+[preflight run 33630656569](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33630656569).
+Signed annotated tag object `c3239bfc7c4d3c4b7fc5ce26e0f602962e7d4337`
+and [release run 33630790150](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33630790150)
+published 23 assets at `2026-09-02T12:36:19Z`. The `SHA256SUMS` SHA-256 is
+`c6d52cbf8794db6e478e3b2ea9e1ed8eee7757137650892a6a96fcbb839bb6bc`;
+the root wheel, MCPB, and gateway 0.1.2 wheel SHA-256 values are respectively
+`1adccb72376f50456fd16a979e372f802ae73ba35b766633bc3d8bd4ab5abcc8`,
+`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`,
+and `e3c685a300aadaafa406ccf38b2d8c56107e7145f6a075d0909a9c74a715f285`.
+[Attestation 44695012](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44695012)
+covers the 22 non-manifest assets, and the official MCP Registry version 0.19.0
+is active/latest. [Core container run 33630789998](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33630789998)
+published and smoke-tested index
+`sha256:bdbfed2afa87f25e8ef88dffeb4ba7ab198854705528c0de5abe31552a170b9a`;
+[attestation 44695462](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44695462)
+binds it to the tagged source. [Gateway run 33630790011](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33630790011)
+published and smoke-tested index
+`sha256:b5c43013da1fdddd9e6e56cab0e4f0f562e39ab25cc640869c5008e3457218e3`;
+[attestation 44695195](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44695195)
+binds it to the same source. No hosted gateway or live-order activation is
+claimed. Canonical Trade Safety schema hosting remains independently proven by
+LiquiLens Pages run
+[33592149926](https://github.com/beepboop2025/liquilens-site/actions/runs/33592149926)
+at site revision `3ec660175c81c5b282715ee400eea2f771dc2610`.
 
 ## [0.18.0] - 2026-09-02
 
