@@ -5,6 +5,8 @@ directory contains machine contracts and downstream gates that can be adopted
 without a negotiated marketplace listing:
 
 - `fdc3/` validates the namespaced financial-desktop context;
+- `trade-safety-gateway/` implements the fixed-upstream, read-only public
+  sandbox; it has no broker credentials or execution route;
 - `openlineage/` validates the custom lineage facet;
 - `dbt/` rejects warehouse rows that strip clocks, rights, or redaction state;
   and
@@ -15,3 +17,8 @@ FDC3 App Directory registration, a Bloomberg/LSEG application listing, a
 certified Power BI connector, an Excel AppSource listing, and public cloud-data
 marketplace listings remain separate deployment and provider-review actions.
 The kit does not label those gated surfaces as live.
+
+The Trade Safety request, policy, broker-preview and receipt schemas live in
+`../protocol/`. The FDC3 directory also contains a receipt context and intent
+fragments. These are workflow and interoperability contracts, not evidence that
+an App Directory, broker, OMS, or runtime has accepted the integration.

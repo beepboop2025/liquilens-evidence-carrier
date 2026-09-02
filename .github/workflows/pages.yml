@@ -9,7 +9,11 @@ on:
     branches: [main]
     paths:
       - browser/**
+      - integrations/fdc3/**
+      - examples/trade-safety/**
       - protocol/*.schema.json
+      - protocol/*.json
+      - protocol/*.mjs
       - LICENSE
       - NOTICE
       - .github/workflows/pages.yml
@@ -55,12 +59,14 @@ jobs:
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Assemble static artifact
         run: |
-          mkdir -p _site/protocol
+          mkdir -p _site/protocol/fdc3 _site/protocol/examples/trade-safety
           cp browser/.nojekyll browser/index.html browser/styles.css _site/
           cp browser/app.mjs browser/examples.mjs browser/verifier.mjs _site/
           cp LICENSE NOTICE _site/
-          cp protocol/liquilens-evidence-carrier-v1.schema.json _site/protocol/
-          cp protocol/liquilens-evidence-carrier-reference-v1.schema.json _site/protocol/
+          cp protocol/*.json protocol/*.mjs _site/protocol/
+          cp integrations/fdc3/*.json _site/protocol/fdc3/
+          cp examples/trade-safety/*.json examples/trade-safety/README.md \
+            _site/protocol/examples/trade-safety/
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

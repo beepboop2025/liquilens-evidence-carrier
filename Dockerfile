@@ -1,4 +1,4 @@
-ARG VERSION="0.16.0"
+ARG VERSION="0.17.0"
 
 FROM python:3.13.7-alpine3.22@sha256:9ba6d8cbebf0fb6546ae71f2a1c14f6ffd2fdab83af7fa5669734ef30ad48844 AS builder
 
@@ -51,7 +51,7 @@ ARG README_URL="https://github.com/beepboop2025/liquilens-evidence-carrier#readm
 ARG MAINTAINERS='[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]'
 
 LABEL org.opencontainers.image.title="LiquiLens Evidence Carrier" \
-      org.opencontainers.image.description="Offline verification of financial evidence carriers and four-product fleet briefs." \
+      org.opencontainers.image.description="Offline verification of evidence carriers, fleet briefs, and trade-safety receipts." \
       org.opencontainers.image.created="${CREATED}" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}" \

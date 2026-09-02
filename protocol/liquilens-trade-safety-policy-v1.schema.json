@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json",
+  "title": "LiquiLens Trade Safety Policy v1",
+  "description": "A fail-closed operator policy for evaluating an exact Trade Safety Request. It cannot authorize, recommend, allocate capital, or execute a trade.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "policy_id",
+    "version",
+    "required_products",
+    "max_evidence_age_seconds",
+    "hold_regimes",
+    "max_notional_usd",
+    "max_exit_cost_bps",
+    "max_venue_spread_bps",
+    "missing_evidence",
+    "live_requires_executable_quote",
+    "live_requires_broker_preview",
+    "auto_resize",
+    "extensions"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.trade-safety-policy.v1"},
+    "policy_id": {"$ref": "#/$defs/nonBlank"},
+    "version": {"$ref": "#/$defs/nonBlank"},
+    "required_products": {
+      "type": "array",
+      "description": "Seiche and Undertow are mandatory baseline dependencies. LiquiLens may be added only when its evidence is applicable and eligible for the evaluated policy.",
+      "minItems": 2,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {"enum": ["seiche", "undertow", "liquilens"]},
+      "allOf": [
+        {"contains": {"const": "seiche"}, "minContains": 1},
+        {"contains": {"const": "undertow"}, "minContains": 1}
+      ]
+    },
+    "max_evidence_age_seconds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seiche", "undertow", "liquilens"],
+      "properties": {
+        "seiche": {"$ref": "#/$defs/positiveInteger"},
+        "undertow": {"$ref": "#/$defs/positiveInteger"},
+        "liquilens": {"$ref": "#/$defs/positiveInteger"}
+      }
+    },
+    "hold_regimes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["CALM", "EROSION", "STRAIN", "STRESS"]}
+    },
+    "max_notional_usd": {"$ref": "#/$defs/nullablePositiveNumber"},
+    "max_exit_cost_bps": {"$ref": "#/$defs/nullablePositiveNumber"},
+    "max_venue_spread_bps": {"$ref": "#/$defs/nullablePositiveNumber"},
+    "missing_evidence": {"const": "fail_closed"},
+    "live_requires_executable_quote": {"const": true},
+    "live_requires_broker_preview": {"const": true},
+    "auto_resize": {"const": false},
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced operator constraints. Unsupported policy extensions must fail closed."
+    }
+  },
+  "$defs": {
+    "nonBlank": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "nullablePositiveNumber": {
+      "oneOf": [
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "null"}
+      ]
+    }
+  }
+}

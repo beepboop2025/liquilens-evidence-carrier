@@ -1,0 +1,25 @@
+{
+  "schema": "liquilens.trade-safety-policy.v1",
+  "policy_id": "example-paper-policy",
+  "version": "1.0.0",
+  "required_products": [
+    "seiche",
+    "undertow"
+  ],
+  "max_evidence_age_seconds": {
+    "seiche": 300,
+    "undertow": 300,
+    "liquilens": 86400
+  },
+  "hold_regimes": [
+    "STRESS"
+  ],
+  "max_notional_usd": 100000.0,
+  "max_exit_cost_bps": 50.0,
+  "max_venue_spread_bps": 20.0,
+  "missing_evidence": "fail_closed",
+  "live_requires_executable_quote": true,
+  "live_requires_broker_preview": true,
+  "auto_resize": false,
+  "extensions": {}
+}

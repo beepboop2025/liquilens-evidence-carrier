@@ -45,12 +45,24 @@ jobs:
           uv sync --locked --extra dev
           uv run --locked --extra dev pytest -q
           uv run --locked --extra dev python scripts/validate_kit.py
+          uv sync --project integrations/trade-safety-gateway --locked --extra test
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            pytest -q integrations/trade-safety-gateway/tests
           source_date_epoch="$(git show -s --format=%ct HEAD)"
           SOURCE_DATE_EPOCH="$source_date_epoch" uv build --out-dir dist
+          SOURCE_DATE_EPOCH="$source_date_epoch" \
+            uv build --project integrations/trade-safety-gateway --out-dir dist
           cp protocol/liquilens-evidence-carrier-v1.schema.json dist/
           cp protocol/liquilens-evidence-carrier-reference-v1.schema.json dist/
           cp protocol/liquilens-fleet-brief-v1.schema.json dist/
+          cp protocol/liquilens-trade-safety-request-v1.schema.json dist/
+          cp protocol/liquilens-trade-safety-policy-v1.schema.json dist/
+          cp protocol/liquilens-broker-preview-reference-v1.schema.json dist/
+          cp protocol/liquilens-trade-safety-receipt-v1.schema.json dist/
+          cp protocol/verify_hash_tree_v1.mjs dist/
           cp integrations/fdc3/com.liquilens.evidence.schema.json dist/
+          cp integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json dist/
+          cp integrations/fdc3/trade-safety-intents.json dist/
           cp integrations/openlineage/liquilens-evidence-facet.schema.json dist/
           version="${GITHUB_REF_NAME#v}"
           artifact="dist/liquilens-evidence-carrier-mcp-${version}.mcpb"
@@ -76,14 +88,18 @@ jobs:
               | sort -z \
               | xargs -0 sha256sum > SHA256SUMS
           )
-      - name: Attest runnable and package release artifacts
+      - name: Attest runnable, package, and protocol release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/*.whl
             dist/liquilens_evidence-*.tar.gz
+            dist/liquilens_trade_safety_gateway-*.tar.gz
             dist/liquilens-evidence-carrier-*.tar.gz
             dist/*.mcpb
+            dist/*.schema.json
+            dist/trade-safety-intents.json
+            dist/verify_hash_tree_v1.mjs
       - name: Publish public release
         env:
           GH_TOKEN: ${{ github.token }}

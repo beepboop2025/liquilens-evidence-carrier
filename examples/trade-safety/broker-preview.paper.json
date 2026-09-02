@@ -1,0 +1,16 @@
+{
+  "schema": "liquilens.broker-preview-reference.v1",
+  "state": "not_applicable",
+  "provider": null,
+  "account_id": "example-paper-account",
+  "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+  "preview_id": null,
+  "source_url": null,
+  "source_sha256": null,
+  "retrieved_at": "2026-09-02T11:59:45Z",
+  "expires_at": null,
+  "limitations": [
+    "paper_fixture_has_no_broker_preview_or_execution_authority"
+  ],
+  "facts": {}
+}

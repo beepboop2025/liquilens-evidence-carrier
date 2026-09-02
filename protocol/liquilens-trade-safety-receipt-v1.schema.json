@@ -1,0 +1,639 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json",
+  "title": "LiquiLens Trade Safety Receipt v1",
+  "description": "A short-lived, exact-order, fail-closed operator-policy evaluation over independent Seiche, Undertow, and conditional LiquiLens evidence. It is not an execution instruction, recommendation, capital allocation, credit rating, or executable quote.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "canonicalization",
+    "receipt_id",
+    "record_hash",
+    "evaluated_at",
+    "expires_at",
+    "request",
+    "request_hash",
+    "policy",
+    "policy_hash",
+    "evidence",
+    "broker_preview",
+    "decision",
+    "issuer",
+    "integrity",
+    "authority"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.trade-safety-receipt.v1"},
+    "canonicalization": {"const": "liquilens-hash-tree-v1"},
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^trade_safety_[0-9a-f]{24}$"
+    },
+    "record_hash": {"$ref": "#/$defs/sha256"},
+    "evaluated_at": {"$ref": "#/$defs/timestamp"},
+    "expires_at": {"$ref": "#/$defs/timestamp"},
+    "request": {
+      "$ref": "https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json"
+    },
+    "request_hash": {"$ref": "#/$defs/sha256"},
+    "policy": {
+      "$ref": "https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json"
+    },
+    "policy_hash": {"$ref": "#/$defs/sha256"},
+    "evidence": {"$ref": "#/$defs/evidence"},
+    "broker_preview": {
+      "$ref": "https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json"
+    },
+    "decision": {"$ref": "#/$defs/decision"},
+    "issuer": {"$ref": "#/$defs/issuer"},
+    "integrity": {"$ref": "#/$defs/integrity"},
+    "authority": {"$ref": "#/$defs/authority"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": {"mode": {"const": "observe"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {"enforced": {"const": false}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": {"mode": {"enum": ["paper", "live"]}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {"enforced": {"const": true}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {"outcome": {"const": "pass"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {
+              "reason_codes": {
+                "prefixItems": [{"const": "operator_policy_satisfied"}],
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "resubmit_required": {"const": false}
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {"outcome": {"const": "limit"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {"resubmit_required": {"const": true}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "decision": {
+            "properties": {"outcome": {"enum": ["hold", "unavailable"]}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {"resubmit_required": {"const": false}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": {"mode": {"const": "live"}}
+          },
+          "integrity": {
+            "properties": {"profile": {"const": "sha256"}}
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "decision": {
+            "properties": {"outcome": {"const": "unavailable"}}
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": {"mode": {"const": "live"}}
+          },
+          "decision": {
+            "properties": {
+              "outcome": {"enum": ["pass", "limit", "hold"]}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "integrity": {
+            "properties": {"profile": {"const": "hmac-sha256"}}
+          },
+          "broker_preview": {
+            "properties": {"state": {"const": "verified"}}
+          },
+          "evidence": {
+            "properties": {
+              "seiche": {
+                "properties": {
+                  "state": {"const": "eligible"},
+                  "real_money_eligible": {"const": true}
+                }
+              },
+              "undertow": {
+                "properties": {
+                  "state": {"const": "eligible"},
+                  "real_money_eligible": {"const": true},
+                  "executable_quote": {"const": true}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "request": {
+            "properties": {"mode": {"const": "live"}}
+          },
+          "policy": {
+            "properties": {
+              "required_products": {
+                "contains": {"const": "liquilens"},
+                "minContains": 1
+              }
+            }
+          },
+          "decision": {
+            "properties": {
+              "outcome": {"enum": ["pass", "limit", "hold"]}
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "evidence": {
+            "properties": {
+              "liquilens": {
+                "properties": {
+                  "state": {"const": "eligible"},
+                  "real_money_eligible": {"const": true}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "nonBlank": {"type": "string", "pattern": ".*\\S.*"},
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "nullableNonBlank": {
+      "oneOf": [
+        {"$ref": "#/$defs/nonBlank"},
+        {"type": "null"}
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "nullablePositiveNumber": {
+      "oneOf": [
+        {"type": "number", "exclusiveMinimum": 0},
+        {"type": "null"}
+      ]
+    },
+    "requiredProducts": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {"enum": ["seiche", "undertow", "liquilens"]},
+      "allOf": [
+        {"contains": {"const": "seiche"}, "minContains": 1},
+        {"contains": {"const": "undertow"}, "minContains": 1}
+      ]
+    },
+    "evidenceSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product",
+        "state",
+        "evidence_class",
+        "source_url",
+        "source_schema",
+        "source_sha256",
+        "request_hash",
+        "as_of",
+        "knowledge_time",
+        "retrieved_at",
+        "expires_at",
+        "rights_status",
+        "real_money_eligible",
+        "executable_quote",
+        "limitations",
+        "facts"
+      ],
+      "properties": {
+        "product": {"enum": ["seiche", "undertow", "liquilens"]},
+        "state": {
+          "enum": [
+            "eligible",
+            "context_only",
+            "unavailable",
+            "not_applicable"
+          ]
+        },
+        "evidence_class": {
+          "enum": [
+            "observed",
+            "derived",
+            "structural",
+            "research",
+            "restricted",
+            "unavailable"
+          ]
+        },
+        "source_url": {"$ref": "#/$defs/httpsUri"},
+        "source_schema": {"$ref": "#/$defs/nullableNonBlank"},
+        "source_sha256": {"$ref": "#/$defs/nullableSha256"},
+        "request_hash": {"$ref": "#/$defs/sha256"},
+        "as_of": {"$ref": "#/$defs/nullableTimestamp"},
+        "knowledge_time": {"$ref": "#/$defs/nullableTimestamp"},
+        "retrieved_at": {"$ref": "#/$defs/timestamp"},
+        "expires_at": {"$ref": "#/$defs/nullableTimestamp"},
+        "rights_status": {
+          "enum": [
+            "allowed",
+            "metadata_only",
+            "restricted",
+            "unknown",
+            "blocked",
+            "licensed"
+          ]
+        },
+        "real_money_eligible": {"type": "boolean"},
+        "executable_quote": {"type": "boolean"},
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonBlank"}
+        },
+        "facts": {"type": "object"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {"state": {"const": "not_applicable"}}
+          },
+          "then": {
+            "properties": {
+              "source_sha256": {"type": "null"},
+              "as_of": {"type": "null"},
+              "knowledge_time": {"type": "null"},
+              "expires_at": {"type": "null"},
+              "real_money_eligible": {"const": false},
+              "executable_quote": {"const": false},
+              "facts": {"maxProperties": 0}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"state": {"const": "unavailable"}}
+          },
+          "then": {
+            "properties": {
+              "real_money_eligible": {"const": false},
+              "executable_quote": {"const": false}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {"enum": ["eligible", "context_only"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "source_sha256": {"$ref": "#/$defs/sha256"},
+              "as_of": {"$ref": "#/$defs/timestamp"},
+              "knowledge_time": {"$ref": "#/$defs/timestamp"},
+              "expires_at": {"$ref": "#/$defs/timestamp"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"state": {"const": "eligible"}}
+          },
+          "then": {
+            "properties": {
+              "rights_status": {
+                "enum": ["licensed", "allowed", "metadata_only"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"state": {"const": "context_only"}}
+          },
+          "then": {
+            "properties": {
+              "real_money_eligible": {"const": false},
+              "executable_quote": {"const": false}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"real_money_eligible": {"const": true}}
+          },
+          "then": {
+            "properties": {
+              "state": {"const": "eligible"},
+              "rights_status": {"enum": ["allowed", "licensed"]}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {"executable_quote": {"const": true}}
+          },
+          "then": {
+            "properties": {
+              "state": {"const": "eligible"},
+              "real_money_eligible": {"const": true}
+            }
+          }
+        }
+      ]
+    },
+    "seicheEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceSection"},
+        {
+          "properties": {
+            "product": {"const": "seiche"},
+            "executable_quote": {"const": false},
+            "facts": {
+              "type": "object",
+              "properties": {
+                "regime": {"enum": ["CALM", "EROSION", "STRAIN", "STRESS"]}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {"enum": ["eligible", "context_only"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "facts": {"required": ["regime"]}
+            }
+          }
+        }
+      ]
+    },
+    "undertowEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceSection"},
+        {
+          "properties": {
+            "product": {"const": "undertow"},
+            "facts": {
+              "type": "object",
+              "properties": {
+                "requested_size_usd": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "published_rung_used_usd": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "worst_sell_cost_bps": {"type": "number", "minimum": 0},
+                "venue_spread_bps": {"type": "number", "minimum": 0}
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {"enum": ["eligible", "context_only"]}
+            }
+          },
+          "then": {
+            "properties": {
+              "facts": {
+                "required": [
+                  "requested_size_usd",
+                  "published_rung_used_usd",
+                  "worst_sell_cost_bps",
+                  "venue_spread_bps"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "liquilensEvidence": {
+      "allOf": [
+        {"$ref": "#/$defs/evidenceSection"},
+        {
+          "properties": {
+            "product": {"const": "liquilens"},
+            "executable_quote": {"const": false}
+          }
+        }
+      ]
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["seiche", "undertow", "liquilens"],
+      "properties": {
+        "seiche": {"$ref": "#/$defs/seicheEvidence"},
+        "undertow": {"$ref": "#/$defs/undertowEvidence"},
+        "liquilens": {"$ref": "#/$defs/liquilensEvidence"}
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_products",
+        "max_notional_usd",
+        "max_exit_cost_bps",
+        "max_venue_spread_bps",
+        "auto_resize"
+      ],
+      "properties": {
+        "required_products": {"$ref": "#/$defs/requiredProducts"},
+        "max_notional_usd": {"$ref": "#/$defs/nullablePositiveNumber"},
+        "max_exit_cost_bps": {"$ref": "#/$defs/nullablePositiveNumber"},
+        "max_venue_spread_bps": {"$ref": "#/$defs/nullablePositiveNumber"},
+        "auto_resize": {"const": false}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome",
+        "enforced",
+        "reason_codes",
+        "constraints",
+        "summary",
+        "resubmit_required"
+      ],
+      "properties": {
+        "outcome": {"enum": ["pass", "limit", "hold", "unavailable"]},
+        "enforced": {"type": "boolean"},
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonBlank"}
+        },
+        "constraints": {"$ref": "#/$defs/constraints"},
+        "summary": {"$ref": "#/$defs/nonBlank"},
+        "resubmit_required": {"type": "boolean"}
+      }
+    },
+    "issuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "endpoint"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonBlank"},
+        "version": {"$ref": "#/$defs/nonBlank"},
+        "endpoint": {"$ref": "#/$defs/httpsUri"}
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile", "key_id", "signature"],
+      "properties": {
+        "profile": {"enum": ["sha256", "hmac-sha256"]},
+        "key_id": {"$ref": "#/$defs/nullableNonBlank"},
+        "signature": {"$ref": "#/$defs/nullableSha256"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "profile": {"const": "sha256"},
+            "key_id": {"type": "null"},
+            "signature": {"type": "null"}
+          }
+        },
+        {
+          "properties": {
+            "profile": {"const": "hmac-sha256"},
+            "key_id": {"$ref": "#/$defs/nonBlank"},
+            "signature": {"$ref": "#/$defs/sha256"}
+          }
+        }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "financial_authority",
+        "can_execute",
+        "can_recommend",
+        "can_allocate_capital",
+        "is_credit_rating",
+        "is_executable_quote"
+      ],
+      "properties": {
+        "financial_authority": {"const": "operator_policy_check_only"},
+        "can_execute": {"const": false},
+        "can_recommend": {"const": false},
+        "can_allocate_capital": {"const": false},
+        "is_credit_rating": {"const": false},
+        "is_executable_quote": {"const": false}
+      }
+    }
+  }
+}

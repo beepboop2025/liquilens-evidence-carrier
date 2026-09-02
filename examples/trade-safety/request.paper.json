@@ -1,0 +1,42 @@
+{
+  "schema": "liquilens.trade-safety-request.v1",
+  "request_id": "example-paper-btc-001",
+  "created_at": "2026-09-02T11:59:00Z",
+  "expires_at": "2026-09-02T12:10:00Z",
+  "mode": "paper",
+  "agent": {
+    "agent_id": "example-copilot",
+    "operator_id": "example-operator",
+    "tenant_id": "example-tenant",
+    "account_id": "example-paper-account",
+    "runtime": "reference-fixture/1.0",
+    "strategy_id": "example-strategy",
+    "authorization_scope": [
+      "evidence:read",
+      "orders:paper"
+    ]
+  },
+  "order": {
+    "instrument": {
+      "asset_class": "crypto",
+      "symbol": "BTC/USD",
+      "identifiers": {}
+    },
+    "side": "sell",
+    "order_type": "market",
+    "notional": {
+      "amount": 1000.0,
+      "currency": "USD"
+    },
+    "quantity": 0.025,
+    "limit_price": null,
+    "stop_price": null,
+    "venue": null,
+    "time_in_force": "IOC"
+  },
+  "policy_ref": {
+    "policy_id": "example-paper-policy",
+    "version": "1.0.0"
+  },
+  "extensions": {}
+}

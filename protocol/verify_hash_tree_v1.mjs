@@ -222,6 +222,23 @@ function omitFields(value, fieldNames) {
   return result;
 }
 
+function tradeSafetyReceiptPayload(value) {
+  const payload = omitFields(value, new Set(["receipt_id", "record_hash"]));
+  const integrity = payload.integrity;
+  if (integrity === null || Array.isArray(integrity) || typeof integrity !== "object") {
+    throw new Error("trade-safety receipt integrity must be a JSON object");
+  }
+  const normalizedIntegrity = Object.create(null);
+  for (const key of Object.keys(integrity)) {
+    normalizedIntegrity[key] = key === "signature" ? null : integrity[key];
+  }
+  if (!Object.hasOwn(normalizedIntegrity, "signature")) {
+    throw new Error("trade-safety receipt integrity must contain signature");
+  }
+  payload.integrity = normalizedIntegrity;
+  return payload;
+}
+
 function stringField(value, fieldName) {
   const field = value[fieldName];
   if (typeof field !== "string") throw new Error(`${fieldName} must be a string`);
@@ -263,6 +280,11 @@ export function verifyArtifactJson(text, artifactKind) {
     expectedHash = stringField(artifact, "record_hash");
     expectedId = stringField(artifact, "brief_id");
     idPrefix = "fleet_brief_";
+  } else if (artifactKind === "trade-safety-receipt") {
+    payload = tradeSafetyReceiptPayload(artifact);
+    expectedHash = stringField(artifact, "record_hash");
+    expectedId = stringField(artifact, "receipt_id");
+    idPrefix = "trade_safety_";
   } else if (artifactKind === "value") {
     payload = artifact;
     expectedHash = null;

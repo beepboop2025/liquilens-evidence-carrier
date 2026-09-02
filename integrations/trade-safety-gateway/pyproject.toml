@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liquilens-trade-safety-gateway"
+version = "0.1.0"
+description = "Read-only sandbox gateway for hash-bound LiquiLens Trade Safety Receipts"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.15"
+authors = [{name = "LiquiLens"}]
+keywords = ["ai-agents", "fastapi", "mcp", "risk-controls", "trade-safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastapi>=0.116.1,<0.117",
+    "httpx>=0.28.1,<0.29",
+    "liquilens-evidence==0.17.0",
+    "uvicorn>=0.35.0,<0.36",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.4,<9",
+    "ruff>=0.15,<0.16",
+]
+
+[project.scripts]
+liquilens-trade-safety-gateway = "trade_safety_gateway.__main__:main"
+
+[project.urls]
+Homepage = "https://liquilens.in/protocol/"
+Repository = "https://github.com/beepboop2025/liquilens-evidence-carrier"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+trade_safety_gateway = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../../src"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.uv.sources]
+liquilens-evidence = {path = "../..", editable = true}

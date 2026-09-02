@@ -16,6 +16,16 @@ Nix, browser, Agent Skill, Codex-plugin, or external-directory channels. The
 matrix below keeps each channel at its own receipt-backed version. LiquiLens is
 not endorsed by the platforms or projects named here.
 
+## Trade Safety v1 candidate
+
+The source tree is preparing `v0.17.0`, which adds strict Trade Safety request,
+policy, broker-preview and receipt contracts, local CLI/MCP verification,
+cross-language vectors, FDC3 assets, and a separately locked read-only sandbox
+gateway. It is not a published release or a live hosted gateway yet. Until a
+signed tag, release checksums, attestations, Registry record and public endpoint
+are verified, production consumers should continue to pin `v0.16.0` and treat
+the Trade Safety artifacts as candidate bytes.
+
 ## Fleet Brief v1
 
 `liquilens.fleet-brief.v1` adds one content-addressed section for each canonical

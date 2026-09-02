@@ -101,6 +101,15 @@ jobs:
         run: |
           uv build
           uv run --locked --extra dev python -m zipfile --list dist/*.whl
+      - name: Test and build the locked read-only sandbox gateway
+        run: |
+          uv sync --project integrations/trade-safety-gateway --locked --extra test
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            pytest -q integrations/trade-safety-gateway/tests
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            ruff check integrations/trade-safety-gateway/src \
+              integrations/trade-safety-gateway/tests
+          uv build --project integrations/trade-safety-gateway
 
   action-smoke:
     runs-on: ubuntu-24.04

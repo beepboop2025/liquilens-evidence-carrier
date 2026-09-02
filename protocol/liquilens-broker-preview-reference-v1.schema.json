@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json",
+  "title": "LiquiLens Broker Preview Reference v1",
+  "description": "A short-lived, tenant/account- and request-bound reference to a broker-generated preview. It is not an order, execution acknowledgement, fill, or grant of trading authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "state",
+    "provider",
+    "account_id",
+    "request_hash",
+    "preview_id",
+    "source_url",
+    "source_sha256",
+    "retrieved_at",
+    "expires_at",
+    "limitations",
+    "facts"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.broker-preview-reference.v1"},
+    "state": {"enum": ["verified", "unavailable", "not_applicable"]},
+    "provider": {"$ref": "#/$defs/nullableNonBlank"},
+    "account_id": {"$ref": "#/$defs/nonBlank"},
+    "request_hash": {"$ref": "#/$defs/sha256"},
+    "preview_id": {"$ref": "#/$defs/nullableNonBlank"},
+    "source_url": {"$ref": "#/$defs/nullableHttpsUri"},
+    "source_sha256": {"$ref": "#/$defs/nullableSha256"},
+    "retrieved_at": {"$ref": "#/$defs/timestamp"},
+    "expires_at": {"$ref": "#/$defs/nullableTimestamp"},
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/nonBlank"}
+    },
+    "facts": {"type": "object"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"state": {"const": "verified"}},
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "provider": {"$ref": "#/$defs/nonBlank"},
+          "preview_id": {"$ref": "#/$defs/nonBlank"},
+          "source_url": {"$ref": "#/$defs/httpsUri"},
+          "source_sha256": {"$ref": "#/$defs/sha256"},
+          "expires_at": {"$ref": "#/$defs/timestamp"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"state": {"const": "not_applicable"}},
+        "required": ["state"]
+      },
+      "then": {
+        "properties": {
+          "provider": {"type": "null"},
+          "preview_id": {"type": "null"},
+          "source_url": {"type": "null"},
+          "source_sha256": {"type": "null"},
+          "expires_at": {"type": "null"},
+          "facts": {"maxProperties": 0}
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "nonBlank": {"type": "string", "pattern": ".*\\S.*"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "httpsUri": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://"
+    },
+    "nullableNonBlank": {
+      "oneOf": [
+        {"$ref": "#/$defs/nonBlank"},
+        {"type": "null"}
+      ]
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {"$ref": "#/$defs/sha256"},
+        {"type": "null"}
+      ]
+    },
+    "nullableTimestamp": {
+      "oneOf": [
+        {"$ref": "#/$defs/timestamp"},
+        {"type": "null"}
+      ]
+    },
+    "nullableHttpsUri": {
+      "oneOf": [
+        {"$ref": "#/$defs/httpsUri"},
+        {"type": "null"}
+      ]
+    }
+  }
+}

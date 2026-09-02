@@ -1,7 +1,8 @@
 # Run LiquiLens Evidence Carrier with Nix
 
 The repository is a directly runnable flake for the source verifier and offline
-stdio MCP server. The working tree takes its version from `VERSION`; at the
+stdio MCP server, including local hash-only Trade Safety Receipt verification.
+The working tree takes its version from `VERSION`; at the
 2026-08-29 preparation checkpoint, the latest published immutable invocation
 was `v0.15.0`. Nix requires no Python environment or package-registry account.
 

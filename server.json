@@ -2,19 +2,19 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.beepboop2025/liquilens-evidence-carrier",
   "title": "LiquiLens Evidence Carrier",
-  "description": "Offline verification of local LiquiLens evidence carriers and four-product fleet briefs.",
+  "description": "Offline verification of local evidence carriers, fleet briefs, and hash-only trade-safety receipts.",
   "websiteUrl": "https://liquilens.in/protocol/",
   "repository": {
     "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
     "source": "github",
     "id": "1344895874"
   },
-  "version": "0.16.0",
+  "version": "0.17.0",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens-evidence-carrier-mcp-0.16.0.mcpb",
-      "fileSha256": "c44b13b2efc4622a8ecfc06848f32358982dd2a9458a271e1ed77d646791961a",
+      "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.0/liquilens-evidence-carrier-mcp-0.17.0.mcpb",
+      "fileSha256": "588e01120d32f2ae118313930e56abe21dc8d27b5b7dad5fe343c0afdc610d8e",
       "transport": {
         "type": "stdio"
       }

@@ -125,6 +125,8 @@
             grep --fixed-strings '"verify_carrier"' "$TMPDIR/mcp-response.json"
             grep --fixed-strings '"project_carrier"' "$TMPDIR/mcp-response.json"
             grep --fixed-strings '"verify_fleet_brief"' "$TMPDIR/mcp-response.json"
+            grep --fixed-strings '"verify_trade_safety_receipt"' \
+              "$TMPDIR/mcp-response.json"
 
             touch "$out"
           '';

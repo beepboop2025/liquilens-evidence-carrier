@@ -13,6 +13,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXED_ZIP_TIME = (2026, 8, 24, 0, 0, 0)
+_OFFLINE_ADOPTION_ASSETS = (
+    Path("protocol/verify_hash_tree_v1.mjs"),
+    Path("integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json"),
+    Path("integrations/fdc3/trade-safety-intents.json"),
+)
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -54,6 +59,12 @@ def _archive_files(version: str) -> list[tuple[Path, str]]:
     files.extend(
         (path, path.relative_to(ROOT).as_posix())
         for path in sorted((ROOT / "protocol").glob("*.json"))
+    )
+    # Keep offline validation and discovery self-contained while excluding the
+    # separately deployed, network-capable gateway implementation.
+    files.extend(
+        (ROOT / relative_path, relative_path.as_posix())
+        for relative_path in _OFFLINE_ADOPTION_ASSETS
     )
     missing = [str(path) for path, _name in files if not path.is_file()]
     if missing:

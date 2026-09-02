@@ -1,0 +1,46 @@
+{
+  "schema": "liquilens.fdc3.trade-safety-intents.v1",
+  "fdc3_version": "2.2",
+  "context_schemas": {
+    "fdc3.order": "https://fdc3.finos.org/schemas/2.2/context/order.schema.json",
+    "com.liquilens.trade-safety-receipt": "https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json"
+  },
+  "provider_interop": {
+    "intents": {
+      "listensFor": {
+        "liquilens.EvaluateTradeSafety": {
+          "displayName": "Evaluate Trade Safety",
+          "contexts": ["fdc3.order"],
+          "resultType": "com.liquilens.trade-safety-receipt"
+        },
+        "liquilens.ViewTradeSafetyReceipt": {
+          "displayName": "View Trade Safety Receipt",
+          "contexts": ["com.liquilens.trade-safety-receipt"]
+        }
+      }
+    }
+  },
+  "consumer_interop": {
+    "intents": {
+      "raises": {
+        "liquilens.EvaluateTradeSafety": ["fdc3.order"],
+        "liquilens.ViewTradeSafetyReceipt": [
+          "com.liquilens.trade-safety-receipt"
+        ]
+      }
+    }
+  },
+  "safety_contract": {
+    "fdc3_order_is_complete_request": false,
+    "canonical_request_required": "https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json",
+    "reject_identifier_only_order": true,
+    "requires_exact_order_binding": true,
+    "requires_policy_reference": true,
+    "requires_operator_scope": true,
+    "live_requires_request_bound_broker_preview": true,
+    "hash_only_live_outcome": "unavailable",
+    "execution_side_effects": false,
+    "returns_execution_result": false,
+    "receipt_authority": "operator_policy_check_only"
+  }
+}
