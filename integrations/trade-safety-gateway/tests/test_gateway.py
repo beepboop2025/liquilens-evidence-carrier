@@ -20,6 +20,7 @@ from trade_safety_gateway.app import (
     MCP_PROTOCOL_VERSION,
     SEICHE_URL,
     SERVICE_REVISION,
+    SERVICE_VERSION,
     UNDERTOW_URL,
     RawUpstreamResponse,
     create_app,
@@ -254,12 +255,14 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         health = client.get("/healthz")
         assert health.status_code == 200
         assert health.json()["state"] == "read_only_sandbox"
+        assert health.json()["version"] == SERVICE_VERSION == "0.1.1"
         assert health.json()["source_revision"] == SERVICE_REVISION
         assert health.headers["x-trade-safety-execution"] == "disabled"
         assert health.headers["x-trade-safety-authority"] == "read-only"
         capabilities = client.get("/v1/capabilities").json()
         assert capabilities["execution_tools"] == []
         assert capabilities["live_outcome"] == "unavailable"
+        assert capabilities["version"] == SERVICE_VERSION
         assert capabilities["source_revision"] == SERVICE_REVISION
         assert capabilities["mcp_protocol_versions"] == [
             MCP_PROTOCOL_VERSION,

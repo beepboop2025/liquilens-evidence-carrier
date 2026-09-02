@@ -38,7 +38,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.1.0"
+SERVICE_VERSION = "0.1.1"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"

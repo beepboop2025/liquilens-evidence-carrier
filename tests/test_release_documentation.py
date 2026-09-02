@@ -6,6 +6,16 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+CANDIDATE_VERSION = "0.18.0"
+CANDIDATE_MCPB_SHA256 = (
+    "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+)
+CANDIDATE_README_SHA256 = (
+    "3cc9705a2c1aa0471342199f54509b2aa66a02a2c84d89287732a89cd026018a"
+)
+CANDIDATE_GATEWAY_VERSION = "0.1.1"
+CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
+CANONICAL_SITE_WORKFLOW = "33592149926"
 RELEASE_VERSION = "0.17.1"
 RELEASE_CANDIDATE = "a74274236e177404c2d254541e6a4110a4ce8a0d"
 RELEASE_TAG_OBJECT = "8844ee4556d59472a587cb9ceb412112c23543db"
@@ -51,7 +61,7 @@ PRIOR_README_SHA256 = (
 )
 
 
-def test_main_facing_docs_record_published_v0171_and_separate_deployment():
+def test_main_facing_docs_separate_v0180_candidate_from_published_v0171():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     release_receipt = (
         ROOT / f"docs/RELEASE-{RELEASE_VERSION}.md"
@@ -61,6 +71,9 @@ def test_main_facing_docs_record_published_v0171_and_separate_deployment():
     ).read_text(encoding="utf-8")
     failed_release = (
         ROOT / f"docs/RELEASE-{FAILED_VERSION}.md"
+    ).read_text(encoding="utf-8")
+    candidate_release = (
+        ROOT / f"docs/RELEASE-{CANDIDATE_VERSION}.md"
     ).read_text(encoding="utf-8")
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
@@ -94,8 +107,23 @@ def test_main_facing_docs_record_published_v0171_and_separate_deployment():
     assert "attestations/44596593" in release_receipt
     assert "reports `active` and `isLatest: true`" in normalized_release
     assert "not a hosted Trade Safety gateway" in normalized_release
-    assert "canonical URL not hosted yet" in normalized_readme
-    assert "returned HTTP 404" in normalized_readme
+    assert "canonical URL not hosted yet" not in normalized_readme
+    assert "returned HTTP 404" not in normalized_readme
+    assert "returned HTTP\n404" in release_receipt
+    for text in (readme, distribution, changelog, candidate_release):
+        assert CANONICAL_SITE_REVISION in text
+        assert CANONICAL_SITE_WORKFLOW in text
+        assert CANDIDATE_MCPB_SHA256 in text
+
+    normalized_candidate = " ".join(candidate_release.split())
+    assert f"source checkpoint prepares `v{CANDIDATE_VERSION}`" in readme
+    assert "not yet tagged, published, or registered" in normalized_readme
+    assert "prepared source; not tagged, published, registered, or deployed" in (
+        normalized_candidate
+    )
+    assert "No v0.18.0 tag object" in candidate_release
+    assert "not a hosted Trade Safety gateway" in candidate_release
+    assert f"## [{CANDIDATE_VERSION}] - 2026-09-02" in changelog
 
     for text in (readme, failed_release):
         assert FAILED_TAG_OBJECT in text
@@ -133,18 +161,54 @@ def test_main_facing_docs_record_published_v0171_and_separate_deployment():
         assert stale_claim not in published_record
 
 
-def test_published_registry_metadata_tracks_release_version():
+def test_candidate_registry_metadata_tracks_source_version():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     server = json.loads((ROOT / "server.json").read_text(encoding="utf-8"))
     version = project["project"]["version"]
     package = server["packages"][0]
 
-    assert version == RELEASE_VERSION
+    assert version == CANDIDATE_VERSION
     assert (ROOT / "VERSION").read_text(encoding="utf-8").strip() == version
     assert server["version"] == version
     assert package["identifier"].endswith(
         f"/v{version}/liquilens-evidence-carrier-mcp-{version}.mcpb"
     )
+    assert package["fileSha256"] == CANDIDATE_MCPB_SHA256
+
+
+def test_candidate_gateway_identity_and_security_floors_are_consistent():
+    gateway_root = ROOT / "integrations/trade-safety-gateway"
+    project = tomllib.loads((gateway_root / "pyproject.toml").read_text())
+    lock = tomllib.loads((gateway_root / "uv.lock").read_text())
+    dependencies = project["project"]["dependencies"]
+
+    assert project["project"]["version"] == CANDIDATE_GATEWAY_VERSION
+    assert f"liquilens-evidence=={CANDIDATE_VERSION}" in dependencies
+    assert "fastapi>=0.141.1,<0.142" in dependencies
+    assert "starlette>=1.3.1,<2" in dependencies
+    assert "pytest>=9.0.3,<10" in project["project"]["optional-dependencies"][
+        "test"
+    ]
+
+    versions = {
+        package["name"]: package["version"]
+        for package in lock["package"]
+        if package["name"]
+        in {
+            "fastapi",
+            "liquilens-evidence",
+            "liquilens-trade-safety-gateway",
+            "pytest",
+            "starlette",
+        }
+    }
+    assert versions == {
+        "fastapi": "0.141.1",
+        "liquilens-evidence": CANDIDATE_VERSION,
+        "liquilens-trade-safety-gateway": CANDIDATE_GATEWAY_VERSION,
+        "pytest": "9.1.1",
+        "starlette": "1.6.0",
+    }
 
 
 def test_published_v016_records_and_embedded_readme_stay_reproducible():
@@ -179,6 +243,17 @@ def test_published_v0171_embedded_readme_stays_reproducible():
     assert "bytes prepared for the v0.17.1 MCPB" in normalized_frozen
     assert "not publication proof" in frozen_text
     assert frozen.read_bytes() != (ROOT / "README.md").read_bytes()
+
+
+def test_candidate_v0180_embedded_readme_matches_registry_digest_input():
+    candidate = ROOT / "mcpb/release-readmes" / f"{CANDIDATE_VERSION}.md"
+    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == (
+        CANDIDATE_README_SHA256
+    )
+    normalized = " ".join(candidate.read_text(encoding="utf-8").split())
+    assert "bytes prepared for the v0.18.0 MCPB candidate" in normalized
+    assert "No such publication receipt is asserted" in normalized
+    assert candidate.read_bytes() != (ROOT / "README.md").read_bytes()
 
 
 def test_failed_v0170_embedded_readme_stays_reproducible():

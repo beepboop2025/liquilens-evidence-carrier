@@ -26,9 +26,9 @@ def _working_tree_text(path: str) -> str:
 
 
 def test_current_candidate_metadata_passes_preflight_validation():
-    metadata = validate_candidate_metadata(_working_tree_text, "0.17.1")
+    metadata = validate_candidate_metadata(_working_tree_text, "0.18.0")
     assert metadata["mcpb_sha256"] == (
-        "4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1"
+        "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
     )
 
 
@@ -39,7 +39,7 @@ def test_version_mismatch_fails_before_tag_creation():
         return _working_tree_text(path)
 
     with pytest.raises(PreflightError, match="VERSION"):
-        validate_candidate_metadata(mismatched, "0.17.1")
+        validate_candidate_metadata(mismatched, "0.18.0")
 
 
 def test_placeholder_mcpb_digest_fails_before_tag_creation():
@@ -47,13 +47,13 @@ def test_placeholder_mcpb_digest_fails_before_tag_creation():
         text = _working_tree_text(path)
         if path == "server.json":
             return text.replace(
-                "4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1",
+                "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb",
                 "0" * 64,
             )
         return text
 
     with pytest.raises(PreflightError, match="placeholder"):
-        validate_candidate_metadata(placeholder, "0.17.1")
+        validate_candidate_metadata(placeholder, "0.18.0")
 
 
 def test_manual_preflight_workflow_has_no_tag_write_authority():
@@ -85,7 +85,7 @@ def test_manual_preflight_workflow_has_no_tag_write_authority():
 def test_git_like_inputs_fail_before_any_network_call(field, value, message):
     arguments = {
         "commit": "a" * 40,
-        "version": "0.17.1",
+        "version": "0.18.0",
         "remote": "origin",
         "branch": "main",
     }
@@ -97,8 +97,8 @@ def test_git_like_inputs_fail_before_any_network_call(field, value, message):
 def _successful_run() -> dict[str, Any]:
     commit = "a" * 40
     return {
-        "name": f"Release preflight v0.17.1 @ {commit}",
-        "display_title": f"Release preflight v0.17.1 @ {commit}",
+        "name": f"Release preflight v0.18.0 @ {commit}",
+        "display_title": f"Release preflight v0.18.0 @ {commit}",
         "event": "workflow_dispatch",
         "head_branch": "main",
         "head_sha": "b" * 40,
@@ -116,7 +116,7 @@ def test_tag_controller_binds_successful_run_to_exact_candidate():
     commit = "a" * 40
     receipt = validate_preflight_run(
         _successful_run(),
-        version="0.17.1",
+        version="0.18.0",
         commit=commit,
         protected_head="b" * 40,
     )
@@ -131,7 +131,7 @@ def test_tag_controller_binds_successful_run_to_exact_candidate():
         ("head_branch", "feature"),
         ("path", ".github/workflows/other.yml"),
         ("name", "Release preflight"),
-        ("display_title", "Release preflight v0.17.1 @ " + "c" * 40),
+        ("display_title", "Release preflight v0.18.0 @ " + "c" * 40),
     ),
 )
 def test_tag_controller_rejects_unbound_or_failed_run(field, value):
@@ -140,7 +140,7 @@ def test_tag_controller_rejects_unbound_or_failed_run(field, value):
     with pytest.raises(TagPreflightError, match=field):
         validate_preflight_run(
             run,
-            version="0.17.1",
+            version="0.18.0",
             commit="a" * 40,
             protected_head="b" * 40,
         )
@@ -179,7 +179,7 @@ def test_tag_controller_rejects_invalid_run_workflow_id():
     with pytest.raises(TagPreflightError, match="workflow_id"):
         validate_preflight_run(
             run,
-            version="0.17.1",
+            version="0.18.0",
             commit="a" * 40,
             protected_head="b" * 40,
         )
@@ -189,7 +189,7 @@ def test_tag_controller_rejects_superseded_main_preflight():
     with pytest.raises(TagPreflightError, match="current protected main"):
         validate_preflight_run(
             _successful_run(),
-            version="0.17.1",
+            version="0.18.0",
             commit="a" * 40,
             protected_head="c" * 40,
         )
@@ -199,19 +199,19 @@ def test_remote_tag_receipt_binds_object_and_peeled_commit():
     tag_object = "c" * 40
     commit = "a" * 40
     refs = [
-        f"{tag_object}\trefs/tags/v0.17.1",
-        f"{commit}\trefs/tags/v0.17.1^{{}}",
+        f"{tag_object}\trefs/tags/v0.18.0",
+        f"{commit}\trefs/tags/v0.18.0^{{}}",
     ]
     validate_remote_tag_refs(
         refs,
-        tag="v0.17.1",
+        tag="v0.18.0",
         tag_object=tag_object,
         commit=commit,
     )
     with pytest.raises(TagPreflightError, match="tag object differs"):
         validate_remote_tag_refs(
             refs,
-            tag="v0.17.1",
+            tag="v0.18.0",
             tag_object="d" * 40,
             commit=commit,
         )
