@@ -16,15 +16,30 @@ Nix, browser, Agent Skill, Codex-plugin, or external-directory channels. The
 matrix below keeps each channel at its own receipt-backed version. LiquiLens is
 not endorsed by the platforms or projects named here.
 
-## Trade Safety v1 candidate
+## Trade Safety v1 recovery candidate
 
-The source tree is preparing `v0.17.0`, which adds strict Trade Safety request,
-policy, broker-preview and receipt contracts, local CLI/MCP verification,
-cross-language vectors, FDC3 assets, and a separately locked read-only sandbox
-gateway. It is not a published release or a live hosted gateway yet. Until a
-signed tag, release checksums, attestations, Registry record and public endpoint
-are verified, production consumers should continue to pin `v0.16.0` and treat
-the Trade Safety artifacts as candidate bytes.
+The source tree is preparing `v0.17.1`, which carries strict Trade Safety
+request, policy, broker-preview and receipt contracts, local CLI/MCP
+verification, cross-language vectors, FDC3 assets, and a separately locked
+read-only sandbox gateway. It is not a published release or a live hosted
+gateway. Until a new signed tag, green release workflow, release checksums,
+attestations, Registry record, and public endpoint are independently verified,
+production consumers should continue to pin `v0.16.0` and treat the Trade
+Safety artifacts as candidate bytes.
+
+### Immutable v0.17.0 failed attempt
+
+The annotated `v0.17.0` tag object
+`cb85e527c2b74abf476fd9a01b73b2235ce976b7` is immutable and targets GitHub
+protected-main merge `edde9b92ad9851d2974b91326a8c3877f4386d3a`.
+[Release run 33585764285](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33585764285)
+failed in `Verify signed tag, commit, ancestry, and version`: tag verification
+passed, but the merge-commit signature could not be verified. Artifact build,
+attestation, GitHub publication, and the Registry job were skipped. No v0.17.0
+GitHub release or official MCP Registry version exists, so `v0.17.0` is not a
+distribution pin and must not be recreated or force-moved. The frozen
+`mcpb/release-readmes/0.17.0.md` continues to describe only the candidate bundle
+bytes that were prepared; it is not a publication receipt.
 
 ## Fleet Brief v1
 

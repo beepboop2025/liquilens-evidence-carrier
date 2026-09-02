@@ -384,9 +384,10 @@ def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
             assert archive.read(asset) == (ROOT / asset).read_bytes()
         assert json.loads(archive.read("manifest.json"))["version"] == version
         embedded_readme = archive.read("README.md").decode()
-        assert f"bytes prepared for the v{version} MCPB" in embedded_readme
-        assert "is not publication proof" in embedded_readme
-        assert "not embedded in or started by this offline MCPB" in embedded_readme
+        normalized_readme = " ".join(embedded_readme.split())
+        assert f"bytes prepared for the v{version} MCPB" in normalized_readme
+        assert "is not publication proof" in normalized_readme
+        assert "not embedded in or started by this offline MCPB" in normalized_readme
         archive.extractall(extracted)
     carrier_path = _carrier_file(tmp_path, "bundle-carrier.json")
     environment = dict(os.environ)

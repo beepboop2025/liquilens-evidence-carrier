@@ -1,10 +1,34 @@
-# v0.17.0 release candidate
+# v0.17.0 failed release attempt
 
-Status at 2026-09-02: **prepared source; not tagged, published, registered, or
-deployed as v0.17.0**.
+Status at 2026-09-02: **tagged, but not built, attested, published, registered,
+or deployed as v0.17.0**.
 
-The latest signed core release remains v0.16.0. This document is the release
-gate for candidate bytes and must not be read as a publication receipt.
+The immutable annotated `v0.17.0` tag object is
+`cb85e527c2b74abf476fd9a01b73b2235ce976b7`. It targets GitHub protected-main
+merge `edde9b92ad9851d2974b91326a8c3877f4386d3a` (pull request #26). The tag
+name is consumed and must not be deleted, force-moved, or recreated.
+
+The latest signed, downloadable, and official MCP Registry-listed core release
+remains v0.16.0. This document is a failure receipt, not a publication receipt.
+
+## Failure receipt
+
+[Release run 33585764285](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33585764285)
+started from the `v0.17.0` tag and failed in `Verify signed tag, commit,
+ancestry, and version`. The annotated tag signature passed. Verification of the
+target merge commit then failed with `NO_PUBKEY B5690EEEBB952194`.
+
+Because that gate failed:
+
+- `Test and build release artifacts` was skipped;
+- artifact attestation was skipped;
+- `Publish public release` was skipped; and
+- the `mcp-registry` job was skipped.
+
+GitHub has no v0.17.0 release record, and the official MCP Registry has no
+`io.github.beepboop2025/liquilens-evidence-carrier` version `0.17.0`. There are
+therefore no v0.17.0 release checksums, attestations, downloadable artifacts, or
+Registry activation receipts to cite.
 
 ## Candidate scope
 
@@ -22,35 +46,30 @@ gate for candidate bytes and must not be read as a publication receipt.
 - A staged distribution, broker/OMS enforcement, shadow-validation,
   commercialization, reliability, and adoption plan.
 
-## Required release gates
+## Recovery boundary
 
-1. The exact candidate commit is reviewed, signed, merged to protected `main`,
-   and passes all required CI jobs.
-2. Root Python 3.11-3.13, schema, JavaScript, CLI, MCP, lint, type, package,
-   browser, container-smoke, and locked gateway tests pass.
-3. Protocol catalog hashes, package data, FDC3 assets, golden receipts,
-   deterministic MCPB replay, Registry metadata, and source versions agree.
-4. The signed annotated `v0.17.0` tag points to that signed protected-main
-   commit and passes the release workflow's tag/commit/ancestry checks.
-5. GitHub publishes checksum and provenance-attested wheel, source,
-   integration-kit, gateway, schema and MCPB artifacts.
-6. An anonymous download matches `SHA256SUMS`, `server.json`, and its GitHub
-   attestation; the official MCP Registry reports active version `0.17.0`.
-7. Canonical LiquiLens Pages publishes the exact tagged schema/FDC3/document
-   bytes, then its Worker catalog is staged, verified, promoted, and retained
-   with a tested rollback version.
+Recovery uses a new `v0.17.1` identity and the independent gate in
+[`RELEASE-0.17.1.md`](RELEASE-0.17.1.md). Passing a later workflow does not turn
+the failed v0.17.0 attempt into a release. Version 0.17.1 must not reuse the
+v0.17.0 tag, versioned bundle name, or release identity, and must not imply that
+v0.17.0 reached the Registry; stable unversioned protocol filenames remain
+intentionally reusable.
 
 ## Runtime boundary
 
-The release can publish a deployable sandbox artifact without activating a
-hosted gateway. Hosted Railway or customer deployment requires an explicitly
-authorized project/environment, exact source/build identity, egress policy,
-edge quota, health/freshness proof, and rollback target. Live order activation
-additionally requires broker preview, executable real-money evidence, scoped
-service identity, asymmetric or tenant-local keys, atomic receipt consumption,
-backup/restore proof, compliance review, and owner authorization.
+A later recovery release may publish a deployable sandbox artifact without
+activating a hosted gateway. Hosted Railway or customer deployment requires an
+explicitly authorized project/environment, exact source/build identity, egress
+policy, edge quota, health/freshness proof, and rollback target. Live order
+activation additionally requires broker preview, executable real-money
+evidence, scoped service identity, asymmetric or tenant-local keys, atomic
+receipt consumption, backup/restore proof, compliance review, and owner
+authorization.
 
 ## Immutable prior receipt
 
 The v0.16.0 release record, embedded MCPB README, hashes, commit, workflow and
-Registry URL remain frozen. Preparing v0.17.0 does not rewrite them.
+Registry URL remain frozen. The prepared v0.17.0 MCPB README is also frozen at
+SHA-256 `ec252e147ed8e835ba4eaf3a2a4132ab70f3739b14eb0a0610766c3574b51767`;
+its wording describes candidate bytes and cannot be upgraded into publication
+proof. Preparing v0.17.1 rewrites neither prior record.
