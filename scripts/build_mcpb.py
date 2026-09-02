@@ -21,6 +21,7 @@ _OFFLINE_ADOPTION_ASSETS = (
     Path("integrations/typescript/package.json"),
     Path("integrations/typescript/README.md"),
     Path("integrations/typescript/LICENSE"),
+    Path("integrations/typescript/NOTICE"),
     Path("integrations/typescript/src/hash_tree_v1.mjs"),
     Path("integrations/typescript/src/index.mjs"),
     Path("integrations/typescript/src/index.d.ts"),

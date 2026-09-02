@@ -58,6 +58,7 @@ jobs:
             uv build --project integrations/trade-safety-gateway --out-dir dist
           SOURCE_DATE_EPOCH="$source_date_epoch" \
             uv build --project integrations/openbb --out-dir dist
+          test -f dist/openbb_liquilens_evidence-0.2.0.tar.gz
           npm pack ./integrations/typescript --pack-destination dist
           test -f dist/liquilens-trade-safety-0.1.0.tgz
           cp protocol/liquilens-evidence-carrier-v1.schema.json dist/
@@ -104,6 +105,7 @@ jobs:
           subject-path: |
             dist/*.whl
             dist/liquilens_evidence-*.tar.gz
+            dist/openbb_liquilens_evidence-*.tar.gz
             dist/liquilens_trade_safety_gateway-*.tar.gz
             dist/liquilens-evidence-carrier-*.tar.gz
             dist/*.mcpb

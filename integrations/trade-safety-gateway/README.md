@@ -32,7 +32,7 @@ There is deliberately no execution-shaped MCP tool.
 | Product | Fixed request | Receipt state and boundary |
 | --- | --- | --- |
 | Seiche | `POST https://api.seiche.info/mcp`, tool `funding_stress_now` | `context_only`; only the validated regime, index, coverage, source clock, and exact response hash are projected. |
-| Undertow | `POST https://api.seiche.info/undertow/mcp`, tool `exit_cost` | `context_only`; BTC aliases, USD, and exact published rungs `$1k/$10k/$100k/$1m` only. A mismatched nearest rung is unavailable evidence. |
+| Undertow | `POST https://api.seiche.info/undertow/mcp`, tool `exit_cost` | `context_only`; BTC aliases, USD, and exact published rungs `$1k/$10k/$100k/$1m` only. The response must cover the declared six-venue roster—Binance, Bitfinex, Coinbase, Gemini, Kraken, and OKX—with no unable-at-depth venue; a partial/extra map or mismatched nearest rung is unavailable evidence. |
 | LiquiLens | `GET https://api.liquilens.in/api/failure-radar/institution/{quoted_slug}` | Called only for a validated `request.order.instrument.identifiers.liquilens_institution_slug`; only latest period end and historical-evidence status/eligibility are projected. Otherwise `not_applicable`. |
 
 Upstream JSON-RPC text content is ignored. The gateway consumes
@@ -41,6 +41,12 @@ fields, and hashes the exact uncompressed response entity bytes. Source,
 generated/as-of, knowledge, retrieval, and local-expiry clocks remain separate.
 The local expiry is explicitly identified as a gateway clock, not an upstream
 claim.
+
+Undertow completeness is roster-scoped, not a claim about the whole market.
+The gateway requires exact set equality with its declared six-CEX roster before
+using the response's worst cost or cross-venue spread. Off-roster CEXs, DEXs,
+and agent-native venues remain unmeasured by construction; adding or changing a
+venue requires a reviewed contract update rather than silent acceptance.
 
 ## Fail-closed and network boundary
 
@@ -62,6 +68,9 @@ claim.
 - Every evidence section and the broker-preview reference carries
   `trade_safety_request_hash(request)`. No nearest-rung result is promoted to
   exact-order evidence.
+- An empty Undertow `unable_at_observed_depth` list is not sufficient by itself:
+  the cost map must also contain every and only the declared six venues. Partial
+  maps therefore fail closed instead of producing a misleading zero spread.
 
 Public-source access does not imply real-money or redistribution rights. All
 three adapters therefore declare `metadata_only`, `context_only`,
@@ -118,6 +127,7 @@ The tests inject byte-exact fake upstream responses and cover:
 
 - unsupported and invalid sizes never calling Undertow;
 - source errors and nearest-rung mismatches failing closed;
+- incomplete or off-roster Undertow venue maps failing closed;
 - exact response hashing and exact-order request-hash binding;
 - paper receipts passing and limiting under operator policy;
 - live receipts never passing and carrying a not-applicable broker preview;

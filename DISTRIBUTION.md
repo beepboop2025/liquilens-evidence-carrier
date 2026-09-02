@@ -25,7 +25,7 @@ published, registered, or deployed. Until their exact protected-main release
 receipts exist, the public production pin remains v0.18.0 and live orders remain
 unconditionally held.
 The prepared deterministic MCPB SHA-256 is
-`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`;
 the future asset URL is not claimed live.
 
 Core `v0.18.0` adds an authenticated paper-order guard, preserves the v1

@@ -1,5 +1,6 @@
 """Release smoke tests bind to the same immutable carrier identity."""
 
+import json
 import tomllib
 from pathlib import Path
 
@@ -87,6 +88,36 @@ def test_gateway_container_is_attested_multiarch_distribution_not_authority():
     )
 
 
+def test_gateway_pr_multiarch_build_installs_the_pinned_qemu_before_buildx():
+    workflow = (ROOT / ".github/workflows/gateway-container.yml").read_text(
+        encoding="utf-8"
+    )
+    smoke = workflow.split("  smoke:", maxsplit=1)[1].split(
+        "  publish:", maxsplit=1
+    )[0]
+    qemu = (
+        "docker/setup-qemu-action@"
+        "96fe6ef7f33517b61c61be40b68a1882f3264fb8"
+    )
+    buildx = (
+        "docker/setup-buildx-action@"
+        "37fe631027851001ddb9b187196cc803df7f5f0e"
+    )
+    assert smoke.count(qemu) == 1
+    assert smoke.index(qemu) < smoke.index(buildx)
+
+
+def test_typescript_tarball_manifest_carries_root_license_and_notice():
+    package = json.loads(
+        (ROOT / "integrations/typescript/package.json").read_text(encoding="utf-8")
+    )
+    assert {"LICENSE", "NOTICE"} <= set(package["files"])
+    for name in ("LICENSE", "NOTICE"):
+        assert (ROOT / "integrations/typescript" / name).read_bytes() == (
+            ROOT / name
+        ).read_bytes()
+
+
 def test_container_context_carries_every_root_package_input():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     data_files = project["tool"]["setuptools"]["data-files"]
@@ -158,6 +189,7 @@ def test_release_publishes_and_attests_trade_safety_assets():
     assert "uv build --project integrations/openbb --out-dir dist" in (
         build_step.replace("\\\n            ", "")
     )
+    assert "test -f dist/openbb_liquilens_evidence-0.2.0.tar.gz" in build_step
 
     assert "uv build --project integrations/trade-safety-gateway --out-dir dist" in (
         build_step.replace("\\\n            ", "")
@@ -166,6 +198,7 @@ def test_release_publishes_and_attests_trade_safety_assets():
     assert "xargs -0 sha256sum > SHA256SUMS" in build_step
     for subject in (
         "dist/*.whl",
+        "dist/openbb_liquilens_evidence-*.tar.gz",
         "dist/liquilens_trade_safety_gateway-*.tar.gz",
         "dist/*.schema.json",
         "dist/trade-safety-intents.json",
@@ -177,6 +210,15 @@ def test_release_publishes_and_attests_trade_safety_assets():
 
     publish_step = workflow.split("- name: Publish public release", maxsplit=1)[1]
     assert 'gh release create "$GITHUB_REF_NAME" dist/*' in publish_step
+
+
+def test_openbb_reproducible_install_uses_the_candidate_release_tag():
+    readme = (ROOT / "integrations/openbb/README.md").read_text(encoding="utf-8")
+    assert (
+        "liquilens-evidence-carrier.git@v0.19.0#subdirectory=integrations/openbb"
+        in readme
+    )
+    assert "f4e9d6fb6bb20abbe6fc4625bd8c0f3279b48674" not in readme
 
 
 def test_release_preflight_runs_before_any_immutable_tag_is_created():

@@ -116,3 +116,101 @@ test("concurrent replay attempts invoke the paper callback exactly once", async 
   }
   assert.equal(submissions, 1);
 });
+
+test("caller mutation while receipt consumption is pending cannot substitute the request", async () => {
+  const vector = corpus.cases.find((item) => item.id === "paper-pass");
+  assert.ok(vector);
+  const request = Buffer.from(vector.request_utf8_base64, "base64");
+  const receipt = Buffer.from(vector.receipt_utf8_base64, "base64");
+  const originalRequestJson = request.toString("utf8");
+  const symbolOffset = request.indexOf("BTC/USD", 0, "utf8");
+  assert.notEqual(symbolOffset, -1);
+
+  let releaseConsumption;
+  let markConsumerEntered;
+  const consumerEntered = new Promise((resolve) => {
+    markConsumerEntered = resolve;
+  });
+  const receiptConsumer = {
+    consume() {
+      return new Promise((resolve) => {
+        releaseConsumption = resolve;
+        markConsumerEntered();
+      });
+    },
+  };
+  const gateway = new PaperTradeSafetyOrderGateway(
+    async (authorization) => authorization,
+    {
+      binding: vector.binding,
+      receiptConsumer,
+      hmacKey,
+      clock: () => new Date(vector.evaluated_at),
+    },
+  );
+
+  const pending = gateway.submit(request, receipt);
+  await consumerEntered;
+  request.set(Buffer.from("ETH/USD", "utf8"), symbolOffset);
+  assert.match(request.toString("utf8"), /ETH\/USD/u);
+  releaseConsumption(true);
+
+  const authorization = await pending;
+  assert.equal(authorization.requestJson, originalRequestJson);
+  assert.equal(JSON.parse(authorization.requestJson).order.instrument.symbol, "BTC/USD");
+});
+
+test("gateway validates and seals its execution binding before asynchronous use", async () => {
+  const vector = corpus.cases.find((item) => item.id === "paper-pass");
+  assert.ok(vector);
+  const request = Buffer.from(vector.request_utf8_base64, "base64");
+  const receipt = Buffer.from(vector.receipt_utf8_base64, "base64");
+  const binding = { ...vector.binding };
+
+  assert.throws(
+    () => new PaperTradeSafetyOrderGateway(async () => undefined, {
+      binding: { ...binding, account_id: " " },
+      receiptConsumer: { consume: async () => true },
+      hmacKey,
+    }),
+    /binding\.account_id must be a non-blank string/u,
+  );
+
+  let releaseConsumption;
+  let markConsumerEntered;
+  const consumerEntered = new Promise((resolve) => {
+    markConsumerEntered = resolve;
+  });
+  const gateway = new PaperTradeSafetyOrderGateway(
+    async (authorization) => authorization,
+    {
+      binding,
+      receiptConsumer: {
+        consume() {
+          return new Promise((resolve) => {
+            releaseConsumption = resolve;
+            markConsumerEntered();
+          });
+        },
+      },
+      hmacKey,
+      clock: () => new Date(vector.evaluated_at),
+    },
+  );
+
+  const pending = gateway.submit(request, receipt);
+  await consumerEntered;
+  binding.account_id = "substituted-paper-account";
+  releaseConsumption(true);
+
+  const authorization = await pending;
+  assert.notEqual(authorization.binding, binding);
+  assert.equal(authorization.binding.account_id, vector.binding.account_id);
+  assert.ok(Object.isFrozen(authorization.binding));
+  assert.throws(
+    () => {
+      authorization.binding.account_id = "another-account";
+    },
+    TypeError,
+  );
+});

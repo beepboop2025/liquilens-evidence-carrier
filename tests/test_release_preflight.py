@@ -28,7 +28,7 @@ def _working_tree_text(path: str) -> str:
 def test_current_candidate_metadata_passes_preflight_validation():
     metadata = validate_candidate_metadata(_working_tree_text, "0.19.0")
     assert metadata["mcpb_sha256"] == (
-        "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74"
+        "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a"
     )
 
 
@@ -47,7 +47,7 @@ def test_placeholder_mcpb_digest_fails_before_tag_creation():
         text = _working_tree_text(path)
         if path == "server.json":
             return text.replace(
-                "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74",
+                "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a",
                 "0" * 64,
             )
         return text
@@ -88,6 +88,10 @@ def test_manual_preflight_workflow_has_no_tag_write_authority():
     assert workflow.count("scripts/build_mcpb.py") == 2
     assert workflow.count("--check-registry-metadata") == 2
     assert 'cmp --silent "$artifact" "$replay"' in workflow
+    assert (
+        '"$RUNNER_TEMP/release-build/openbb_liquilens_evidence-0.2.0.tar.gz"'
+        in workflow
+    )
 
 
 @pytest.mark.parametrize(

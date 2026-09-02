@@ -21,6 +21,7 @@ from trade_safety_gateway.app import (
     SEICHE_URL,
     SERVICE_REVISION,
     SERVICE_VERSION,
+    UNDERTOW_REQUIRED_VENUES,
     UNDERTOW_URL,
     RawUpstreamResponse,
     create_app,
@@ -94,6 +95,8 @@ def _undertow_bytes(
     spread: float = 8.0,
     unable: list[str] | None = None,
     venue_costs: dict[str, Any] | None = None,
+    best_venue: str = "binance",
+    worst_venue: str = "bitfinex",
 ) -> bytes:
     return _mcp_response(
         "trade-safety-undertow-v1",
@@ -104,9 +107,16 @@ def _undertow_bytes(
             "requested_size_usd": requested,
             "published_rung_used_usd": rung,
             "sell_cost_bp_by_venue": venue_costs
-            or {"venue-a": 2.0, "venue-b": worst},
-            "best": {"venue": "venue-a", "sell_bp": 2.0},
-            "worst": {"venue": "venue-b", "sell_bp": worst},
+            or {
+                "binance": 2.0,
+                "bitfinex": worst,
+                "coinbase": 4.0,
+                "gemini": 6.0,
+                "kraken": 3.0,
+                "okx": 5.0,
+            },
+            "best": {"venue": best_venue, "sell_bp": 2.0},
+            "worst": {"venue": worst_venue, "sell_bp": worst},
             "venue_spread_bp": spread,
             "unable_at_observed_depth": unable or [],
         },
@@ -273,6 +283,9 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
             MCP_LEGACY_PROTOCOL_VERSION,
         ]
         assert capabilities["limits"]["request_bytes"] == MAX_REQUEST_BYTES
+        assert capabilities["upstreams"]["undertow"]["required_venues"] == sorted(
+            UNDERTOW_REQUIRED_VENUES
+        )
         openapi = client.get("/openapi.json").json()
         assert {"/healthz", "/v1/capabilities", "/v1/check", "/mcp"} <= set(
             openapi["paths"]
@@ -384,6 +397,47 @@ def test_unmeasured_depth_and_forged_spread_make_undertow_unavailable() -> None:
     assert section["source_sha256"] == hashlib.sha256(spread_raw).hexdigest()
 
 
+def test_partial_venue_map_cannot_claim_complete_undertow_coverage() -> None:
+    fake = FakeUpstream()
+    partial_raw = _undertow_bytes(
+        venue_costs={"binance": 2.0},
+        best_venue="binance",
+        worst_venue="binance",
+        worst=2.0,
+        spread=0.0,
+    )
+    fake.responses[UNDERTOW_URL] = partial_raw
+    with _client(fake) as client:
+        receipt = _post_check(client, _request()).json()
+    section = receipt["evidence"]["undertow"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["facts"] == {}
+    assert section["source_sha256"] == hashlib.sha256(partial_raw).hexdigest()
+
+
+def test_extra_venue_cannot_claim_declared_undertow_coverage() -> None:
+    fake = FakeUpstream()
+    venue_costs = {
+        "binance": 2.0,
+        "bitfinex": 10.0,
+        "coinbase": 4.0,
+        "gemini": 6.0,
+        "kraken": 3.0,
+        "okx": 5.0,
+        "off-roster": 7.0,
+    }
+    extra_raw = _undertow_bytes(venue_costs=venue_costs)
+    fake.responses[UNDERTOW_URL] = extra_raw
+    with _client(fake) as client:
+        receipt = _post_check(client, _request()).json()
+    section = receipt["evidence"]["undertow"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["facts"] == {}
+    assert section["source_sha256"] == hashlib.sha256(extra_raw).hexdigest()
+
+
 def test_unsupported_venue_and_malformed_sizes_never_reach_undertow() -> None:
     for request in (
         _request(venue="venue-a"),
@@ -435,7 +489,7 @@ def test_malformed_venue_cost_values_fail_closed() -> None:
         assert receipt["evidence"]["undertow"]["state"] == "unavailable"
 
     fake = FakeUpstream()
-    raw = _undertow_bytes().replace(b'"venue-b":10.0', b'"venue-b":NaN')
+    raw = _undertow_bytes().replace(b'"bitfinex":10.0', b'"bitfinex":NaN')
     fake.responses[UNDERTOW_URL] = raw
     with _client(fake) as client:
         receipt = _post_check(client, _request()).json()

@@ -387,6 +387,7 @@ def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
             "integrations/typescript/package.json",
             "integrations/typescript/README.md",
             "integrations/typescript/LICENSE",
+            "integrations/typescript/NOTICE",
             "integrations/typescript/src/hash_tree_v1.mjs",
             "integrations/typescript/src/index.mjs",
             "integrations/typescript/src/index.d.ts",

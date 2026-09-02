@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import {
+  MAX_ARTIFACT_BYTES,
   canonicalValuesEqual,
   digestValue,
   isJsonObject,
@@ -49,6 +50,14 @@ const RIGHTS_STATUSES = new Set([
 ]);
 const UNSAFE_RIGHTS = new Set(["restricted", "unknown", "blocked"]);
 const REAL_MONEY_RIGHTS = new Set(["allowed", "licensed"]);
+const EXECUTION_BINDING_FIELDS = new Set([
+  "account_id", "tenant_id", "operator_id", "agent_id", "runtime", "strategy_id",
+  "policy_id", "policy_version", "policy_hash", "issuer_name", "issuer_version",
+  "issuer_endpoint", "hmac_key_id",
+]);
+const EXECUTION_AGENT_FIELDS = [
+  "account_id", "tenant_id", "operator_id", "agent_id", "runtime", "strategy_id",
+];
 
 export class TradeSafetyVerificationError extends Error {}
 
@@ -613,15 +622,27 @@ function bindingText(binding, key, { nullable = false } = {}) {
   return text(binding[key], `binding.${key}`, { nullable });
 }
 
+function validatedExecutionBinding(binding) {
+  if (!isJsonObject(binding)) throw new TypeError("binding must be an object");
+  const snapshot = { ...binding };
+  exactKeys(snapshot, "binding", EXECUTION_BINDING_FIELDS);
+  const validated = Object.create(null);
+  for (const key of EXECUTION_AGENT_FIELDS) {
+    validated[key] = bindingText(snapshot, key, { nullable: key === "strategy_id" });
+  }
+  validated.policy_id = bindingText(snapshot, "policy_id");
+  validated.policy_version = bindingText(snapshot, "policy_version");
+  validated.policy_hash = sha256(snapshot.policy_hash, "binding.policy_hash");
+  validated.issuer_name = bindingText(snapshot, "issuer_name");
+  validated.issuer_version = bindingText(snapshot, "issuer_version");
+  validated.issuer_endpoint = bindingText(snapshot, "issuer_endpoint");
+  validated.hmac_key_id = bindingText(snapshot, "hmac_key_id");
+  return Object.freeze(validated);
+}
+
 function verifyBinding(receipt, binding) {
-  exactKeys(binding, "binding", new Set([
-    "account_id", "tenant_id", "operator_id", "agent_id", "runtime", "strategy_id",
-    "policy_id", "policy_version", "policy_hash", "issuer_name", "issuer_version",
-    "issuer_endpoint", "hmac_key_id",
-  ]));
   const request = receipt.request;
-  const agentFields = ["account_id", "tenant_id", "operator_id", "agent_id", "runtime", "strategy_id"];
-  for (const key of agentFields) {
+  for (const key of EXECUTION_AGENT_FIELDS) {
     const expected = bindingText(binding, key, { nullable: key === "strategy_id" });
     if (request.agent[key] !== expected) throw new TradeSafetyOrderBlocked("execution_context_mismatch", "request identity does not match this broker credential lane", { receiptId: receipt.receipt_id });
   }
@@ -677,7 +698,7 @@ export class PaperTradeSafetyOrderGateway {
     if (!(hmacKey instanceof Uint8Array) || hmacKey.byteLength === 0) throw new TypeError("the paper gateway requires a non-empty HMAC key");
     if (typeof clock !== "function") throw new TypeError("clock must be callable");
     this.#submitOrder = submitOrder;
-    this.#binding = binding;
+    this.#binding = validatedExecutionBinding(binding);
     this.#consumer = receiptConsumer;
     this.#hmacKey = new Uint8Array(hmacKey);
     this.#clock = clock;
@@ -685,8 +706,18 @@ export class PaperTradeSafetyOrderGateway {
 
   async submit(requestUtf8, receiptUtf8) {
     let request;
+    let requestJson;
     try {
-      const parsed = parseJsonUtf8(requestUtf8, "request");
+      if (!(requestUtf8 instanceof Uint8Array)) {
+        throw new TypeError("request must be supplied as raw UTF-8 bytes");
+      }
+      if (requestUtf8.byteLength === 0) throw new Error("request must not be empty");
+      if (requestUtf8.byteLength > MAX_ARTIFACT_BYTES) {
+        throw new Error(`request exceeds ${MAX_ARTIFACT_BYTES} raw bytes`);
+      }
+      const requestSnapshot = new Uint8Array(requestUtf8);
+      requestJson = new TextDecoder("utf-8", { fatal: true }).decode(requestSnapshot);
+      const parsed = parseJsonUtf8(requestSnapshot, "request");
       if (isJsonObject(parsed) && parsed.mode === "live") {
         throw new TradeSafetyOrderBlocked("mode_not_supported", "the reference order guard is paper-only; live routing is held");
       }
@@ -716,11 +747,11 @@ export class PaperTradeSafetyOrderGateway {
     }
     if (consumed !== true) throw new TradeSafetyOrderBlocked("receipt_replay", "receipt was expired, already claimed, or could not be atomically claimed", { outcome: verified.outcome, receiptId: verified.receiptId });
     const authorization = Object.freeze({
-      requestJson: new TextDecoder("utf-8", { fatal: true }).decode(requestUtf8),
+      requestJson,
       receiptId: verified.receiptId,
       requestHash: verified.requestHash,
       authenticated: true,
-      binding: Object.freeze({ ...this.#binding }),
+      binding: this.#binding,
     });
     return this.#submitOrder(authorization);
   }

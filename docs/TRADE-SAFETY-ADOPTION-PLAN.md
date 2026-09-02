@@ -180,6 +180,12 @@ Near-term work:
 Initial source: hosted MCP `exit_cost`, restricted to BTC, USD, and exact
 published rungs of USD 1,000, 10,000, 100,000, or 1,000,000.
 
+The read-only sandbox adapter treats the current committed roster—Binance,
+Bitfinex, Coinbase, Gemini, Kraken, and OKX—as an explicit coverage contract.
+It uses exit-cost and venue-spread facts only when every roster venue is present
+and measured at the exact rung. A partial or extra venue map is unavailable,
+and complete roster coverage is not represented as complete market coverage.
+
 Near-term work:
 
 - reject boolean, non-finite, non-positive, out-of-grid and beyond-depth sizes;

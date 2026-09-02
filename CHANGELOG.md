@@ -28,7 +28,7 @@ authority.
 No `v0.19.0` tag, GitHub release, Registry publication, or deployment receipt
 exists at this source checkpoint. Version 0.18.0 remains the production pin.
 The reproducible local MCPB candidate SHA-256 is
-`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`;
 it is not a download receipt.
 
 ## [0.18.0] - 2026-09-02

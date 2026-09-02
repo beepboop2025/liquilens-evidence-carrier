@@ -74,6 +74,9 @@ EVIDENCE_TTL_SECONDS = 60
 RECEIPT_TTL_SECONDS = 60
 
 PUBLISHED_RUNG_USD = frozenset({1_000.0, 10_000.0, 100_000.0, 1_000_000.0})
+UNDERTOW_REQUIRED_VENUES = frozenset(
+    {"binance", "bitfinex", "coinbase", "gemini", "kraken", "okx"}
+)
 BTC_ALIASES = frozenset(
     {
         "BTC",
@@ -704,6 +707,17 @@ def _undertow_section(
         if not isinstance(venue, str) or not venue.strip():
             raise ValueError("Undertow venue name is invalid")
         normalized_costs[venue] = _finite_number(cost, f"venue.{venue}")
+    unable = payload.get("unable_at_observed_depth")
+    if not isinstance(unable, list) or not all(
+        isinstance(item, str) and item.strip() for item in unable
+    ):
+        raise ValueError("Undertow unable-at-depth field is invalid")
+    if unable:
+        raise ValueError("Undertow could not measure every venue at requested depth")
+    if set(normalized_costs) != UNDERTOW_REQUIRED_VENUES:
+        raise ValueError(
+            "Undertow venue costs do not cover the declared six-venue roster"
+        )
     best = _mapping(payload.get("best"), "best")
     best_venue = best.get("venue")
     best_sell = _finite_number(best.get("sell_bp"), "best.sell_bp")
@@ -724,13 +738,6 @@ def _undertow_section(
         or abs(worst_sell - max(normalized_costs.values())) > 1e-9
     ):
         raise ValueError("Undertow worst cost does not match venue costs")
-    unable = payload.get("unable_at_observed_depth")
-    if not isinstance(unable, list) or not all(
-        isinstance(item, str) and item.strip() for item in unable
-    ):
-        raise ValueError("Undertow unable-at-depth field is invalid")
-    if unable:
-        raise ValueError("Undertow could not measure every venue at requested depth")
     claimed_venue_spread = _finite_number(
         payload.get("venue_spread_bp"), "venue_spread_bp"
     )
@@ -756,6 +763,7 @@ def _undertow_section(
             "public_metadata_context_only_not_licensed_for_real_money_execution",
             "estimated_depth_cost_not_a_book_walk_or_executable_quote",
             "exact_published_rung_required_nearest_rung_substitution_forbidden",
+            "complete_declared_six_venue_roster_required_off_roster_venues_unmeasured",
             "upstream_has_no_response_schema_id_shape_validated_by_gateway",
             "gateway_expiry_is_local_not_an_upstream_expiry",
         ],
@@ -1117,6 +1125,7 @@ def capabilities() -> dict[str, Any]:
                 "asset_aliases": sorted(BTC_ALIASES),
                 "currency": "USD",
                 "published_rungs_usd": sorted(PUBLISHED_RUNG_USD),
+                "required_venues": sorted(UNDERTOW_REQUIRED_VENUES),
             },
             "liquilens": {
                 "url_base": LIQUILENS_BASE_URL,
@@ -1492,6 +1501,7 @@ __all__ = [
     "MAX_UPSTREAM_BYTES",
     "PUBLISHED_RUNG_USD",
     "SEICHE_URL",
+    "UNDERTOW_REQUIRED_VENUES",
     "UNDERTOW_URL",
     "RawUpstreamResponse",
     "TradeSafetyGateway",

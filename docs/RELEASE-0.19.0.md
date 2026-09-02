@@ -19,7 +19,7 @@ OCI deployment, hosted gateway, or live-order activation receipt yet. A local
 candidate digest proves only reproducible prepared bytes; it does not prove the
 future release URL exists.
 Two byte-identical deterministic local MCPB builds produced SHA-256
-`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`.
+`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`.
 
 ## Candidate gates
 

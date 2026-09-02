@@ -39,7 +39,7 @@ order authority. Until protected-main preflight and the controlled release finis
 [`docs/RELEASE-0.19.0.md`](docs/RELEASE-0.19.0.md); no v0.19.0 publication or
 deployment receipt is asserted here.
 The two deterministic local candidate builds currently hash to
-`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+`11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a`;
 this is prepared-byte identity, not publication proof.
 
 Release `v0.18.0` adds authenticated sync/async paper-order gateways around the

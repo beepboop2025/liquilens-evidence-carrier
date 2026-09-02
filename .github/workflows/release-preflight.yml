@@ -83,6 +83,8 @@ jobs:
           SOURCE_DATE_EPOCH="$source_date_epoch" \
             uv build --project integrations/openbb \
               --out-dir "$RUNNER_TEMP/release-build"
+          test -f \
+            "$RUNNER_TEMP/release-build/openbb_liquilens_evidence-0.2.0.tar.gz"
           npm pack ./integrations/typescript \
             --pack-destination "$RUNNER_TEMP/release-build"
           test -f \

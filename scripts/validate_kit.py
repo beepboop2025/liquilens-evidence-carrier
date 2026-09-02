@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_VERSION = "0.19.0"
 SOURCE_MCPB_SHA256 = (
-    "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74"
+    "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a"
 )
 GATEWAY_VERSION = "0.1.2"
 PUBLISHED_VERSION = "0.18.0"

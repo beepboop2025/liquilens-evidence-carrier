@@ -21,11 +21,13 @@ python -m pip install \
 openbb-build
 ```
 
-For a reproducible installation, pin the reviewed extension source snapshot:
+For a reproducible installation after the release is published, pin the signed,
+repository-protected v0.19.0 source tag. The release controller creates this tag
+only from the final reviewed candidate after preflight succeeds:
 
 ```bash
 python -m pip install \
-  "git+https://github.com/beepboop2025/liquilens-evidence-carrier.git@f4e9d6fb6bb20abbe6fc4625bd8c0f3279b48674#subdirectory=integrations/openbb"
+  "git+https://github.com/beepboop2025/liquilens-evidence-carrier.git@v0.19.0#subdirectory=integrations/openbb"
 ```
 
 The package pins the LiquiLens verifier dependency to the immutable v0.18.0
