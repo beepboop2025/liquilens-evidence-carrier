@@ -34,6 +34,7 @@ from .evidence_carrier import (
 )
 from .fleet_brief import FLEET_BRIEF_MAX_BYTES, verify_fleet_brief
 from .protocol_resources import protocol_path
+from .trade_safety import TRADE_SAFETY_MAX_BYTES, verify_trade_safety_receipt
 
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -44,7 +45,10 @@ _SERVER_INFO: dict[str, Any] = {
     "name": MCP_SERVER_NAME,
     "title": "LiquiLens Evidence Carrier",
     "version": __version__,
-    "description": "Offline verification of local evidence carriers and fleet briefs.",
+    "description": (
+        "Offline verification of local evidence carriers, fleet briefs, and "
+        "hash-only trade-safety receipts."
+    ),
     "websiteUrl": "https://liquilens.in/protocol/",
 }
 _SERVER_CAPABILITIES: dict[str, Any] = {
@@ -52,11 +56,14 @@ _SERVER_CAPABILITIES: dict[str, Any] = {
     "tools": {"listChanged": False},
 }
 _INSTRUCTIONS = (
-    "Read-only and offline. Verify local carrier or fleet-brief JSON. "
+    "Read-only and offline. Verify local carrier, fleet-brief, or hash-only "
+    "trade-safety receipt JSON. "
     "A valid carrier may still be non-exportable: preserve export_disposition, "
     "reason_codes, rights, clocks, and the all-false authority boundary. This "
-    "server does not fetch market data, combine product scores, recommend, rate "
-    "credit, or execute trades."
+    "server does not accept authentication secrets, fetch market data, combine "
+    "product scores, recommend, rate credit, or execute trades. Signed live "
+    "receipts therefore fail closed in MCP v1 and must be verified locally with "
+    "a tenant-controlled key."
 )
 
 _PROJECTION_FORMATS = (
@@ -173,6 +180,41 @@ _TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "openWorldHint": False,
         },
     },
+    {
+        "name": "verify_trade_safety_receipt",
+        "title": "Verify local hash-only trade-safety receipt",
+        "description": (
+            "Verify one local order-bound receipt under the configured root at an "
+            "explicit clock. This v1 tool accepts no authentication secrets, so "
+            "HMAC receipts fail closed and require tenant-local verification. It "
+            "never fetches market data, recommends, or executes an order."
+        ),
+        "inputSchema": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Receipt JSON path, relative to the allowed root or absolute within it.",
+                },
+                "evaluated_at": {
+                    "type": "string",
+                    "description": (
+                        "Required verification clock as an RFC 3339 UTC timestamp ending in Z."
+                    ),
+                },
+            },
+            "required": ["path", "evaluated_at"],
+            "additionalProperties": False,
+        },
+        "annotations": {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        },
+    },
 ]
 
 _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
@@ -190,6 +232,26 @@ _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
         "LiquiLens Fleet Brief schema",
         "liquilens-fleet-brief-v1.schema.json",
         "JSON Schema for four-product, rights-aware fleet briefs.",
+    ),
+    "liquilens-evidence://protocol/trade-safety-request-schema": (
+        "Trade-Safety Request schema",
+        "liquilens-trade-safety-request-v1.schema.json",
+        "JSON Schema for one exact, operator-authorized proposed order.",
+    ),
+    "liquilens-evidence://protocol/trade-safety-policy-schema": (
+        "Trade-Safety Policy schema",
+        "liquilens-trade-safety-policy-v1.schema.json",
+        "JSON Schema for fail-closed operator-authored policy constraints.",
+    ),
+    "liquilens-evidence://protocol/broker-preview-reference-schema": (
+        "Broker Preview Reference schema",
+        "liquilens-broker-preview-reference-v1.schema.json",
+        "JSON Schema for a non-executable broker-owned preview reference.",
+    ),
+    "liquilens-evidence://protocol/trade-safety-receipt-schema": (
+        "Trade-Safety Receipt schema",
+        "liquilens-trade-safety-receipt-v1.schema.json",
+        "JSON Schema for deterministic, order-bound policy receipts.",
     ),
     "liquilens-evidence://protocol/catalog": (
         "Evidence Carrier protocol catalog",
@@ -434,6 +496,51 @@ class EvidenceCarrierMCPServer:
             "authority": dict(value["authority"]),
         }
 
+    def _verify_trade_safety_tool(
+        self, arguments: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        allowed = {"path", "evaluated_at"}
+        extra = set(arguments) - allowed
+        if extra:
+            raise MCPInputError(
+                "verify_trade_safety_receipt has unsupported arguments: "
+                + ", ".join(sorted(extra))
+            )
+        if "path" not in arguments or "evaluated_at" not in arguments:
+            raise MCPInputError(
+                "verify_trade_safety_receipt requires path and evaluated_at"
+            )
+        if not isinstance(arguments["evaluated_at"], str):
+            raise MCPInputError(
+                "verify_trade_safety_receipt evaluated_at must be explicit"
+            )
+        path, receipt, byte_count = self._resolve_json(
+            arguments["path"],
+            max_bytes=TRADE_SAFETY_MAX_BYTES,
+            artifact_name="trade-safety receipt",
+        )
+        evaluated_at = _evaluated_at(arguments["evaluated_at"])
+        verified = verify_trade_safety_receipt(
+            receipt,
+            evaluated_at=evaluated_at,
+        )
+        value = verified.receipt
+        return {
+            "ok": True,
+            "receipt_id": value["receipt_id"],
+            "record_hash": value["record_hash"],
+            "outcome": verified.outcome.value,
+            "policy_satisfied": verified.policy_satisfied,
+            "authenticated": verified.authenticated,
+            "receipt_evaluated_at": value["evaluated_at"],
+            "verified_at": _utc_text(evaluated_at),
+            "expires_at": value["expires_at"],
+            "reason_codes": list(value["decision"]["reason_codes"]),
+            "source_path": str(path),
+            "source_bytes": byte_count,
+            "authority": dict(value["authority"]),
+        }
+
     def _tool_result(
         self, name: str, arguments: Mapping[str, Any]
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
@@ -441,6 +548,7 @@ class EvidenceCarrierMCPServer:
             "project_carrier": self._project_tool,
             "verify_carrier": self._verify_tool,
             "verify_fleet_brief": self._verify_fleet_brief_tool,
+            "verify_trade_safety_receipt": self._verify_trade_safety_tool,
         }
         handler = handlers.get(name)
         if handler is None:
@@ -449,18 +557,38 @@ class EvidenceCarrierMCPServer:
             structured = handler(arguments)
         except (EvidenceCarrierError, MCPInputError, TypeError, ValueError) as error:
             message = str(error) or error.__class__.__name__
+            trade_safety = name == "verify_trade_safety_receipt"
             return {
                 "resultType": "complete",
                 "content": [
-                    {"type": "text", "text": f"Evidence operation failed: {message}"}
+                    {
+                        "type": "text",
+                        "text": (
+                            f"Trade-safety verification failed: {message}"
+                            if trade_safety
+                            else f"Evidence operation failed: {message}"
+                        ),
+                    }
                 ],
                 "structuredContent": {
                     "ok": False,
-                    "error": {"code": "carrier_input_rejected", "message": message},
+                    "error": {
+                        "code": (
+                            "trade_safety_receipt_rejected"
+                            if trade_safety
+                            else "carrier_input_rejected"
+                        ),
+                        "message": message,
+                    },
                 },
                 "isError": True,
             }, None
-        if name == "verify_fleet_brief":
+        if name == "verify_trade_safety_receipt":
+            summary = (
+                f"Verified trade-safety receipt {structured['receipt_id']}: "
+                f"outcome {structured['outcome']}."
+            )
+        elif name == "verify_fleet_brief":
             summary = f"Verified fleet brief {structured['brief_id']}."
         else:
             summary = (

@@ -1,6 +1,6 @@
 {
   "schema": "liquilens.evidence-carrier-catalog.v1",
-  "release": "0.16.0",
+  "release": "0.17.0",
   "license": "Apache-2.0",
   "artifacts": [
     {
@@ -22,10 +22,40 @@
       "sha256": "aaf95337ff973dfbdda97e8ac63975a61b199e43854927404055fbeb52fc6058"
     },
     {
+      "name": "LiquiLens Trade Safety Request v1",
+      "path": "liquilens-trade-safety-request-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json",
+      "sha256": "73af15f84b09b0772368095a01d0f076b9334dd8bbdf9637015aed86e35a47f5"
+    },
+    {
+      "name": "LiquiLens Trade Safety Policy v1",
+      "path": "liquilens-trade-safety-policy-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json",
+      "sha256": "d9171e61c2d378eec545a14bbab0d1ca54302397c809eeeeaae55fb9154ae8d1"
+    },
+    {
+      "name": "LiquiLens Broker Preview Reference v1",
+      "path": "liquilens-broker-preview-reference-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json",
+      "sha256": "89069649379ca759382dcf3f9237e58b069e7fddeeecae6cffa686bbe7351422"
+    },
+    {
+      "name": "LiquiLens Trade Safety Receipt v1",
+      "path": "liquilens-trade-safety-receipt-v1.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json",
+      "sha256": "c2232ae5f80eb42edf7562ae5f5e44ccb9866a13717b697b4d41c28e74b25abe"
+    },
+    {
       "name": "LiquiLens FDC3 Evidence Context",
       "path": "../integrations/fdc3/com.liquilens.evidence.schema.json",
       "canonical_url": "https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json",
       "sha256": "9519474a4d0bf3a77834320d9aa43a88d5df96d49f691110154050212c7511b7"
+    },
+    {
+      "name": "LiquiLens FDC3 Trade Safety Receipt Context",
+      "path": "../integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+      "canonical_url": "https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+      "sha256": "6c013eef85134e17b649e67c75227a698b76b7d97c7048edb3e8cd703563620b"
     },
     {
       "name": "LiquiLens OpenLineage Evidence Facet",

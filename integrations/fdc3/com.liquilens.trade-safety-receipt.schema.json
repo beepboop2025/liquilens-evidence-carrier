@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+  "title": "LiquiLens FDC3 Trade Safety Receipt Context",
+  "description": "A proprietary FDC3 context carrying one verified Trade Safety Receipt. Delivery through FDC3 does not add execution, recommendation, allocation, quote, or financial authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "name", "id", "receiptSchema", "receipt"],
+  "properties": {
+    "type": {"const": "com.liquilens.trade-safety-receipt"},
+    "name": {"type": "string", "pattern": ".*\\S.*"},
+    "id": {
+      "type": "object",
+      "required": ["liquilensTradeSafetyReceiptId"],
+      "additionalProperties": {"type": "string", "pattern": ".*\\S.*"},
+      "properties": {
+        "liquilensTradeSafetyReceiptId": {
+          "type": "string",
+          "pattern": "^trade_safety_[0-9a-f]{24}$"
+        }
+      }
+    },
+    "receiptSchema": {
+      "const": "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json"
+    },
+    "receipt": {
+      "$ref": "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json"
+    }
+  }
+}

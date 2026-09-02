@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "liquilens-evidence-carrier",
   "display_name": "LiquiLens Evidence Carrier",
-  "version": "0.16.0",
-  "description": "Offline, read-only verification of local evidence carriers and four-product fleet briefs.",
-  "long_description": "Verifies carrier and fleet-brief identities, clocks, rights, product boundaries, and authority boundaries before producing any existing transport projection. It makes no network requests and cannot recommend, rate credit, or execute trades.",
+  "version": "0.17.0",
+  "description": "Offline verification of local evidence carriers, fleet briefs, and hash-only trade-safety receipts.",
+  "long_description": "Verifies carrier, fleet-brief, and order-bound receipt identities, clocks, rights, product boundaries, deterministic policy results, and authority boundaries. It makes no network requests, accepts no authentication secrets, and cannot recommend, rate credit, or execute trades.",
   "author": {
     "name": "LiquiLens",
     "url": "https://liquilens.in/protocol/"
@@ -49,6 +49,10 @@
     {
       "name": "verify_fleet_brief",
       "description": "Verify one local content-addressed four-product fleet brief at its exact evaluation clock."
+    },
+    {
+      "name": "verify_trade_safety_receipt",
+      "description": "Verify one local hash-only, exact-order trade-safety receipt; authenticated live receipts fail closed in this secretless server."
     }
   ],
   "tools_generated": false,
@@ -58,7 +62,8 @@
     "fleet-brief",
     "offline",
     "provenance",
-    "read-only"
+    "read-only",
+    "trade-safety"
   ],
   "license": "Apache-2.0",
   "compatibility": {
@@ -75,7 +80,7 @@
     "evidence_root": {
       "type": "directory",
       "title": "Evidence directory",
-      "description": "Directory containing carrier or fleet-brief JSON files this read-only server may inspect.",
+      "description": "Directory containing carrier, fleet-brief, or trade-safety receipt JSON files this read-only server may inspect.",
       "required": true
     }
   }

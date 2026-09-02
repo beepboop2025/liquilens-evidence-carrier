@@ -1,0 +1,70 @@
+{
+  "seiche": {
+    "product": "seiche",
+    "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+    "state": "context_only",
+    "evidence_class": "derived",
+    "source_url": "https://api.seiche.info/mcp",
+    "source_schema": "seiche.public.v2",
+    "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "as_of": "2026-09-02T11:59:30Z",
+    "knowledge_time": "2026-09-02T11:59:35Z",
+    "retrieved_at": "2026-09-02T11:59:45Z",
+    "expires_at": "2026-09-02T12:05:00Z",
+    "rights_status": "metadata_only",
+    "real_money_eligible": false,
+    "executable_quote": false,
+    "limitations": [
+      "synthetic_fixture_not_live_market_evidence"
+    ],
+    "facts": {
+      "regime": "CALM",
+      "funding_stress_index": 20.0
+    }
+  },
+  "undertow": {
+    "product": "undertow",
+    "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+    "state": "context_only",
+    "evidence_class": "derived",
+    "source_url": "https://api.seiche.info/undertow/mcp",
+    "source_schema": "undertow.exit-cost.v1",
+    "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "as_of": "2026-09-02T11:59:35Z",
+    "knowledge_time": "2026-09-02T11:59:40Z",
+    "retrieved_at": "2026-09-02T11:59:45Z",
+    "expires_at": "2026-09-02T12:05:00Z",
+    "rights_status": "metadata_only",
+    "real_money_eligible": false,
+    "executable_quote": false,
+    "limitations": [
+      "synthetic_fixture_estimate_not_book_walk_or_executable_quote"
+    ],
+    "facts": {
+      "requested_size_usd": 1000.0,
+      "published_rung_used_usd": 1000.0,
+      "worst_sell_cost_bps": 10.0,
+      "venue_spread_bps": 8.0
+    }
+  },
+  "liquilens": {
+    "product": "liquilens",
+    "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+    "state": "not_applicable",
+    "evidence_class": "unavailable",
+    "source_url": "https://liquilens.in/protocol/",
+    "source_schema": null,
+    "source_sha256": null,
+    "as_of": null,
+    "knowledge_time": null,
+    "retrieved_at": "2026-09-02T11:59:45Z",
+    "expires_at": null,
+    "rights_status": "metadata_only",
+    "real_money_eligible": false,
+    "executable_quote": false,
+    "limitations": [
+      "no_institution_context_requested_for_fixture"
+    ],
+    "facts": {}
+  }
+}

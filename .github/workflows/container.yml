@@ -151,9 +151,11 @@ jobs:
           release_dir="$(mktemp -d)"
           release_base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${REQUESTED_TAG}"
           curl --fail --location --silent --show-error \
+            --retry 18 --retry-all-errors --retry-delay 10 --retry-max-time 240 \
             --output "$release_dir/SHA256SUMS" \
             "$release_base/SHA256SUMS"
           curl --fail --location --silent --show-error \
+            --retry 18 --retry-all-errors --retry-delay 10 --retry-max-time 240 \
             --output "$release_dir/$wheel_name" \
             "$release_base/$wheel_name"
           wheel_sha="$(awk -v file="$wheel_name" \
@@ -206,7 +208,7 @@ jobs:
             README_URL=${{ steps.release.outputs.readme_url }}
           labels: |
             org.opencontainers.image.created=${{ steps.release.outputs.created }}
-            org.opencontainers.image.description=Offline verification of financial evidence carriers and four-product fleet briefs.
+            org.opencontainers.image.description=Offline verification of evidence carriers, fleet briefs, and trade-safety receipts.
             org.opencontainers.image.documentation=https://liquilens.in/protocol/
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.revision=${{ steps.release.outputs.revision }}

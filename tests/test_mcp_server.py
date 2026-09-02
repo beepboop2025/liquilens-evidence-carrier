@@ -98,6 +98,7 @@ def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
         "verify_carrier",
         "project_carrier",
         "verify_fleet_brief",
+        "verify_trade_safety_receipt",
     ]
     assert all(tool["annotations"]["readOnlyHint"] for tool in listed["tools"])
     assert all(not tool["annotations"]["openWorldHint"] for tool in listed["tools"])
@@ -175,7 +176,7 @@ def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
     assert brief_verified["structuredContent"]["authority"]["can_execute"] is False
 
     resources = _result(server.handle(_modern_request(6, "resources/list")))
-    assert len(resources["resources"]) == 4
+    assert len(resources["resources"]) == 8
     uri = resources["resources"][0]["uri"]
     read = _result(server.handle(_modern_request(7, "resources/read", {"uri": uri})))
     assert json.loads(read["contents"][0]["text"])["$schema"].startswith(
@@ -210,7 +211,7 @@ def test_legacy_initialize_list_and_call(tmp_path: Path) -> None:
         server.handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     )
     assert "resultType" not in listed
-    assert len(listed["tools"]) == 3
+    assert len(listed["tools"]) == 4
 
     called = _result(
         server.handle(
@@ -365,10 +366,27 @@ def test_deterministic_mcpb_runs_from_extracted_bundle(tmp_path: Path) -> None:
 
     extracted = tmp_path / "extracted"
     with zipfile.ZipFile(first) as archive:
-        assert "manifest.json" in archive.namelist()
-        assert "src/liquilens_evidence/mcp_server.py" in archive.namelist()
+        names = set(archive.namelist())
+        offline_adoption_assets = {
+            "protocol/verify_hash_tree_v1.mjs",
+            "integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+            "integrations/fdc3/trade-safety-intents.json",
+        }
+        assert {
+            "manifest.json",
+            "src/liquilens_evidence/mcp_server.py",
+            *offline_adoption_assets,
+        } <= names
+        assert not any(
+            name.startswith("integrations/trade-safety-gateway/") for name in names
+        )
+        for asset in offline_adoption_assets:
+            assert archive.read(asset) == (ROOT / asset).read_bytes()
         assert json.loads(archive.read("manifest.json"))["version"] == version
-        assert f"versioned for `v{version}`" in archive.read("README.md").decode()
+        embedded_readme = archive.read("README.md").decode()
+        assert f"bytes prepared for the v{version} MCPB" in embedded_readme
+        assert "is not publication proof" in embedded_readme
+        assert "not embedded in or started by this offline MCPB" in embedded_readme
         archive.extractall(extracted)
     carrier_path = _carrier_file(tmp_path, "bundle-carrier.json")
     environment = dict(os.environ)

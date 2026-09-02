@@ -87,3 +87,42 @@ def test_ci_and_release_replay_the_declared_mcpb_bytes():
         assert "--output \"$artifact\"" in workflow
         assert "--output \"$replay\"" in workflow
         assert "cmp --silent \"$artifact\" \"$replay\"" in workflow
+
+
+def test_release_publishes_and_attests_trade_safety_assets():
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    build_step = workflow.split(
+        "- name: Test and build release artifacts", maxsplit=1
+    )[1].split("- name: Attest runnable", maxsplit=1)[0]
+    attest_step = workflow.split("- name: Attest runnable", maxsplit=1)[1].split(
+        "- name: Publish public release", maxsplit=1
+    )[0]
+
+    loose_assets = (
+        "protocol/liquilens-trade-safety-request-v1.schema.json",
+        "protocol/liquilens-trade-safety-policy-v1.schema.json",
+        "protocol/liquilens-broker-preview-reference-v1.schema.json",
+        "protocol/liquilens-trade-safety-receipt-v1.schema.json",
+        "protocol/verify_hash_tree_v1.mjs",
+        "integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+        "integrations/fdc3/trade-safety-intents.json",
+    )
+    for asset in loose_assets:
+        assert f"cp {asset} dist/" in build_step
+
+    assert "uv build --project integrations/trade-safety-gateway --out-dir dist" in (
+        build_step.replace("\\\n            ", "")
+    )
+    assert "find . -maxdepth 1 -type f" in build_step
+    assert "xargs -0 sha256sum > SHA256SUMS" in build_step
+    for subject in (
+        "dist/*.whl",
+        "dist/liquilens_trade_safety_gateway-*.tar.gz",
+        "dist/*.schema.json",
+        "dist/trade-safety-intents.json",
+        "dist/verify_hash_tree_v1.mjs",
+    ):
+        assert subject in attest_step
+
+    publish_step = workflow.split("- name: Publish public release", maxsplit=1)[1]
+    assert 'gh release create "$GITHUB_REF_NAME" dist/*' in publish_step

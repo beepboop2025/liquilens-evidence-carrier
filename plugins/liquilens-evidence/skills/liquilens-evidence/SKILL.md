@@ -1,6 +1,6 @@
 ---
 name: liquilens-evidence
-description: Verify and rights-safely project LiquiLens Evidence Carrier or Fleet Brief JSON in local files. Use for provenance, clock, integrity, redistribution, FDC3, OpenLineage, or four-product brief-validation tasks; not for collecting market data, trading, recommendations, ratings, or bypassing source rights.
+description: Verify and rights-safely project LiquiLens Evidence Carrier, Fleet Brief, or Trade Safety Receipt JSON in local files. Use for provenance, clocks, integrity, redistribution, FDC3, OpenLineage, brief validation, or order-bound policy-receipt verification; not for collecting market data, trading, recommendations, ratings, or bypassing source rights.
 license: Apache-2.0
 ---
 
@@ -16,7 +16,10 @@ Prefer an already-configured `io.github.beepboop2025/liquilens-evidence-carrier`
 MCP server. Call `verify_carrier` for one explicit path below its configured
 root; call `project_carrier` only after verification. For
 `liquilens.fleet-brief.v1`, call `verify_fleet_brief` with its explicit path and
-the exact UTC `evaluated_at` recorded in the brief.
+the exact UTC `evaluated_at` recorded in the brief. For a
+`liquilens.trade-safety-receipt.v1`, call `verify_trade_safety_receipt` only
+when the server lists it. The offline MCP tool accepts no signing secret and
+therefore rejects HMAC/live receipts; verify those inside the tenant boundary.
 
 Otherwise, use an installed `liquilens-evidence` CLI. If no verifier is present
 and the task permits a bounded public package download, the immutable v0.15.0
@@ -32,6 +35,8 @@ uvx --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/
 Fleet Brief verification requires `liquilens-evidence >= 0.15.0` or an MCP
 server that actually lists `verify_fleet_brief`. The command above is pinned to
 the signed release wheel and fails closed if its bytes change.
+Trade Safety Receipt verification requires `liquilens-evidence >= 0.17.0` or
+an MCP server that actually lists `verify_trade_safety_receipt`.
 
 Use the task's explicit UTC evaluation time when supplied. If current policy
 evaluation is requested, use the actual current UTC time and report it. Do not
@@ -51,6 +56,9 @@ task's authority.
 - Treat unknown, restricted, or absent redistribution permission as denial.
 - Keep `can_execute`, `can_recommend`, and `is_credit_rating` false. Carrier
   verification does not grant financial authority.
+- A trade-safety `pass` means only that the embedded operator policy was
+  satisfied for the exact bound request. Check expiry, authentication,
+  broker-preview binding and one-time consumption at any execution boundary.
 
 ## Project only verified evidence
 

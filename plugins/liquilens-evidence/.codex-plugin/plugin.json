@@ -1,7 +1,7 @@
 {
   "name": "liquilens-evidence",
-  "version": "0.16.0",
-  "description": "Verify and rights-safely project local LiquiLens Evidence Carrier or Fleet Brief JSON.",
+  "version": "0.17.0",
+  "description": "Verify local Evidence Carrier, Fleet Brief, or Trade Safety Receipt JSON without widening authority.",
   "author": {
     "name": "LiquiLens",
     "url": "https://liquilens.in/protocol/"
@@ -15,24 +15,27 @@
     "mcp",
     "provenance",
     "rights",
+    "trade-safety",
     "verification"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": "LiquiLens Evidence",
     "shortDescription": "Verify financial evidence without widening its rights.",
-    "longDescription": "Verify local Evidence Carrier and four-product Fleet Brief identity, clocks, freshness, redistribution rights, product states, and authority boundaries before producing bounded projections.",
+    "longDescription": "Verify local Evidence Carrier, four-product Fleet Brief, and order-bound Trade Safety Receipt identity, clocks, freshness, redistribution rights, deterministic policy state, and authority boundaries before producing bounded projections.",
     "developerName": "LiquiLens",
     "category": "Developer Tools",
     "capabilities": [
       "Read-only verification",
       "Fleet Brief verification",
+      "Trade Safety Receipt verification",
       "Rights-aware projection"
     ],
     "websiteURL": "https://liquilens.in/protocol/",
     "defaultPrompt": [
       "Verify this local evidence carrier.",
       "Verify this local four-product Fleet Brief.",
+      "Verify this local Trade Safety Receipt without accepting a signing secret.",
       "Project this verified carrier without widening rights."
     ],
     "brandColor": "#0B1623"

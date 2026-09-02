@@ -8,7 +8,9 @@ trap 'rm -rf -- "$smoke_dir"' EXIT HUP INT TERM
 chmod 0755 "$smoke_dir"
 
 cp examples/descriptor.json "$smoke_dir/descriptor.json"
-chmod 0644 "$smoke_dir/descriptor.json"
+cp examples/trade-safety/receipt.paper.pass.json \
+  "$smoke_dir/receipt.paper.pass.json"
+chmod 0644 "$smoke_dir/descriptor.json" "$smoke_dir/receipt.paper.pass.json"
 
 docker run --rm \
   --network none \
@@ -41,10 +43,20 @@ docker run --rm \
   verify-brief fleet-brief.json --as-of 2026-08-25T00:00:00Z \
   >"$smoke_dir/brief-verification.json"
 
+docker run --rm \
+  --network none \
+  --read-only \
+  --mount "type=bind,src=$smoke_dir,dst=/evidence,readonly" \
+  "$image_ref" \
+  verify-trade-safety receipt.paper.pass.json \
+  --as-of 2026-09-02T12:00:30Z \
+  >"$smoke_dir/trade-safety-verification.json"
+
 python3 - \
   "$smoke_dir/carrier.json" \
   "$smoke_dir/verification.json" \
-  "$smoke_dir/brief-verification.json" <<'PY'
+  "$smoke_dir/brief-verification.json" \
+  "$smoke_dir/trade-safety-verification.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -52,6 +64,7 @@ from pathlib import Path
 carrier = json.loads(Path(sys.argv[1]).read_text())
 verification = json.loads(Path(sys.argv[2]).read_text())
 brief_verification = json.loads(Path(sys.argv[3]).read_text())
+trade_safety_verification = json.loads(Path(sys.argv[4]).read_text())
 assert carrier["carrier_id"].startswith("evidence_")
 assert verification["ok"] is True
 assert verification["export_disposition"] == "full"
@@ -62,6 +75,10 @@ assert brief_verification["states"] == {
     "undertow": "missing",
     "palimpsest": "missing",
 }
+assert trade_safety_verification["ok"] is True
+assert trade_safety_verification["outcome"] == "pass"
+assert trade_safety_verification["authenticated"] is False
+assert trade_safety_verification["authority"]["can_execute"] is False
 PY
 
 cat >"$smoke_dir/requests.ndjson" <<'EOF'
@@ -70,6 +87,7 @@ cat >"$smoke_dir/requests.ndjson" <<'EOF'
 {"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"verify_carrier","arguments":{"path":"carrier.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
 {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"verify_fleet_brief","arguments":{"path":"fleet-brief.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"verify_trade_safety_receipt","arguments":{"path":"receipt.paper.pass.json","evaluated_at":"2026-09-02T12:00:30Z"}}}
 EOF
 
 docker run --rm -i \
@@ -87,7 +105,7 @@ import sys
 from pathlib import Path
 
 responses = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
-assert [response["id"] for response in responses] == [1, 2, 3, 4]
+assert [response["id"] for response in responses] == [1, 2, 3, 4, 5]
 assert responses[0]["result"]["serverInfo"]["name"] == (
     "io.github.beepboop2025/liquilens-evidence-carrier"
 )
@@ -95,6 +113,7 @@ assert [tool["name"] for tool in responses[1]["result"]["tools"]] == [
     "verify_carrier",
     "project_carrier",
     "verify_fleet_brief",
+    "verify_trade_safety_receipt",
 ]
 assert responses[2]["result"]["structuredContent"]["ok"] is True
 assert responses[2]["result"]["structuredContent"]["authority"] == {
@@ -104,6 +123,8 @@ assert responses[2]["result"]["structuredContent"]["authority"] == {
     "is_credit_rating": False,
 }
 assert responses[3]["result"]["structuredContent"]["states"]["liquilens"] == "full"
+assert responses[4]["result"]["structuredContent"]["outcome"] == "pass"
+assert responses[4]["result"]["structuredContent"]["authority"]["can_execute"] is False
 PY
 
 IMAGE_UNDER_TEST="$image_ref" EXPECTED_VERSION="$expected_version" python3 <<'PY'

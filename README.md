@@ -13,13 +13,14 @@ The carrier is infrastructure for inspection and reproducibility. It is not an
 order, recommendation, credit rating, market-data entitlement, or endorsement
 by Bloomberg, LSEG, FactSet, FINOS, or any other platform.
 
-This source tree is versioned for `v0.16.0`; a source version alone is not
-publication proof. The signed `v0.16.0` core release was published on
-2026-08-29 from reviewed commit
+This source tree is versioned for `v0.17.0`; a source version alone is not
+publication proof. It is not published as `v0.17.0`. The latest signed core
+release remains `v0.16.0`, published on 2026-08-29 from reviewed commit
 `410f7d91114fba715e9a9ae830faa775064a4502`. Its GitHub assets are
 checksum-pinned and attested, and the official MCP Registry version is active
 and latest. See [`docs/RELEASE-0.16.0.md`](docs/RELEASE-0.16.0.md) for exact
-release receipts and the independently versioned channel boundary.
+published receipts and [`docs/RELEASE-0.17.0.md`](docs/RELEASE-0.17.0.md) for
+the candidate boundary.
 
 ## Why it travels
 
@@ -60,6 +61,7 @@ included for cross-language `liquilens-hash-tree-v1` identity checks:
 ```bash
 node protocol/verify_hash_tree_v1.mjs --artifact evidence-carrier carrier.json
 node protocol/verify_hash_tree_v1.mjs --artifact fleet-brief fleet-brief.json
+node protocol/verify_hash_tree_v1.mjs --artifact trade-safety-receipt receipt.json
 ```
 
 ## Canonical contracts
@@ -69,11 +71,17 @@ node protocol/verify_hash_tree_v1.mjs --artifact fleet-brief fleet-brief.json
 | Full carrier | `https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json` |
 | Redacted reference | `https://liquilens.in/protocol/liquilens-evidence-carrier-reference-v1.schema.json` |
 | Four-product fleet brief | `https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json` |
+| Trade Safety request | `https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json` |
+| Trade Safety policy | `https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json` |
+| Broker preview reference | `https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json` |
+| Trade Safety receipt | `https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json` |
+| FDC3 Trade Safety receipt | `https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json` |
 | FDC3 context | `https://liquilens.in/protocol/fdc3/com.liquilens.evidence.schema.json` |
 | OpenLineage facet | `https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json` |
 
-The current protocol is v1. Release `v0.16.0` changes release and discovery
-metadata, not protocol semantics or evidence authority. Its signed release
+The current contracts are v1. Source candidate `v0.17.0` adds Trade Safety
+without changing the previously published Carrier or Fleet Brief semantics.
+Release `v0.16.0` remains the production pin. Its signed release
 workflow is [run 33261143612](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33261143612),
 the wheel SHA-256 is
 `317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11`, and
@@ -82,6 +90,38 @@ the MCPB SHA-256 is
 Production integrations can pin `v0.16.0`; separately released container,
 skill, plugin, browser, and package-manager channels retain their own verified
 versions. Use the canonical URLs for schema identity and discovery.
+
+## Order-bound Trade Safety Receipts
+
+`liquilens.trade-safety-receipt.v1` composes independent Seiche funding/system
+context, Undertow position-sized exit context, optional LiquiLens institution
+context, an operator-authored policy, and a broker-preview reference into one
+short-lived receipt bound to one exact proposed order. Missing, stale,
+restricted, mismatched, or future-dated inputs fail closed.
+
+```bash
+liquilens-evidence issue-trade-safety \
+  --request examples/trade-safety/request.paper.json \
+  --evidence examples/trade-safety/evidence.paper.json \
+  --policy examples/trade-safety/policy.paper.json \
+  --broker-preview examples/trade-safety/broker-preview.paper.json \
+  --issuer examples/trade-safety/issuer.paper.json \
+  --as-of 2026-09-02T12:00:00Z > receipt.json
+
+liquilens-evidence verify-trade-safety receipt.json \
+  --as-of 2026-09-02T12:00:30Z
+```
+
+A hash-only receipt supports observation and paper conformance. A live `pass`
+requires tenant-local authenticated integrity, real-money-eligible required
+evidence, an executable Undertow quote, and an unexpired broker preview bound to
+the same request and account. Current public adapters satisfy none of those live
+gates. A `pass` is not advice, broker approval, or an execution instruction;
+the immutable authority object keeps execution, recommendation, allocation,
+credit-rating, and executable-quote authority false. See
+[`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md), the
+[`adoption plan`](docs/TRADE-SAFETY-ADOPTION-PLAN.md), and the
+[`read-only sandbox gateway`](integrations/trade-safety-gateway/README.md).
 
 ## Four-product fleet briefs
 
@@ -125,7 +165,7 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The server exposes three read-only tools:
+The `v0.17.0` source candidate exposes four read-only tools:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
@@ -133,6 +173,9 @@ The server exposes three read-only tools:
   `cloudevent`, `otel`, `openlineage`, `jsonld`, `csl`, `flat`, or `arrow`).
 - `verify_fleet_brief` verifies one local four-product brief at its exact
   recorded evaluation clock without returning embedded evidence bodies.
+- `verify_trade_safety_receipt` verifies one local hash-only order-bound receipt.
+  It accepts no secret; HMAC/live receipts fail closed and must be verified
+  inside the tenant boundary.
 
 It never fetches network data, expands restricted rights, recommends, rates
 credit, or executes a financial action. The published `v0.16.0` GitHub release
@@ -149,6 +192,9 @@ bundle for compatible desktop clients. Registry identity:
   contract, rights routing, transports, and failure modes.
 - [`docs/FLEET-BRIEF-V1.md`](docs/FLEET-BRIEF-V1.md) defines deterministic,
   rights-aware four-product briefs and their five explicit section states.
+- [`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md) defines
+  strict order, policy, evidence, broker-preview, receipt and verification
+  semantics; the companion adoption plan separates discovery from enforcement.
 - [`CHANGELOG.md`](CHANGELOG.md) and
   [`docs/RELEASE-0.16.0.md`](docs/RELEASE-0.16.0.md) record the published core
   release, exact receipts, and separately versioned distribution channels.
@@ -193,7 +239,7 @@ passes every matched file through `liquilens-evidence verify-files`.
 Protocol artifact SHA-256 values are recorded in
 [`protocol/catalog.json`](protocol/catalog.json). The original carrier,
 reference, FDC3, and OpenLineage contracts retain their established identities;
-the Fleet Brief v1 schema is additive. This public repository is the
+the Fleet Brief and Trade Safety v1 schemas are additive. This public repository is the
 redistribution boundary for the carrier kit; private research code and datasets
 are not included.
 

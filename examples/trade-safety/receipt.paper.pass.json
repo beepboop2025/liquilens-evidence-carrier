@@ -1,0 +1,200 @@
+{
+  "authority": {
+    "can_allocate_capital": false,
+    "can_execute": false,
+    "can_recommend": false,
+    "financial_authority": "operator_policy_check_only",
+    "is_credit_rating": false,
+    "is_executable_quote": false
+  },
+  "broker_preview": {
+    "account_id": "example-paper-account",
+    "expires_at": null,
+    "facts": {},
+    "limitations": [
+      "paper_fixture_has_no_broker_preview_or_execution_authority"
+    ],
+    "preview_id": null,
+    "provider": null,
+    "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+    "retrieved_at": "2026-09-02T11:59:45Z",
+    "schema": "liquilens.broker-preview-reference.v1",
+    "source_sha256": null,
+    "source_url": null,
+    "state": "not_applicable"
+  },
+  "canonicalization": "liquilens-hash-tree-v1",
+  "decision": {
+    "constraints": {
+      "auto_resize": false,
+      "max_exit_cost_bps": 50.0,
+      "max_notional_usd": 100000.0,
+      "max_venue_spread_bps": 20.0,
+      "required_products": [
+        "seiche",
+        "undertow"
+      ]
+    },
+    "enforced": true,
+    "outcome": "pass",
+    "reason_codes": [
+      "operator_policy_satisfied"
+    ],
+    "resubmit_required": false,
+    "summary": "The operator-authored policy is satisfied for this exact order; this is not approval, advice, or an execution instruction."
+  },
+  "evaluated_at": "2026-09-02T12:00:00Z",
+  "evidence": {
+    "liquilens": {
+      "as_of": null,
+      "evidence_class": "unavailable",
+      "executable_quote": false,
+      "expires_at": null,
+      "facts": {},
+      "knowledge_time": null,
+      "limitations": [
+        "no_institution_context_requested_for_fixture"
+      ],
+      "product": "liquilens",
+      "real_money_eligible": false,
+      "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+      "retrieved_at": "2026-09-02T11:59:45Z",
+      "rights_status": "metadata_only",
+      "source_schema": null,
+      "source_sha256": null,
+      "source_url": "https://liquilens.in/protocol/",
+      "state": "not_applicable"
+    },
+    "seiche": {
+      "as_of": "2026-09-02T11:59:30Z",
+      "evidence_class": "derived",
+      "executable_quote": false,
+      "expires_at": "2026-09-02T12:05:00Z",
+      "facts": {
+        "funding_stress_index": 20.0,
+        "regime": "CALM"
+      },
+      "knowledge_time": "2026-09-02T11:59:35Z",
+      "limitations": [
+        "synthetic_fixture_not_live_market_evidence"
+      ],
+      "product": "seiche",
+      "real_money_eligible": false,
+      "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+      "retrieved_at": "2026-09-02T11:59:45Z",
+      "rights_status": "metadata_only",
+      "source_schema": "seiche.public.v2",
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_url": "https://api.seiche.info/mcp",
+      "state": "context_only"
+    },
+    "undertow": {
+      "as_of": "2026-09-02T11:59:35Z",
+      "evidence_class": "derived",
+      "executable_quote": false,
+      "expires_at": "2026-09-02T12:05:00Z",
+      "facts": {
+        "published_rung_used_usd": 1000.0,
+        "requested_size_usd": 1000.0,
+        "venue_spread_bps": 8.0,
+        "worst_sell_cost_bps": 10.0
+      },
+      "knowledge_time": "2026-09-02T11:59:40Z",
+      "limitations": [
+        "synthetic_fixture_estimate_not_book_walk_or_executable_quote"
+      ],
+      "product": "undertow",
+      "real_money_eligible": false,
+      "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+      "retrieved_at": "2026-09-02T11:59:45Z",
+      "rights_status": "metadata_only",
+      "source_schema": "undertow.exit-cost.v1",
+      "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_url": "https://api.seiche.info/undertow/mcp",
+      "state": "context_only"
+    }
+  },
+  "expires_at": "2026-09-02T12:01:00Z",
+  "integrity": {
+    "key_id": null,
+    "profile": "sha256",
+    "signature": null
+  },
+  "issuer": {
+    "endpoint": "https://liquilens.in/protocol/",
+    "name": "liquilens-trade-safety-reference-fixture",
+    "version": "1.0.0"
+  },
+  "policy": {
+    "auto_resize": false,
+    "extensions": {},
+    "hold_regimes": [
+      "STRESS"
+    ],
+    "live_requires_broker_preview": true,
+    "live_requires_executable_quote": true,
+    "max_evidence_age_seconds": {
+      "liquilens": 86400,
+      "seiche": 300,
+      "undertow": 300
+    },
+    "max_exit_cost_bps": 50.0,
+    "max_notional_usd": 100000.0,
+    "max_venue_spread_bps": 20.0,
+    "missing_evidence": "fail_closed",
+    "policy_id": "example-paper-policy",
+    "required_products": [
+      "seiche",
+      "undertow"
+    ],
+    "schema": "liquilens.trade-safety-policy.v1",
+    "version": "1.0.0"
+  },
+  "policy_hash": "da81c9d97672a1fc87049b79a9cc2726c6ead9c6cfbc40f0f3cb497240817351",
+  "receipt_id": "trade_safety_9bfac25daccd67f6521f430f",
+  "record_hash": "9bfac25daccd67f6521f430f191d8c37ae656ebad8c6056719626e9c8cafb17a",
+  "request": {
+    "agent": {
+      "account_id": "example-paper-account",
+      "agent_id": "example-copilot",
+      "authorization_scope": [
+        "evidence:read",
+        "orders:paper"
+      ],
+      "operator_id": "example-operator",
+      "runtime": "reference-fixture/1.0",
+      "strategy_id": "example-strategy",
+      "tenant_id": "example-tenant"
+    },
+    "created_at": "2026-09-02T11:59:00Z",
+    "expires_at": "2026-09-02T12:10:00Z",
+    "extensions": {},
+    "mode": "paper",
+    "order": {
+      "instrument": {
+        "asset_class": "crypto",
+        "identifiers": {},
+        "symbol": "BTC/USD"
+      },
+      "limit_price": null,
+      "notional": {
+        "amount": 1000.0,
+        "currency": "USD"
+      },
+      "order_type": "market",
+      "quantity": 0.025,
+      "side": "sell",
+      "stop_price": null,
+      "time_in_force": "IOC",
+      "venue": null
+    },
+    "policy_ref": {
+      "policy_id": "example-paper-policy",
+      "version": "1.0.0"
+    },
+    "request_id": "example-paper-btc-001",
+    "schema": "liquilens.trade-safety-request.v1"
+  },
+  "request_hash": "e6929ac47331fbaee39647fe361ebb1e189c24df1fcf7ed2f634b202b7f49782",
+  "schema": "liquilens.trade-safety-receipt.v1"
+}

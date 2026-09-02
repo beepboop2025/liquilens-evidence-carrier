@@ -5,6 +5,22 @@ public merely because it appears in this file: the signed GitHub release,
 checksums, attestations, and distribution receipts remain the publication
 authority.
 
+## [0.17.0] - 2026-09-02
+
+- Add strict, exact-order Trade Safety request, operator-policy,
+  broker-preview-reference, and receipt contracts.
+- Add deterministic Python issuance/verification, hash-only and tenant-local
+  HMAC integrity, semantic-freshness and rights gates, CLI commands, offline
+  secretless MCP verification, and Python/JavaScript golden conformance vectors.
+- Add FDC3 receipt/intent assets and a fixed-upstream, locked, read-only FastAPI
+  sandbox whose public evidence can never produce a live pass.
+- Add a detailed ecosystem adoption and staged broker/OMS enforcement plan while
+  retaining all-false financial authority and one-time-consumption requirements.
+
+Prepared source entry only. Publication requires a reviewed signed commit and
+tag, green release workflow, immutable checksums and attestations, official MCP
+Registry proof, and independent canonical-site deployment proof.
+
 ## [0.16.0] - 2026-08-29
 
 - Assign a new release identity to the post-`v0.15.0` README and deterministic

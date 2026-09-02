@@ -1,0 +1,290 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json",
+  "title": "LiquiLens Trade Safety Request v1",
+  "description": "An execution-neutral, exact-order input for a Trade Safety Receipt evaluation. This object is not an order-routing instruction and grants no trading authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "request_id",
+    "created_at",
+    "expires_at",
+    "mode",
+    "agent",
+    "order",
+    "policy_ref",
+    "extensions"
+  ],
+  "properties": {
+    "schema": {"const": "liquilens.trade-safety-request.v1"},
+    "request_id": {"$ref": "#/$defs/externalId"},
+    "created_at": {"$ref": "#/$defs/timestamp"},
+    "expires_at": {"$ref": "#/$defs/timestamp"},
+    "mode": {"enum": ["observe", "paper", "live"]},
+    "agent": {"$ref": "#/$defs/agent"},
+    "order": {"$ref": "#/$defs/order"},
+    "policy_ref": {"$ref": "#/$defs/policyRef"},
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced, execution-material fields not represented by the core order shape. The entire object is bound by request_hash. Evaluators must hold requests containing unsupported extension semantics."
+    }
+  },
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "externalId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+    },
+    "nonBlank": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
+    "positiveNumber": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "operator_id",
+        "tenant_id",
+        "account_id",
+        "runtime",
+        "strategy_id",
+        "authorization_scope"
+      ],
+      "properties": {
+        "agent_id": {"$ref": "#/$defs/nonBlank"},
+        "operator_id": {"$ref": "#/$defs/nonBlank"},
+        "tenant_id": {"$ref": "#/$defs/nonBlank"},
+        "account_id": {"$ref": "#/$defs/nonBlank"},
+        "runtime": {"$ref": "#/$defs/nonBlank"},
+        "strategy_id": {
+          "oneOf": [
+            {"$ref": "#/$defs/nonBlank"},
+            {"type": "null"}
+          ]
+        },
+        "authorization_scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/nonBlank"}
+        }
+      }
+    },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_class", "symbol", "identifiers"],
+      "properties": {
+        "asset_class": {
+          "enum": [
+            "crypto",
+            "equity",
+            "etf",
+            "fixed_income",
+            "fx",
+            "commodity",
+            "derivative",
+            "other"
+          ]
+        },
+        "symbol": {"$ref": "#/$defs/nonBlank"},
+        "identifiers": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^\\S+$"
+          },
+          "additionalProperties": {"$ref": "#/$defs/nonBlank"}
+        }
+      }
+    },
+    "notional": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": {"$ref": "#/$defs/positiveNumber"},
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        }
+      }
+    },
+    "order": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument",
+        "side",
+        "order_type",
+        "notional",
+        "quantity",
+        "limit_price",
+        "stop_price",
+        "venue",
+        "time_in_force"
+      ],
+      "properties": {
+        "instrument": {"$ref": "#/$defs/instrument"},
+        "side": {"enum": ["buy", "sell"]},
+        "order_type": {
+          "enum": ["market", "limit", "stop", "stop_limit", "other"]
+        },
+        "notional": {"$ref": "#/$defs/notional"},
+        "quantity": {
+          "oneOf": [
+            {"$ref": "#/$defs/positiveNumber"},
+            {"type": "null"}
+          ]
+        },
+        "limit_price": {
+          "oneOf": [
+            {"$ref": "#/$defs/positiveNumber"},
+            {"type": "null"}
+          ]
+        },
+        "stop_price": {
+          "oneOf": [
+            {"$ref": "#/$defs/positiveNumber"},
+            {"type": "null"}
+          ]
+        },
+        "venue": {
+          "oneOf": [
+            {"$ref": "#/$defs/nonBlank"},
+            {"type": "null"}
+          ]
+        },
+        "time_in_force": {"$ref": "#/$defs/nonBlank"}
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "order_type": {"const": "market"}
+            },
+            "required": ["order_type"]
+          },
+          "then": {
+            "properties": {
+              "limit_price": {"type": "null"},
+              "stop_price": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "order_type": {"const": "limit"}
+            },
+            "required": ["order_type"]
+          },
+          "then": {
+            "properties": {
+              "limit_price": {"$ref": "#/$defs/positiveNumber"},
+              "stop_price": {"type": "null"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "order_type": {"const": "stop"}
+            },
+            "required": ["order_type"]
+          },
+          "then": {
+            "properties": {
+              "limit_price": {"type": "null"},
+              "stop_price": {"$ref": "#/$defs/positiveNumber"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "order_type": {"const": "stop_limit"}
+            },
+            "required": ["order_type"]
+          },
+          "then": {
+            "properties": {
+              "limit_price": {"$ref": "#/$defs/positiveNumber"},
+              "stop_price": {"$ref": "#/$defs/positiveNumber"}
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "order_type": {"const": "other"}
+            },
+            "required": ["order_type"]
+          },
+          "then": {
+            "properties": {
+              "limit_price": {"type": "null"},
+              "stop_price": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "policyRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_id", "version"],
+      "properties": {
+        "policy_id": {"$ref": "#/$defs/nonBlank"},
+        "version": {"$ref": "#/$defs/nonBlank"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"mode": {"const": "paper"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "agent": {
+            "properties": {
+              "authorization_scope": {
+                "contains": {"const": "orders:paper"},
+                "minContains": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"mode": {"const": "live"}},
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "agent": {
+            "properties": {
+              "authorization_scope": {
+                "contains": {"const": "orders:live"},
+                "minContains": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

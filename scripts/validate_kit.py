@@ -91,10 +91,18 @@ def main() -> int:
         "financialAuthority": "none",
     }
     assert any(tool.get("name") == "verify_fleet_brief" for tool in manifest["tools"])
+    assert any(
+        tool.get("name") == "verify_trade_safety_receipt"
+        for tool in manifest["tools"]
+    )
     assert "fleet-brief" in manifest["keywords"]
+    assert "trade-safety" in manifest["keywords"]
     assert "mcpServers" not in plugin
     assert "fleet-brief" in plugin["keywords"]
     assert "Fleet Brief verification" in plugin["interface"]["capabilities"]
+    assert "Trade Safety Receipt verification" in plugin["interface"][
+        "capabilities"
+    ]
     assert any(
         "Fleet Brief" in prompt for prompt in plugin["interface"]["defaultPrompt"]
     )
@@ -134,7 +142,16 @@ def main() -> int:
     fleet_brief_url = (
         "https://liquilens.in/protocol/liquilens-fleet-brief-v1.schema.json"
     )
-    assert {full_url, reference_url, fleet_brief_url} <= canonical_urls
+    trade_safety_urls = {
+        "https://liquilens.in/protocol/liquilens-trade-safety-request-v1.schema.json",
+        "https://liquilens.in/protocol/liquilens-trade-safety-policy-v1.schema.json",
+        "https://liquilens.in/protocol/liquilens-broker-preview-reference-v1.schema.json",
+        "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json",
+        "https://liquilens.in/protocol/fdc3/com.liquilens.trade-safety-receipt.schema.json",
+    }
+    assert {full_url, reference_url, fleet_brief_url, *trade_safety_urls} <= (
+        canonical_urls
+    )
 
     for relative in (
         "integrations/fdc3/com.liquilens.evidence.schema.json",
@@ -143,6 +160,31 @@ def main() -> int:
         text = (ROOT / relative).read_text(encoding="utf-8")
         assert full_url in text
         assert reference_url in text
+
+    trade_safety_fdc3 = (
+        ROOT / "integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json"
+    ).read_text(encoding="utf-8")
+    assert (
+        "https://liquilens.in/protocol/liquilens-trade-safety-receipt-v1.schema.json"
+        in trade_safety_fdc3
+    )
+    trade_safety_intents = _json(
+        ROOT / "integrations/fdc3/trade-safety-intents.json"
+    )
+    assert trade_safety_intents["context_schemas"][
+        "com.liquilens.trade-safety-receipt"
+    ].endswith("com.liquilens.trade-safety-receipt.schema.json")
+    provider_intents = trade_safety_intents["provider_interop"]["intents"][
+        "listensFor"
+    ]
+    assert provider_intents["liquilens.EvaluateTradeSafety"]["contexts"] == [
+        "fdc3.order"
+    ]
+    assert (
+        provider_intents["liquilens.EvaluateTradeSafety"]["resultType"]
+        == "com.liquilens.trade-safety-receipt"
+    )
+    assert trade_safety_intents["safety_contract"]["execution_side_effects"] is False
 
     assert "NotImplementedError" not in (
         ROOT / "examples/evidence_delivery_policy.py"
@@ -179,6 +221,9 @@ def main() -> int:
         assert candidate_wheel not in readme
     assert "liquilens.fleet-brief.v1" in readme
     assert "liquilens-evidence issue-brief" in readme
+    assert "liquilens.trade-safety-receipt.v1" in readme
+    assert "liquilens-evidence issue-trade-safety" in readme
+    assert f"not published as `v{version}`" in readme
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
     assert f"current core implementation release is `v{PUBLISHED_VERSION}`" in (
         distribution
@@ -198,6 +243,9 @@ def main() -> int:
     release_readme = ROOT / "mcpb/release-readmes" / f"{PUBLISHED_VERSION}.md"
     assert _sha256(release_readme) == PUBLISHED_README_SHA256
     assert release_readme.read_bytes() != (ROOT / "README.md").read_bytes()
+    candidate_release_readme = ROOT / "mcpb/release-readmes" / f"{version}.md"
+    assert candidate_release_readme.is_file()
+    assert candidate_release_readme.read_bytes() != (ROOT / "README.md").read_bytes()
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{PUBLISHED_VERSION}] - 2026-08-29" in changelog
     assert PUBLISHED_REVISION in changelog
@@ -210,6 +258,7 @@ def main() -> int:
     assert 'MCP_PROTOCOL_VERSION = "2026-07-28"' in mcp_source
     assert 'MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"' in mcp_source
     assert "to_openfigi_mapping_jobs" not in mcp_source
+    assert '"verify_trade_safety_receipt"' in mcp_source
     assert "requests" not in project["project"]["dependencies"]
     action = (ROOT / "action.yml").read_text(encoding="utf-8")
     assert "using: composite" in action
@@ -223,6 +272,41 @@ def main() -> int:
     assert "! -name '.*' ! -name SHA256SUMS" in release_workflow
     assert "cmp --silent" in release_workflow
     assert "LICENSE NOTICE README.md CHANGELOG.md server.json" in release_workflow
+    for asset in (
+        "liquilens-trade-safety-request-v1.schema.json",
+        "liquilens-trade-safety-policy-v1.schema.json",
+        "liquilens-broker-preview-reference-v1.schema.json",
+        "liquilens-trade-safety-receipt-v1.schema.json",
+        "com.liquilens.trade-safety-receipt.schema.json",
+        "trade-safety-intents.json",
+    ):
+        assert asset in release_workflow
+    gateway_project = tomllib.loads(
+        (ROOT / "integrations/trade-safety-gateway/pyproject.toml").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert f"liquilens-evidence=={version}" in gateway_project["project"][
+        "dependencies"
+    ]
+    gateway_lock = tomllib.loads(
+        (ROOT / "integrations/trade-safety-gateway/uv.lock").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert any(
+        package.get("name") == "liquilens-evidence"
+        and package.get("version") == version
+        for package in gateway_lock["package"]
+    )
+    golden = _json(ROOT / "examples/trade-safety/receipt.paper.pass.json")
+    assert golden["schema"] == "liquilens.trade-safety-receipt.v1"
+    assert golden["decision"]["outcome"] == "pass"
+    assert golden["authority"]["can_execute"] is False
+    verifier = (ROOT / "protocol/verify_hash_tree_v1.mjs").read_text(
+        encoding="utf-8"
+    )
+    assert 'artifactKind === "trade-safety-receipt"' in verifier
     return 0
 
 

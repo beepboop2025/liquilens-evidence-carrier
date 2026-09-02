@@ -12,8 +12,11 @@ chmod 0755 "$smoke_dir"
 
 cp examples/descriptor.json "$smoke_dir/descriptor.json"
 cp examples/fleet-brief/mixed-states.fleet-brief.json "$smoke_dir/fleet-brief.json"
+cp examples/trade-safety/receipt.paper.pass.json \
+  "$smoke_dir/receipt.paper.pass.json"
 chmod 0644 "$smoke_dir/descriptor.json"
 chmod 0644 "$smoke_dir/fleet-brief.json"
+chmod 0644 "$smoke_dir/receipt.paper.pass.json"
 
 if test -z "${LIQUILENS_CLI_IMAGE:-}"; then
   docker pull --platform linux/amd64 "$cli_image"
@@ -33,6 +36,7 @@ cat >"$smoke_dir/requests.ndjson" <<'EOF'
 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"verify_carrier","arguments":{"path":"carrier.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
 {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"verify_carrier","arguments":{"path":"../etc/passwd","evaluated_at":"2026-08-25T00:00:00Z"}}}
 {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"verify_fleet_brief","arguments":{"path":"fleet-brief.json","evaluated_at":"2026-08-25T00:00:00Z"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"verify_trade_safety_receipt","arguments":{"path":"receipt.paper.pass.json","evaluated_at":"2026-09-02T12:00:30Z"}}}
 EOF
 
 docker run --rm -i \
@@ -48,7 +52,7 @@ import sys
 from pathlib import Path
 
 responses = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
-assert [response["id"] for response in responses] == [1, 2, 3, 4, 5]
+assert [response["id"] for response in responses] == [1, 2, 3, 4, 5, 6]
 assert responses[0]["result"]["serverInfo"]["name"] == (
     "io.github.beepboop2025/liquilens-evidence-carrier"
 )
@@ -56,6 +60,7 @@ assert [tool["name"] for tool in responses[1]["result"]["tools"]] == [
     "verify_carrier",
     "project_carrier",
     "verify_fleet_brief",
+    "verify_trade_safety_receipt",
 ]
 verified = responses[2]["result"]["structuredContent"]
 assert verified["ok"] is True
@@ -78,6 +83,11 @@ assert brief["states"] == {
     "undertow": "unavailable",
     "palimpsest": "rejected",
 }
+trade_safety = responses[5]["result"]["structuredContent"]
+assert trade_safety["ok"] is True
+assert trade_safety["outcome"] == "pass"
+assert trade_safety["authenticated"] is False
+assert trade_safety["authority"]["can_execute"] is False
 PY
 
 IMAGE_UNDER_TEST="$image_ref" \
