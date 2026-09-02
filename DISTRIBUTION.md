@@ -5,27 +5,31 @@ called **live** only when an anonymous or otherwise public retrieval and a real
 runtime check have succeeded. An upstream pull request remains **under review**
 until its maintainer merges and deploys it.
 
-The current core implementation release is `v0.16.0`, signed at commit
-`410f7d91114fba715e9a9ae830faa775064a4502`. Its release assets carry
-checksums and GitHub build-provenance attestations. At the 2026-08-29 evidence
-checkpoint, the official MCP Registry record was verified active and latest at
-`0.16.0`.
+The current core implementation release is `v0.17.1`. Annotated tag object
+`8844ee4556d59472a587cb9ceb412112c23543db` targets allowlisted SSH-signed
+candidate `a74274236e177404c2d254541e6a4110a4ce8a0d`, an ancestor of protected
+`main` at `9a79c3e0c907fd0d698c934ab426ea0a8106303a`. The exact candidate passed
+[preflight run 33589423934](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589423934)
+before the tag was created. The tag-triggered
+[release run 33589489958](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489958)
+published checksummed, GitHub-attested assets, and the official MCP Registry
+record was independently verified active/latest at 0.17.1.
 
 Core publication does not automatically update the independently released OCI,
 Nix, browser, Agent Skill, Codex-plugin, or external-directory channels. The
 matrix below keeps each channel at its own receipt-backed version. LiquiLens is
 not endorsed by the platforms or projects named here.
 
-## Trade Safety v1 recovery candidate
+## Trade Safety v1 published core and hosted boundary
 
-The source tree is preparing `v0.17.1`, which carries strict Trade Safety
-request, policy, broker-preview and receipt contracts, local CLI/MCP
-verification, cross-language vectors, FDC3 assets, and a separately locked
-read-only sandbox gateway. It is not a published release or a live hosted
-gateway. Until a new signed tag, green release workflow, release checksums,
-attestations, Registry record, and public endpoint are independently verified,
-production consumers should continue to pin `v0.16.0` and treat the Trade
-Safety artifacts as candidate bytes.
+Release `v0.17.1` carries strict Trade Safety request, policy, broker-preview
+and receipt contracts, local CLI/MCP verification, cross-language vectors,
+FDC3 assets, and separately packaged read-only sandbox-gateway wheels/source.
+The release and official Registry publication are live; a hosted gateway is
+not. The five new canonical Trade Safety schema/FDC3 URLs still returned HTTP
+404 during the 2026-09-02 post-release check. Production consumers can pin the
+release for local or tenant-hosted use, but must not infer canonical-site or
+gateway deployment from artifact publication.
 
 ### Immutable v0.17.0 failed attempt
 
@@ -47,18 +51,18 @@ bytes that were prepared; it is not a publication receipt.
 producer without fetching native carriers or combining their scores. The
 package, CLI, and offline MCP server support local issuance/verification; the
 schema and examples are in `protocol/liquilens-fleet-brief-v1.schema.json` and
-`examples/fleet-brief/`. They are included in the signed `v0.16.0` release.
+`examples/fleet-brief/`. They are included in the signed `v0.17.1` release.
 That makes the contract available; it does not claim that every product already
 emits a native carrier or that every downstream directory has indexed it.
 
 ## Python release and uvx
 
-The `v0.16.0` release wheel has SHA-256
-`317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11`.
+The `v0.17.1` release wheel has SHA-256
+`dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea`.
 
 ```bash
 uvx --no-cache \
-  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens_evidence-0.16.0-py3-none-any.whl#sha256=317c06b728a2b087eca3d51ba1cdf3f7570e4078334829959008ceb0a29dfd11' \
+  --from 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens_evidence-0.17.1-py3-none-any.whl#sha256=dec2751fa2f20d09a1a77b5f25ae99f28fa49484ea1bf5ede7ca2bcdd86610ea' \
   liquilens-evidence --help
 ```
 
@@ -85,13 +89,20 @@ The CLI image is a public multi-platform image:
 
 ```bash
 docker run --rm \
-  ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a \
+  ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:bd9b92f25fa8666ea1f43afc4047261ad82213f3c121da87f4dcb9f2e401776d \
   --help
 ```
 
-The dedicated MCP image defaults to the stdio server, runs as UID/GID 65532,
-and inherits the exact CLI image above. Keep the evidence mount read-only and
-disable network access:
+The v0.17.1 CLI index was published and its amd64/arm64 manifests were exercised
+by [container run 33589489966](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33589489966).
+Its GitHub provenance attestation binds that exact index digest to candidate
+`a74274236e177404c2d254541e6a4110a4ce8a0d` and `container.yml` on the v0.17.1
+tag.
+
+The independently versioned dedicated MCP image remains at its v0.15.0
+receipt. It defaults to the stdio server and runs as UID/GID 65532, but it does
+not contain the v0.17.1 Trade Safety verifier. Keep the evidence mount read-only
+and disable network access:
 
 ```bash
 docker run --rm -i --network none --read-only \
@@ -99,17 +110,20 @@ docker run --rm -i --network none --read-only \
   ghcr.io/beepboop2025/liquilens-evidence-carrier-mcp@sha256:4e4ffb010b52375b3203b2dc43706c7fa508de2bf8368eca465f49d56392dcea
 ```
 
-Both indexes include `linux/amd64` and `linux/arm64` manifests, SBOMs, BuildKit
-provenance, OCI source metadata, and GitHub artifact attestations.
-The dedicated MCP index was published and smoke-tested without network access
+Both listed indexes include `linux/amd64` and `linux/arm64` manifests. The
+v0.17.1 CLI index includes SBOM and BuildKit provenance and has a GitHub artifact
+attestation. The older dedicated MCP index was published and smoke-tested
+without network access
 or a writable root in [run 32897003998](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/32897003998).
 
 ## MCP clients
 
 The official MCP Registry entry is
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.16.0).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.17.1).
 The signed release also includes a checksum-pinned
-[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.16.0/liquilens-evidence-carrier-mcp-0.16.0.mcpb).
+[`MCPB bundle`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.17.1/liquilens-evidence-carrier-mcp-0.17.1.mcpb)
+with SHA-256
+`4d6c409f2c69588fad6fe13bf2f78ed1b72d3555d81082d5da638d037b0307a1`.
 
 For direct stdio configuration:
 
@@ -242,8 +256,8 @@ offline verifier for caller-supplied JSON, not a market-data provider.
 ## Repository-native enforcement
 
 - Pin the GitHub Action with
-  `uses: beepboop2025/liquilens-evidence-carrier@v0.16.0`.
-- Configure the signed `v0.16.0` hook in `.pre-commit-config.yaml` to verify
+  `uses: beepboop2025/liquilens-evidence-carrier@v0.17.1`.
+- Configure the signed `v0.17.1` hook in `.pre-commit-config.yaml` to verify
   `*.evidence.json` and `*.carrier.json` before a commit lands.
 - Use the dbt project directly from a pinned Git revision until its dbt Hub
   submission is accepted.
