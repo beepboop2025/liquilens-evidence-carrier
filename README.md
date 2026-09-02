@@ -141,6 +141,15 @@ credit-rating, and executable-quote authority false. See
 [`adoption plan`](docs/TRADE-SAFETY-ADOPTION-PLAN.md), and the
 [`read-only sandbox gateway`](integrations/trade-safety-gateway/README.md).
 
+Python broker and agent runtimes can place the fail-closed, paper-only
+[`before_order` guard](docs/TRADE-SAFETY-ORDER-GUARD.md) around their only
+submit callable. Its agent-facing gateway requires tenant-authenticated HMAC
+receipts, so a missing, expired, mismatched, cross-account, or non-pass receipt
+never reaches broker code. A configured claim store blocks receipt replay; use a
+durable operator-owned store outside local paper/demo runs. Live submission
+remains held until the broker idempotency and uncertain-outcome reconciliation
+gates are complete.
+
 ## Four-product fleet briefs
 
 `liquilens.fleet-brief.v1` bundles already-issued native carriers without
