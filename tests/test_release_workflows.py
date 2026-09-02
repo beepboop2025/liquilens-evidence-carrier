@@ -81,7 +81,7 @@ def test_gateway_container_is_attested_multiarch_distribution_not_authority():
         "/v1/capabilities",
     ):
         assert token in workflow
-    assert 'org.opencontainers.image.version="0.1.2"' in dockerfile
+    assert 'org.opencontainers.image.version="0.1.3"' in dockerfile
     assert 'io.liquilens.evidence.core.version="${CORE_VERSION}"' in dockerfile
     assert 'io.liquilens.trade-safety.authority="read-only-hash-only-sandbox"' in (
         dockerfile

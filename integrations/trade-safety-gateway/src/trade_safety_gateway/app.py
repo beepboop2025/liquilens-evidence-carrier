@@ -1,8 +1,9 @@
 """FastAPI surface for read-only, hash-bound trade-safety assessments.
 
 The service deliberately has no broker adapter, credential input, order route, or
-user-selectable upstream.  It translates three fixed public evidence surfaces into
-the strict ``liquilens_evidence.trade_safety`` API and issues SHA-256-only receipts.
+user-selectable upstream, custody, or settlement surface.  It translates three fixed
+public evidence surfaces into the strict ``liquilens_evidence.trade_safety`` API and
+issues SHA-256-only receipts.
 """
 
 from __future__ import annotations
@@ -10,10 +11,9 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import math
 import os
 import re
-from collections.abc import Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
@@ -37,8 +37,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .upstream_contracts import (
+    NativeContractError,
+    ProjectedContext,
+    parse_seiche_context,
+    parse_undertow_context,
+)
+
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.1.2"
+SERVICE_VERSION = "0.1.3"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -51,7 +58,7 @@ if (
     raise RuntimeError("TRADE_SAFETY_SOURCE_REVISION must be a source SHA")
 BUILD_CREATED = os.environ.get("TRADE_SAFETY_BUILD_CREATED", "unknown")
 
-SEICHE_URL = "https://api.seiche.info/mcp"
+SEICHE_URL = "https://api.seiche.info/api/trade-safety/risk-context"
 UNDERTOW_URL = "https://api.seiche.info/undertow/mcp"
 LIQUILENS_BASE_URL = "https://api.liquilens.in/api/failure-radar/institution/"
 ISSUER_ENDPOINT = os.environ.get(
@@ -90,7 +97,6 @@ BTC_ALIASES = frozenset(
         "XBT/USD",
     }
 )
-REGIMES = frozenset({"CALM", "EROSION", "STRAIN", "STRESS"})
 INSTITUTION_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,127}$")
 
 SANDBOX_HEADERS = (
@@ -336,7 +342,9 @@ class UpstreamTransport(Protocol):
 
 
 def _is_allowed_upstream(method: str, url: str) -> bool:
-    if method == "POST" and url in {SEICHE_URL, UNDERTOW_URL}:
+    if method == "GET" and url == SEICHE_URL:
+        return True
+    if method == "POST" and url == UNDERTOW_URL:
         return True
     if method != "GET" or not url.startswith(LIQUILENS_BASE_URL):
         return False
@@ -483,23 +491,6 @@ def _parse_date(value: Any, field_name: str) -> date:
         raise ValueError(f"{field_name} must be an ISO date") from exc
 
 
-def _finite_number(
-    value: Any,
-    field_name: str,
-    *,
-    minimum: float = 0.0,
-    maximum: float | None = None,
-) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise ValueError(f"{field_name} must be a finite number")
-    number = float(value)
-    if not math.isfinite(number) or number < minimum:
-        raise ValueError(f"{field_name} is outside its expected range")
-    if maximum is not None and number > maximum:
-        raise ValueError(f"{field_name} is outside its expected range")
-    return number
-
-
 def _mapping(value: Any, field_name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{field_name} must be an object")
@@ -508,13 +499,17 @@ def _mapping(value: Any, field_name: str) -> dict[str, Any]:
 
 def _mcp_structured(body: bytes, expected_id: str) -> dict[str, Any]:
     response = _strict_json_object(body, "upstream response")
+    if set(response) != {"jsonrpc", "id", "result"}:
+        raise ValueError("upstream JSON-RPC response has unexpected fields")
     if response.get("jsonrpc") != "2.0" or response.get("id") != expected_id:
         raise ValueError("upstream JSON-RPC identity mismatch")
-    if "error" in response:
-        raise ValueError("upstream JSON-RPC error")
     result = _mapping(response.get("result"), "upstream result")
-    if result.get("isError") is True:
+    if set(result) != {"content", "structuredContent", "isError"}:
+        raise ValueError("upstream tool result has unexpected fields")
+    if result.get("isError") is not False:
         raise ValueError("upstream tool result is an error")
+    if not isinstance(result.get("content"), list):
+        raise ValueError("upstream tool content must be an array")
     return _mapping(result.get("structuredContent"), "upstream structuredContent")
 
 
@@ -584,196 +579,111 @@ def _liquilens_not_applicable(
     }
 
 
+def _projected_section(
+    *,
+    product: str,
+    raw: RawUpstreamResponse,
+    request_hash: str,
+    retrieved_at: datetime,
+    request_expires_at: datetime,
+    projected: ProjectedContext,
+    source_url: str,
+    local_expiry_limitation: str,
+) -> dict[str, Any]:
+    expiry_candidates = [
+        request_expires_at,
+        retrieved_at + timedelta(seconds=EVIDENCE_TTL_SECONDS),
+    ]
+    if projected.native_expires_at is not None:
+        expiry_candidates.append(projected.native_expires_at)
+    expires_at = min(expiry_candidates)
+    if expires_at <= retrieved_at:
+        raise NativeContractError(f"{product}_context_expired")
+    limitations = list(
+        dict.fromkeys(
+            [
+                *projected.limitations,
+                "gateway_receipt_binds_native_context_to_canonical_request_hash",
+                local_expiry_limitation,
+            ]
+        )
+    )
+    return {
+        "product": product,
+        "request_hash": request_hash,
+        "state": "context_only",
+        "evidence_class": "derived",
+        "source_url": source_url,
+        "source_schema": projected.source_schema,
+        "source_sha256": _source_sha(raw.body),
+        "as_of": _utc_text(projected.as_of),
+        "knowledge_time": _utc_text(projected.knowledge_time),
+        "retrieved_at": _utc_text(retrieved_at),
+        "expires_at": _utc_text(expires_at),
+        "rights_status": projected.rights_status,
+        "real_money_eligible": False,
+        "executable_quote": False,
+        "limitations": limitations,
+        "facts": projected.facts,
+    }
+
+
 def _seiche_section(
     *,
     raw: RawUpstreamResponse,
     request_hash: str,
     retrieved_at: datetime,
     request_expires_at: datetime,
+    max_age_seconds: int,
 ) -> dict[str, Any]:
-    payload = _mcp_structured(raw.body, "trade-safety-seiche-v1")
-    if payload.get("schema") != "seiche.public.v2":
-        raise ValueError("Seiche schema mismatch")
-    generated_at = _parse_timestamp(payload.get("generated_at"), "generated_at")
-    if generated_at > retrieved_at:
-        raise ValueError("Seiche generated_at follows retrieval")
-    conclusion = _mapping(payload.get("conclusion"), "conclusion")
-    regime = conclusion.get("regime")
-    if regime not in REGIMES:
-        raise ValueError("Seiche regime is invalid")
-    stress_index = _finite_number(
-        conclusion.get("value"), "conclusion.value", maximum=100.0
+    payload = _strict_json_object(raw.body, "Seiche response")
+    projected = parse_seiche_context(
+        payload,
+        request_hash=request_hash,
+        retrieved_at=retrieved_at,
+        max_age_seconds=max_age_seconds,
+        source_url=SEICHE_URL,
     )
-    coverage = _finite_number(
-        conclusion.get("coverage_pct"),
-        "conclusion.coverage_pct",
-        maximum=100.0,
+    return _projected_section(
+        product="seiche",
+        raw=raw,
+        request_hash=request_hash,
+        retrieved_at=retrieved_at,
+        request_expires_at=request_expires_at,
+        projected=projected,
+        source_url=SEICHE_URL,
+        local_expiry_limitation="gateway_expiry_is_local_not_an_upstream_expiry",
     )
-    if coverage < 100.0:
-        raise ValueError("Seiche conclusion coverage is incomplete")
-    data_quality = _mapping(payload.get("data_quality"), "data_quality")
-    if data_quality.get("schema") != "seiche.data_quality.v1":
-        raise ValueError("Seiche data-quality schema mismatch")
-    quality_generated_at = _parse_timestamp(
-        data_quality.get("generated_at"), "data_quality.generated_at"
-    )
-    if quality_generated_at > generated_at:
-        raise ValueError("Seiche data-quality clock follows publication")
-    headline_ages = data_quality.get("headline_ages")
-    if not isinstance(headline_ages, list) or not headline_ages:
-        raise ValueError("Seiche headline observation clocks are unavailable")
-    headline_dates: list[date] = []
-    for index, item in enumerate(headline_ages):
-        headline = _mapping(item, f"data_quality.headline_ages[{index}]")
-        series = headline.get("series")
-        if not isinstance(series, str) or not series.strip():
-            raise ValueError("Seiche headline series is invalid")
-        headline_date = _parse_date(
-            headline.get("asof"), f"data_quality.headline_ages[{index}].asof"
-        )
-        if headline_date > generated_at.date():
-            raise ValueError("Seiche headline observation follows publication")
-        age_days = headline.get("age_days")
-        if (
-            isinstance(age_days, bool)
-            or not isinstance(age_days, int)
-            or age_days < 0
-            or age_days != (generated_at.date() - headline_date).days
-        ):
-            raise ValueError("Seiche headline age does not match its as-of date")
-        headline_dates.append(headline_date)
-    semantic_as_of = datetime.combine(min(headline_dates), time.min, tzinfo=UTC)
-    return {
-        "product": "seiche",
-        "request_hash": request_hash,
-        "state": "context_only",
-        "evidence_class": "derived",
-        "source_url": SEICHE_URL,
-        "source_schema": "seiche.public.v2",
-        "source_sha256": _source_sha(raw.body),
-        "as_of": _utc_text(semantic_as_of),
-        "knowledge_time": _utc_text(generated_at),
-        "retrieved_at": _utc_text(retrieved_at),
-        "expires_at": _evidence_expiry(retrieved_at, request_expires_at),
-        "rights_status": "metadata_only",
-        "real_money_eligible": False,
-        "executable_quote": False,
-        "limitations": [
-            "public_metadata_context_only_not_licensed_for_real_money_execution",
-            "semantic_as_of_is_oldest_reported_headline_observation",
-            "gateway_expiry_is_local_not_an_upstream_expiry",
-        ],
-        "facts": {
-            "regime": regime,
-            "stress_index": stress_index,
-            "coverage_pct": coverage,
-        },
-    }
 
 
 def _undertow_section(
     *,
     raw: RawUpstreamResponse,
     request_hash: str,
-    requested_size: float,
+    expected_request: dict[str, Any],
     retrieved_at: datetime,
     request_expires_at: datetime,
+    max_age_seconds: int,
 ) -> dict[str, Any]:
     payload = _mcp_structured(raw.body, "trade-safety-undertow-v1")
-    as_of_date = _parse_date(payload.get("asof"), "asof")
-    generated_at = _parse_timestamp(payload.get("generated_at"), "generated_at")
-    as_of = datetime.combine(as_of_date, time.min, tzinfo=UTC)
-    if as_of > generated_at or generated_at > retrieved_at:
-        raise ValueError("Undertow clocks are inconsistent")
-    if payload.get("asset") != "BTC":
-        raise ValueError("Undertow asset is not BTC")
-    echoed_size = _finite_number(
-        payload.get("requested_size_usd"), "requested_size_usd"
+    projected = parse_undertow_context(
+        payload,
+        expected_request=expected_request,
+        request_hash=request_hash,
+        retrieved_at=retrieved_at,
+        max_age_seconds=max_age_seconds,
+        source_url=UNDERTOW_URL,
     )
-    published_rung = _finite_number(
-        payload.get("published_rung_used_usd"), "published_rung_used_usd"
+    return _projected_section(
+        product="undertow",
+        raw=raw,
+        request_hash=request_hash,
+        retrieved_at=retrieved_at,
+        request_expires_at=request_expires_at,
+        projected=projected,
+        source_url=UNDERTOW_URL,
+        local_expiry_limitation="gateway_expiry_is_bounded_by_native_expiry",
     )
-    if echoed_size != requested_size or published_rung != requested_size:
-        raise ValueError("Undertow did not return the exact requested published rung")
-    if published_rung not in PUBLISHED_RUNG_USD:
-        raise ValueError("Undertow returned an unpublished rung")
-    venue_costs = _mapping(
-        payload.get("sell_cost_bp_by_venue"), "sell_cost_bp_by_venue"
-    )
-    if not venue_costs:
-        raise ValueError("Undertow venue costs are empty")
-    normalized_costs: dict[str, float] = {}
-    for venue, cost in venue_costs.items():
-        if not isinstance(venue, str) or not venue.strip():
-            raise ValueError("Undertow venue name is invalid")
-        normalized_costs[venue] = _finite_number(cost, f"venue.{venue}")
-    unable = payload.get("unable_at_observed_depth")
-    if not isinstance(unable, list) or not all(
-        isinstance(item, str) and item.strip() for item in unable
-    ):
-        raise ValueError("Undertow unable-at-depth field is invalid")
-    if unable:
-        raise ValueError("Undertow could not measure every venue at requested depth")
-    if set(normalized_costs) != UNDERTOW_REQUIRED_VENUES:
-        raise ValueError(
-            "Undertow venue costs do not cover the declared six-venue roster"
-        )
-    best = _mapping(payload.get("best"), "best")
-    best_venue = best.get("venue")
-    best_sell = _finite_number(best.get("sell_bp"), "best.sell_bp")
-    if (
-        not isinstance(best_venue, str)
-        or best_venue not in normalized_costs
-        or abs(best_sell - normalized_costs[best_venue]) > 1e-9
-        or abs(best_sell - min(normalized_costs.values())) > 1e-9
-    ):
-        raise ValueError("Undertow best cost does not match venue costs")
-    worst = _mapping(payload.get("worst"), "worst")
-    worst_venue = worst.get("venue")
-    worst_sell = _finite_number(worst.get("sell_bp"), "worst.sell_bp")
-    if (
-        not isinstance(worst_venue, str)
-        or worst_venue not in normalized_costs
-        or abs(worst_sell - normalized_costs[worst_venue]) > 1e-9
-        or abs(worst_sell - max(normalized_costs.values())) > 1e-9
-    ):
-        raise ValueError("Undertow worst cost does not match venue costs")
-    claimed_venue_spread = _finite_number(
-        payload.get("venue_spread_bp"), "venue_spread_bp"
-    )
-    venue_spread = max(normalized_costs.values()) - min(normalized_costs.values())
-    if abs(claimed_venue_spread - venue_spread) > 1e-9:
-        raise ValueError("Undertow venue spread does not match exact venue costs")
-    return {
-        "product": "undertow",
-        "request_hash": request_hash,
-        "state": "context_only",
-        "evidence_class": "derived",
-        "source_url": UNDERTOW_URL,
-        "source_schema": None,
-        "source_sha256": _source_sha(raw.body),
-        "as_of": _utc_text(as_of),
-        "knowledge_time": _utc_text(generated_at),
-        "retrieved_at": _utc_text(retrieved_at),
-        "expires_at": _evidence_expiry(retrieved_at, request_expires_at),
-        "rights_status": "metadata_only",
-        "real_money_eligible": False,
-        "executable_quote": False,
-        "limitations": [
-            "public_metadata_context_only_not_licensed_for_real_money_execution",
-            "estimated_depth_cost_not_a_book_walk_or_executable_quote",
-            "exact_published_rung_required_nearest_rung_substitution_forbidden",
-            "complete_declared_six_venue_roster_required_off_roster_venues_unmeasured",
-            "upstream_has_no_response_schema_id_shape_validated_by_gateway",
-            "gateway_expiry_is_local_not_an_upstream_expiry",
-        ],
-        "facts": {
-            "requested_size_usd": echoed_size,
-            "published_rung_used_usd": published_rung,
-            "worst_sell_cost_bps": worst_sell,
-            "venue_spread_bps": venue_spread,
-        },
-    }
 
 
 def _liquilens_section(
@@ -836,9 +746,13 @@ def _liquilens_section(
 
 
 def _undertow_eligibility(request: Mapping[str, Any]) -> tuple[bool, str]:
+    if request["mode"] not in {"observe", "paper"}:
+        return False, "undertow_trade_safety_context_is_observe_or_paper_only"
     order = request["order"]
     if order["venue"] is not None:
         return False, "undertow_has_no_canonical_order_venue_mapping"
+    if order["side"] != "sell":
+        return False, "undertow_trade_safety_context_supports_only_sell_orders"
     instrument = order["instrument"]
     symbol = str(instrument["symbol"]).strip().upper()
     if instrument["asset_class"] != "crypto" or symbol not in BTC_ALIASES:
@@ -850,6 +764,21 @@ def _undertow_eligibility(request: Mapping[str, Any]) -> tuple[bool, str]:
     if amount not in PUBLISHED_RUNG_USD:
         return False, "undertow_requires_an_exact_published_usd_rung"
     return True, ""
+
+
+def _undertow_contract_request(
+    request: Mapping[str, Any], request_hash: str
+) -> dict[str, Any]:
+    """Project only the exact fields accepted by Undertow's paper-only tool."""
+
+    return {
+        "request_hash": request_hash,
+        "mode": request["mode"],
+        "instrument": "BTC/USD",
+        "side": "sell",
+        "venue": None,
+        "requested_size_usd": float(request["order"]["notional"]["amount"]),
+    }
 
 
 def _institution_slug(request: Mapping[str, Any]) -> str | None:
@@ -917,21 +846,23 @@ class TradeSafetyGateway:
             normalized_request
         )
         request_hash = trade_safety_request_hash(normalized_request)
+        undertow_request = (
+            _undertow_contract_request(normalized_request, request_hash)
+            if undertow_allowed
+            else None
+        )
 
         calls: dict[str, Awaitable[RawUpstreamResponse]] = {
-            "seiche": self._upstream.request(
-                "POST",
-                SEICHE_URL,
-                json_body=_mcp_call("funding_stress_now", {}, "trade-safety-seiche-v1"),
-            )
+            "seiche": self._upstream.request("GET", SEICHE_URL)
         }
         if undertow_allowed:
+            assert undertow_request is not None
             calls["undertow"] = self._upstream.request(
                 "POST",
                 UNDERTOW_URL,
                 json_body=_mcp_call(
-                    "exit_cost",
-                    {"size_usd": normalized_request["order"]["notional"]["amount"]},
+                    "trade_safety_exit_context",
+                    undertow_request,
                     "trade-safety-undertow-v1",
                 ),
             )
@@ -957,6 +888,9 @@ class TradeSafetyGateway:
                     request_hash=request_hash,
                     retrieved_at=retrieved_at,
                     request_expires_at=request_expires_at,
+                    max_age_seconds=normalized_policy[
+                        "max_evidence_age_seconds"
+                    ]["seiche"],
                 )
             except (ValueError, TradeSafetyError):
                 seiche = _unavailable_section(
@@ -988,14 +922,16 @@ class TradeSafetyGateway:
             undertow_raw = fetched["undertow"]
             if isinstance(undertow_raw, RawUpstreamResponse):
                 try:
+                    assert undertow_request is not None
                     undertow = _undertow_section(
                         raw=undertow_raw,
                         request_hash=request_hash,
-                        requested_size=float(
-                            normalized_request["order"]["notional"]["amount"]
-                        ),
+                        expected_request=undertow_request,
                         retrieved_at=retrieved_at,
                         request_expires_at=request_expires_at,
+                        max_age_seconds=normalized_policy[
+                            "max_evidence_age_seconds"
+                        ]["undertow"],
                     )
                 except (ValueError, TradeSafetyError):
                     undertow = _unavailable_section(
@@ -1004,7 +940,7 @@ class TradeSafetyGateway:
                         source_url=UNDERTOW_URL,
                         retrieved_at=retrieved_at,
                         limitation=(
-                            "undertow_exact_rung_contract_unavailable_or_invalid"
+                            "undertow_trade_safety_context_unavailable_or_invalid"
                         ),
                         raw=undertow_raw,
                     )
@@ -1109,19 +1045,26 @@ def capabilities() -> dict[str, Any]:
             "can_execute": False,
             "can_recommend": False,
             "can_allocate_capital": False,
+            "can_route_order": False,
+            "can_custody": False,
+            "can_settle": False,
             "has_broker_credentials": False,
             "has_order_submission": False,
         },
         "upstreams": {
             "seiche": {
                 "url": SEICHE_URL,
-                "tool": "funding_stress_now",
+                "method": "GET",
+                "schema": "seiche.risk-context.v1",
                 "state": "context_only",
             },
             "undertow": {
                 "url": UNDERTOW_URL,
-                "tool": "exit_cost",
+                "tool": "trade_safety_exit_context",
+                "schema": "undertow.trade-safety-exit-context.v1",
                 "state": "context_only",
+                "modes": ["observe", "paper"],
+                "side": "sell",
                 "asset_aliases": sorted(BTC_ALIASES),
                 "currency": "USD",
                 "published_rungs_usd": sorted(PUBLISHED_RUNG_USD),
@@ -1157,9 +1100,10 @@ MCP_TOOLS = [
         "name": "assess_trade_safety",
         "title": "Assess exact-order trade safety",
         "description": (
-            "Read fixed public Seiche, Undertow, and conditional LiquiLens context "
-            "and issue a short-lived SHA-256-only sandbox receipt. This tool cannot "
-            "recommend, preview with a broker, route, resize, or execute an order."
+            "Read fixed public native Trade Safety context from Seiche and "
+            "Undertow, plus conditional LiquiLens context, and issue a short-lived "
+            "SHA-256-only sandbox receipt. This tool cannot recommend, preview "
+            "with a broker, route, resize, custody, settle, or execute an order."
         ),
         "inputSchema": {
             "type": "object",
@@ -1256,7 +1200,7 @@ def create_app(
     gateway = TradeSafetyGateway(active_transport, clock=clock)
 
     @asynccontextmanager
-    async def lifespan(_app: FastAPI):
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         yield
         if owns_transport:
             await active_transport.aclose()
@@ -1266,8 +1210,8 @@ def create_app(
         version=SERVICE_VERSION,
         description=(
             "Read-only sandbox assessment over fixed public evidence sources. "
-            "There is no broker credential, order preview, recommendation, or "
-            "execution surface."
+            "There is no broker credential, order preview, recommendation, "
+            "routing, custody, settlement, or execution surface."
         ),
         lifespan=lifespan,
     )
@@ -1345,7 +1289,8 @@ def create_app(
                         "instructions": (
                             "Read-only public sandbox. Live results fail closed; "
                             "there is no broker preview, recommendation, order "
-                            "route, resize, credential, or execution tool."
+                            "route, resize, credential, custody, settlement, or "
+                            "execution tool."
                         ),
                     },
                 )

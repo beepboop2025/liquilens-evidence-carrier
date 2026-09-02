@@ -152,7 +152,7 @@ def validate_candidate_metadata(
     _require_equal(
         "gateway package version",
         gateway.get("project", {}).get("version"),
-        "0.1.2",
+        "0.1.3",
     )
     _require_equal(
         "OpenBB package version",
@@ -198,7 +198,7 @@ def validate_candidate_metadata(
 
     return {
         **versions,
-        "gateway package": "0.1.2",
+        "gateway package": "0.1.3",
         "OpenBB package": "0.2.0",
         "TypeScript package": "0.1.0",
         "conformance_sha256": corpus_digest,

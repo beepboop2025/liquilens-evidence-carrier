@@ -114,7 +114,7 @@ jobs:
           test "$(cat VERSION)" = "$core_version"
           gateway_version="$(python3 -c \
             'import tomllib; print(tomllib.load(open("integrations/trade-safety-gateway/pyproject.toml", "rb"))["project"]["version"])')"
-          test "$gateway_version" = "0.1.2"
+          test "$gateway_version" = "0.1.3"
           {
             echo "revision=$release_commit"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"

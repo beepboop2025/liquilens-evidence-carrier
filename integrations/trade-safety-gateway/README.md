@@ -6,9 +6,9 @@ of fixed public evidence endpoints, and issues the deterministic SHA-256-only
 receipt defined by `liquilens_evidence.trade_safety`.
 
 It is **not** an order gateway. It has no broker credentials, broker preview,
-order-submission route, recommendation route, automatic resize behavior, or
-real-money authority. Every response carries `X-Trade-Safety-Mode: sandbox`,
-`X-Trade-Safety-Authority: read-only`, and
+order-submission route, recommendation route, automatic resize behavior,
+custody, settlement, or real-money authority. Every response carries
+`X-Trade-Safety-Mode: sandbox`, `X-Trade-Safety-Authority: read-only`, and
 `X-Trade-Safety-Execution: disabled`. Live-mode assessments deterministically
 return `unavailable` because the evidence is context-only, the receipt is not
 tenant-authenticated, and the broker-preview reference is `not_applicable`.
@@ -31,22 +31,25 @@ There is deliberately no execution-shaped MCP tool.
 
 | Product | Fixed request | Receipt state and boundary |
 | --- | --- | --- |
-| Seiche | `POST https://api.seiche.info/mcp`, tool `funding_stress_now` | `context_only`; only the validated regime, index, coverage, source clock, and exact response hash are projected. |
-| Undertow | `POST https://api.seiche.info/undertow/mcp`, tool `exit_cost` | `context_only`; BTC aliases, USD, and exact published rungs `$1k/$10k/$100k/$1m` only. The response must cover the declared six-venue roster—Binance, Bitfinex, Coinbase, Gemini, Kraken, and OKX—with no unable-at-depth venue; a partial/extra map or mismatched nearest rung is unavailable evidence. |
+| Seiche | `GET https://api.seiche.info/api/trade-safety/risk-context`, schema `seiche.risk-context.v1` | `context_only`; the native cache-only projection, conservative evidence clocks, rights state, staleness counts, attestation boundary, and projection digest are validated and retained. Seiche is not order-bound upstream, so the receipt explicitly binds its exact projection digest to the canonical Trade Safety request hash. |
+| Undertow | `POST https://api.seiche.info/undertow/mcp`, tool `trade_safety_exit_context` | `context_only`; the gateway sends the canonical Trade Safety request hash with an exact observe/paper BTC/USD sell rung. Undertow must echo that binding and provide a verified PIT head/chain, deployed SHA, approved derived-metadata rights, complete six-venue coverage, coherent clocks, and an intact context digest. |
 | LiquiLens | `GET https://api.liquilens.in/api/failure-radar/institution/{quoted_slug}` | Called only for a validated `request.order.instrument.identifiers.liquilens_institution_slug`; only latest period end and historical-evidence status/eligibility are projected. Otherwise `not_applicable`. |
 
-Upstream JSON-RPC text content is ignored. The gateway consumes
-`structuredContent` only, validates the expected schemas and safety-relevant
-fields, and hashes the exact uncompressed response entity bytes. Source,
-generated/as-of, knowledge, retrieval, and local-expiry clocks remain separate.
-The local expiry is explicitly identified as a gateway clock, not an upstream
-claim.
+Undertow JSON-RPC text content is ignored. The gateway consumes
+`structuredContent` only; Seiche is consumed from its fixed REST representation.
+Both native objects use exact-key validation, have their unkeyed canonical
+digests recomputed, and are checked for cross-field consistency after the digest
+check. The exact uncompressed HTTP entity is hashed independently. Source,
+observation/as-of, knowledge, producer retrieval, gateway retrieval, native
+expiry, and local receipt-expiry clocks remain separate.
 
 Undertow completeness is roster-scoped, not a claim about the whole market.
-The gateway requires exact set equality with its declared six-CEX roster before
-using the response's worst cost or cross-venue spread. Off-roster CEXs, DEXs,
-and agent-native venues remain unmeasured by construction; adding or changing a
-venue requires a reviewed contract update rather than silent acceptance.
+The gateway requires exact set equality with its declared six-CEX roster and
+cross-checks quote conversion, required depth band, per-venue basis-point and
+dollar costs, best/worst venue, spread, peg, proof, rights, and expiry before
+using a result. Off-roster CEXs, DEXs, and agent-native venues remain unmeasured
+by construction; adding or changing a venue requires a reviewed contract update
+rather than silent acceptance.
 
 ## Fail-closed and network boundary
 
@@ -60,17 +63,21 @@ venue requires a reviewed contract update rather than silent acceptance.
 - Request bodies are capped at 64 KiB; source bodies at 1 MiB; gateway responses
   at 512 KiB. Each upstream operation has a five-second total timeout and a
   two-second connect timeout.
-- Independent eligible sources are fetched concurrently. A source or contract
-  error becomes that product's `unavailable` evidence section, so the protocol
-  emits a valid unavailable receipt instead of silently dropping the source.
+- Independent eligible sources are fetched concurrently. A source error,
+  producer-declared unavailable state, stale native clock, digest failure,
+  request-hash mismatch, proof failure, or rights mismatch becomes that
+  product's typed `unavailable` evidence section. Because Seiche and Undertow
+  are mandatory products, the receipt then fails closed.
 - The service does not log request bodies, response bodies, secrets, account
   data, or source exceptions. The bundled command disables access logs.
 - Every evidence section and the broker-preview reference carries
-  `trade_safety_request_hash(request)`. No nearest-rung result is promoted to
-  exact-order evidence.
-- An empty Undertow `unable_at_observed_depth` list is not sufficient by itself:
-  the cost map must also contain every and only the declared six venues. Partial
-  maps therefore fail closed instead of producing a misleading zero spread.
+  `trade_safety_request_hash(request)`. Undertow also receives and echoes it;
+  Seiche's native projection digest and request hash receive a separate local
+  binding digest inside the hash-sealed receipt. No nearest-rung result is
+  promoted to exact-order evidence.
+- Observe and paper are the only modes sent to Undertow. Live and buy requests
+  never reach its sell-side paper-context tool; they produce typed unavailable
+  evidence instead.
 
 Public-source access does not imply real-money or redistribution rights. All
 three adapters therefore declare `metadata_only`, `context_only`,
@@ -102,10 +109,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.1.2 .
+  -t liquilens-trade-safety-gateway:0.1.3 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.1.2
+  -p 8080:8080 liquilens-trade-safety-gateway:0.1.3
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the
@@ -126,9 +133,12 @@ boundary and must be operated by the adopter.
 The tests inject byte-exact fake upstream responses and cover:
 
 - unsupported and invalid sizes never calling Undertow;
-- source errors and nearest-rung mismatches failing closed;
-- incomplete or off-roster Undertow venue maps failing closed;
-- exact response hashing and exact-order request-hash binding;
+- source errors, producer-unavailable results, stale clocks, and digest
+  mismatches failing closed;
+- incomplete/off-roster Undertow venue maps and inconsistent conversion, depth,
+  cost, rights, PIT, deployed-SHA, or authority fields failing closed;
+- exact response hashing, native-digest retention, and exact-order request-hash
+  binding across both products;
 - paper receipts passing and limiting under operator policy;
 - live receipts never passing and carrying a not-applicable broker preview;
 - conditional, minimal LiquiLens projection;

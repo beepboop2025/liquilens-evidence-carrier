@@ -5,6 +5,20 @@ public merely because it appears in this file: the signed GitHub release,
 checksums, attestations, and distribution receipts remain the publication
 authority.
 
+## [Unreleased]
+
+- Prepare independently versioned Trade Safety gateway `0.1.3` against the
+  unchanged core `0.19.0` protocol: consume Seiche
+  `seiche.risk-context.v1` and Undertow
+  `trade_safety_exit_context` instead of their legacy convenience views.
+- Bind both native context digests to one canonical Trade Safety request hash;
+  retain Seiche clocks/staleness/attestation state and Undertow
+  rights/PIT/source/deployed digests without promoting either to execution
+  authority.
+- Fail typed unavailable on producer-unavailable, malformed, mismatched,
+  tampered, stale, incomplete-rights, or unverified-proof responses, while
+  keeping observe/paper-only and no execution, routing, custody, or settlement.
+
 ## [0.19.0] - 2026-09-02
 
 - Add a deterministic adversarial Trade Safety v1 corpus spanning pass, limit,

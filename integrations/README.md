@@ -10,7 +10,8 @@ without a negotiated marketplace listing:
 - `openbb/` provides offline carrier and hash-only Trade Safety receipt
   verification without accepting authentication secrets;
 - `trade-safety-gateway/` implements the fixed-upstream, read-only public
-  sandbox; it has no broker credentials or execution route;
+  sandbox over Seiche and Undertow's native Trade Safety contracts; it has no
+  broker credentials, execution route, custody, or settlement surface;
 - `openlineage/` validates the custom lineage facet;
 - `dbt/` rejects warehouse rows that strip clocks, rights, or redaction state;
   and

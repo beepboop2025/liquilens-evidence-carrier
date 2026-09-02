@@ -3,9 +3,10 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from liquilens_evidence.trade_safety import (
     TRADE_SAFETY_POLICY_SCHEMA,
@@ -54,37 +55,81 @@ def _mcp_response(request_id: str, structured: dict[str, Any]) -> bytes:
     )
 
 
+def _sealed(value: dict[str, Any], field: str) -> dict[str, Any]:
+    unsigned = {key: item for key, item in value.items() if key != field}
+    return {**unsigned, field: hashlib.sha256(_json_bytes(unsigned)).hexdigest()}
+
+
 def _seiche_bytes(
     *, regime: str = "CALM", oldest_headline_asof: str = "2026-08-26"
 ) -> bytes:
-    return _mcp_response(
-        "trade-safety-seiche-v1",
-        {
-            "schema": "seiche.public.v2",
-            "generated_at": "2026-09-02T11:59:30Z",
-            "conclusion": {
-                "regime": regime,
-                "value": 20.0,
-                "coverage_pct": 100.0,
-            },
-            "proof": {"withheld": True},
-            "data_quality": {
-                "schema": "seiche.data_quality.v1",
-                "generated_at": "2026-09-02T11:59:30Z",
-                "headline_ages": [
-                    {
-                        "series": "reserves_b",
-                        "asof": oldest_headline_asof,
-                        "age_days": (
-                            date(2026, 9, 2)
-                            - date.fromisoformat(oldest_headline_asof)
-                        ).days,
-                    },
-                    {"series": "sofr_pct", "asof": "2026-09-01", "age_days": 1},
-                ],
-            },
+    evidence_at = datetime.fromisoformat(oldest_headline_asof).replace(tzinfo=UTC)
+    evaluated_at = datetime(2026, 9, 2, 11, 59, 45, tzinfo=UTC)
+    payload = {
+        "ok": True,
+        "schema": "seiche.risk-context.v1",
+        "status": "available",
+        "reason": None,
+        "state": "context_only",
+        "evidence_class": "derived",
+        "rights_status": "metadata_only",
+        "context_only": True,
+        "executable": False,
+        "executable_quote": False,
+        "real_money_eligible": False,
+        "can_authorize_order": False,
+        "projection_mode": "cache_only",
+        "request_time_collection": False,
+        "request_time_model_fitting": False,
+        "request_time_network": False,
+        "request_time_notary": False,
+        "request_time_broker": False,
+        "attestation_state": "not_evaluated",
+        "source_url": "https://api.seiche.info/api/trade-safety/risk-context",
+        "source_snapshot_version": "0.12.0 fixture",
+        "regime": regime,
+        "stress_index": 20.0,
+        "coverage_pct": 84.0,
+        "fault_count": 1,
+        "staleness": {
+            "fresh": 3,
+            "aging": 1,
+            "stale": 1,
+            "dead": 0,
+            "unknown": 1,
+            "total": 6,
         },
-    )
+        "clocks": {
+            "snapshot_generated_at": "2026-09-02T11:59:30Z",
+            "evidence_as_of": evidence_at.isoformat().replace("+00:00", "Z"),
+            "evaluated_at": "2026-09-02T11:59:45Z",
+            "snapshot_age_seconds": 15,
+            "evidence_age_seconds": int(
+                (evaluated_at - evidence_at).total_seconds()
+            ),
+            "basis": "oldest valid public provenance observation clock",
+        },
+        "attestation": {
+            "status": "not_evaluated",
+            "ed25519_status": "not_evaluated",
+            "ots_status": "not_evaluated",
+            "bitcoin_anchor_claimed": False,
+            "ledger_read": False,
+            "reason": "attestation_ledger_not_evaluated_by_this_projection",
+            "disclosure": "Stream proof is separate and is not order authority.",
+        },
+        "limitations": [
+            "public_metadata_context_only_not_licensed_for_real_money_execution",
+            "not_order_bound_and_cannot_authorize_or_route_an_order",
+            "stream_attestation_is_not_per_order_execution_authority",
+            "projection_sha256_is_a_server_internal_change_detector_not_authentication",
+        ],
+        "disclaimer": "Research context only; not investment advice.",
+        "canonicalization": (
+            "python-json-sort-keys-utf8-no-nan-server-internal-v1"
+        ),
+    }
+    return _json_bytes(_sealed(payload, "projection_sha256"))
 
 
 def _undertow_bytes(
@@ -97,29 +142,194 @@ def _undertow_bytes(
     venue_costs: dict[str, Any] | None = None,
     best_venue: str = "binance",
     worst_venue: str = "bitfinex",
+    request_hash: str | None = None,
+    mode: str = "paper",
 ) -> bytes:
-    return _mcp_response(
-        "trade-safety-undertow-v1",
-        {
-            "asof": "2026-09-02",
-            "generated_at": "2026-09-02T11:59:40Z",
+    binding = request_hash or trade_safety_request_hash(_request())
+    costs = venue_costs or {
+        "binance": 2.0,
+        "bitfinex": worst,
+        "coinbase": 4.0,
+        "gemini": 6.0,
+        "kraken": 3.0,
+        "okx": 5.0,
+    }
+    conversions = {}
+    depth = {}
+    for venue in UNDERTOW_REQUIRED_VENUES:
+        quote = "USDT" if venue in {"binance", "okx"} else "USD"
+        price = 0.999 if quote == "USDT" else 1.0
+        requested_quote = requested / price
+        conversions[venue] = {
+            "quote_currency": quote,
+            "state": "bound_usdt_usd" if quote == "USDT" else "identity",
+            "usd_per_quote": price,
+            "requested_notional_quote": requested_quote,
+        }
+        depth[venue] = {
+            "side": "bid",
+            "required_band": "1pct" if requested_quote <= 200_000 else "2pct",
+            "covers_required_band": True,
+            "covers_1pct_bid": True,
+            "covers_2pct_bid": True,
+            "span_below": 0.03,
+            "depth_1pct_bid_quote": 200_000.0,
+            "depth_2pct_bid_quote": 2_000_000.0,
+            "within_observed_depth": True,
+        }
+    costs_usd = {
+        venue: round(requested * float(cost) / 10_000, 2)
+        for venue, cost in costs.items()
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool)
+    }
+    request_projection = {
+        "request_hash": binding,
+        "mode": mode,
+        "instrument": "BTC/USD",
+        "side": "sell",
+        "venue": None,
+        "requested_size_usd": requested,
+    }
+    payload = {
+        "schema": "undertow.trade-safety-exit-context.v1",
+        "schema_url": (
+            "https://liquilens-undertow.com/"
+            "undertow-trade-safety-exit-context-v1.schema.json"
+        ),
+        "status": "available",
+        "reason": None,
+        "request_hash": binding,
+        "request": request_projection,
+        "evidence_class": "derived",
+        "measurement": {
+            "instrument": "BTC/USD",
             "asset": "BTC",
+            "side": "sell",
+            "venue": None,
             "requested_size_usd": requested,
             "published_rung_used_usd": rung,
-            "sell_cost_bp_by_venue": venue_costs
-            or {
-                "binance": 2.0,
-                "bitfinex": worst,
-                "coinbase": 4.0,
-                "gemini": 6.0,
-                "kraken": 3.0,
-                "okx": 5.0,
+            "estimator": "band_interpolation_v1",
+            "quote_conversion_by_venue": conversions,
+            "sell_cost_bps_by_venue": costs,
+            "sell_cost_usd_by_venue": costs_usd,
+            "best": {
+                "venue": best_venue,
+                "sell_cost_bps": costs.get(best_venue, 2.0),
+                "sell_cost_usd": costs_usd.get(best_venue, 0.2),
             },
-            "best": {"venue": best_venue, "sell_bp": 2.0},
-            "worst": {"venue": worst_venue, "sell_bp": worst},
-            "venue_spread_bp": spread,
-            "unable_at_observed_depth": unable or [],
+            "worst": {
+                "venue": worst_venue,
+                "sell_cost_bps": costs.get(worst_venue, worst),
+                "sell_cost_usd": costs_usd.get(worst_venue, 1.0),
+            },
+            "venue_spread_bps": spread,
+            "venue_spread_usd": round(requested * spread / 10_000, 2),
         },
+        "coverage": {
+            "state": "complete",
+            "expected_venues": sorted(UNDERTOW_REQUIRED_VENUES),
+            "priced_venues": sorted(UNDERTOW_REQUIRED_VENUES),
+            "unreachable_venues": [],
+            "unable_at_observed_depth": unable or [],
+            "uncovered_at_required_band": [],
+            "conversion_unavailable_venues": [],
+            "missing_venues": [],
+            "source_lower_bound_note": None,
+            "depth_coverage_by_venue": depth,
+        },
+        "peg": {
+            "state": "within_threshold",
+            "pair": "USDT/USD",
+            "source": "coinbase USDT-USD ticker",
+            "price": 0.999,
+            "deviation": 0.001,
+            "warn_threshold": 0.005,
+            "depeg_flag": False,
+            "observation_at": "2026-09-02T11:59:05Z",
+        },
+        "source": {
+            "url": UNDERTOW_URL,
+            "pack": "crypto_desk.json",
+            "source_schema": "undertow.crypto_desk.v2",
+            "raw_sha256": "1" * 64,
+            "canonical_sha256": "2" * 64,
+            "pit_input_sha256": "3" * 64,
+            "deployed_sha": "4" * 40,
+        },
+        "pit": {
+            "state": "verified",
+            "board_content_sha256": "5" * 64,
+            "ledger": "data/_pit/board.jsonl",
+            "key": "2026-09-02T11:59:20Z",
+            "revision": 3,
+            "record_hash": "6" * 64,
+            "chain_verified": True,
+            "head_verified": True,
+        },
+        "clocks": {
+            "observation_at": "2026-09-02T11:59:05Z",
+            "oldest_observation_at": "2026-09-02T11:59:00Z",
+            "venue_observation_at_by_venue": {
+                venue: f"2026-09-02T11:59:0{index}Z"
+                for index, venue in enumerate(sorted(UNDERTOW_REQUIRED_VENUES))
+            },
+            "max_observation_skew_seconds": 5.0,
+            "max_observation_skew_allowed_seconds": 300,
+            "knowledge_at": "2026-09-02T11:59:20Z",
+            "retrieved_at": "2026-09-02T11:59:40Z",
+            "expires_at": "2026-09-02T13:59:00Z",
+        },
+        "rights": {
+            "status": "approved",
+            "manifest": "trade_safety_exit_rights.json",
+            "manifest_schema": "undertow.trade-safety-exit-rights.v1",
+            "manifest_version": "2026-09-02.review.1",
+            "reviewed_by": "reviewer@example.invalid",
+            "reviewed_at": "2026-09-02T11:00:00Z",
+            "valid_from": "2026-09-02T00:00:00Z",
+            "valid_until": "2026-12-01T00:00:00Z",
+            "raw_sha256": "7" * 64,
+            "canonical_sha256": "8" * 64,
+            "pit_input_sha256": "9" * 64,
+            "scope": "derived_metadata_only",
+            "raw_order_books_included": False,
+            "redistribution": "derived_metrics_only",
+            "venue_states": {
+                venue: "approved" for venue in sorted(UNDERTOW_REQUIRED_VENUES)
+            },
+            "venue_reviewed_at_by_venue": {
+                venue: "2026-09-02T11:00:00Z"
+                for venue in sorted(UNDERTOW_REQUIRED_VENUES)
+            },
+            "venue_proof_sha256_by_venue": {
+                venue: hashlib.sha256(venue.encode()).hexdigest()
+                for venue in sorted(UNDERTOW_REQUIRED_VENUES)
+            },
+        },
+        "authority": {
+            "state": "context_only",
+            "mode": mode,
+            "paper_only": True,
+            "execution_authority": False,
+            "can_authorize_order": False,
+            "can_route_order": False,
+            "can_place_order": False,
+            "can_modify_order": False,
+            "can_cancel_order": False,
+            "can_clear_other_controls": False,
+            "can_increase_risk": False,
+            "executable_quote": False,
+            "real_money_eligible": False,
+        },
+        "limitations": [
+            "band_interpolated_estimate_not_a_book_walk",
+            "not_an_executable_quote_or_broker_preview",
+            "exact_published_rungs_only_no_nearest_floor_or_interpolation",
+            "context_cannot_clear_another_trade_safety_control",
+        ],
+    }
+    return _mcp_response(
+        "trade-safety-undertow-v1", _sealed(payload, "context_sha256")
     )
 
 
@@ -139,6 +349,46 @@ def _liquilens_bytes() -> bytes:
             "sensitive_to_contract": {"must_not": "be projected"},
         }
     )
+
+
+def _set_path(value: dict[str, Any], path: tuple[str, ...], replacement: Any) -> None:
+    target = value
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = replacement
+
+
+def _mutated_seiche(
+    path: tuple[str, ...], value: Any, *, reseal: bool = True
+) -> bytes:
+    payload = json.loads(_seiche_bytes())
+    _set_path(payload, path, value)
+    if reseal:
+        payload = _sealed(payload, "projection_sha256")
+    return _json_bytes(payload)
+
+
+def _mutated_undertow(
+    path: tuple[str, ...],
+    value: Any,
+    *,
+    request_hash: str | None = None,
+    reseal: bool = True,
+) -> bytes:
+    envelope = json.loads(_undertow_bytes(request_hash=request_hash))
+    payload = envelope["result"]["structuredContent"]
+    _set_path(payload, path, value)
+    if reseal:
+        envelope["result"]["structuredContent"] = _sealed(
+            payload, "context_sha256"
+        )
+    return _json_bytes(envelope)
+
+
+def _mutated_undertow_envelope(path: tuple[str, ...], value: Any) -> bytes:
+    envelope = json.loads(_undertow_bytes())
+    _set_path(envelope, path, value)
+    return _json_bytes(envelope)
 
 
 class FakeUpstream:
@@ -269,7 +519,7 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         health = client.get("/healthz")
         assert health.status_code == 200
         assert health.json()["state"] == "read_only_sandbox"
-        assert health.json()["version"] == SERVICE_VERSION == "0.1.2"
+        assert health.json()["version"] == SERVICE_VERSION == "0.1.3"
         assert health.json()["source_revision"] == SERVICE_REVISION
         assert health.headers["x-trade-safety-execution"] == "disabled"
         assert health.headers["x-trade-safety-authority"] == "read-only"
@@ -317,13 +567,197 @@ def test_paper_receipt_can_pass_and_limit_and_hashes_exact_source_bytes() -> Non
         assert passed["evidence"]["seiche"]["state"] == "context_only"
         assert passed["evidence"]["seiche"]["as_of"] == "2026-08-26T00:00:00Z"
         assert passed["evidence"]["undertow"]["executable_quote"] is False
-        assert passed["evidence"]["undertow"]["source_schema"] is None
+        assert passed["evidence"]["undertow"]["source_schema"] == (
+            "undertow.trade-safety-exit-context.v1"
+        )
 
         limited_policy = _policy()
         limited_policy["max_exit_cost_bps"] = 5.0
         limited = _post_check(client, request, limited_policy).json()
         assert limited["decision"]["outcome"] == "limit"
         assert "max_exit_cost_bps_exceeded" in limited["decision"]["reason_codes"]
+
+
+def test_native_contract_calls_bind_and_retain_proof_rights_and_clocks() -> None:
+    fake = FakeUpstream()
+    request = _request()
+    request_hash = trade_safety_request_hash(request)
+    with _client(fake) as client:
+        receipt = _post_check(client, request).json()
+
+    assert fake.calls[0] == ("GET", SEICHE_URL, None)
+    undertow_call = next(call for call in fake.calls if call[1] == UNDERTOW_URL)
+    assert undertow_call == (
+        "POST",
+        UNDERTOW_URL,
+        {
+            "jsonrpc": "2.0",
+            "id": "trade-safety-undertow-v1",
+            "method": "tools/call",
+            "params": {
+                "name": "trade_safety_exit_context",
+                "arguments": {
+                    "request_hash": request_hash,
+                    "mode": "paper",
+                    "instrument": "BTC/USD",
+                    "side": "sell",
+                    "venue": None,
+                    "requested_size_usd": 1_000.0,
+                },
+            },
+        },
+    )
+    seiche = receipt["evidence"]["seiche"]
+    undertow = receipt["evidence"]["undertow"]
+    assert seiche["facts"]["gateway_binding"]["request_hash"] == request_hash
+    assert seiche["facts"]["clocks"]["evidence_as_of"] == seiche["as_of"]
+    assert seiche["facts"]["attestation"]["ledger_read"] is False
+    assert seiche["facts"]["staleness"]["total"] == 6
+    assert undertow["facts"]["gateway_binding"]["request_hash"] == request_hash
+    assert undertow["facts"]["native_request"]["request_hash"] == request_hash
+    assert undertow["facts"]["source"] == {
+        "url": UNDERTOW_URL,
+        "pack": "crypto_desk.json",
+        "source_schema": "undertow.crypto_desk.v2",
+        "raw_sha256": "1" * 64,
+        "canonical_sha256": "2" * 64,
+        "pit_input_sha256": "3" * 64,
+        "deployed_sha": "4" * 40,
+    }
+    assert undertow["facts"]["pit"]["chain_verified"] is True
+    assert undertow["facts"]["pit"]["head_verified"] is True
+    assert undertow["facts"]["rights"]["status"] == "approved"
+    assert undertow["facts"]["rights"]["scope"] == "derived_metadata_only"
+    assert undertow["facts"]["clocks"]["expires_at"] == (
+        "2026-09-02T13:59:00Z"
+    )
+    assert set(undertow["facts"]["authority"].values()) <= {
+        False,
+        True,
+        "context_only",
+        "paper",
+    }
+    assert receipt["request_hash"] == request_hash
+    assert receipt["decision"]["outcome"] == "pass"
+
+    for section in (seiche, undertow):
+        binding = dict(section["facts"]["gateway_binding"])
+        binding_sha256 = binding.pop("binding_sha256")
+        assert binding_sha256 == hashlib.sha256(_json_bytes(binding)).hexdigest()
+
+
+def test_observe_request_is_bound_without_becoming_an_enforcement_or_order() -> None:
+    request = _request(mode="observe")
+    request_hash = trade_safety_request_hash(request)
+    fake = FakeUpstream()
+    fake.responses[UNDERTOW_URL] = _undertow_bytes(
+        request_hash=request_hash, mode="observe"
+    )
+    with _client(fake) as client:
+        receipt = _post_check(client, request).json()
+    assert receipt["decision"]["outcome"] == "pass"
+    assert receipt["decision"]["enforced"] is False
+    assert receipt["evidence"]["undertow"]["facts"]["authority"]["mode"] == (
+        "observe"
+    )
+    assert receipt["evidence"]["undertow"]["facts"]["authority"][
+        "can_place_order"
+    ] is False
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "reseal"),
+    [
+        (("unexpected",), "extension", True),
+        (("can_authorize_order",), True, True),
+        (("projection_sha256",), "f" * 64, False),
+        (("clocks", "evidence_age_seconds"), 1, True),
+        (("staleness", "total"), 999, True),
+        (("status",), "unavailable", True),
+    ],
+)
+def test_seiche_adversarial_native_context_fails_typed_unavailable(
+    path: tuple[str, ...], value: Any, reseal: bool
+) -> None:
+    fake = FakeUpstream()
+    fake.responses[SEICHE_URL] = _mutated_seiche(path, value, reseal=reseal)
+    with _client(fake) as client:
+        response = _post_check(client, _request())
+    receipt = response.json()
+    section = receipt["evidence"]["seiche"]
+    assert response.status_code == 200
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["source_sha256"] == hashlib.sha256(
+        fake.responses[SEICHE_URL]
+    ).hexdigest()
+    assert "seiche_upstream_contract_unavailable_or_invalid" in section[
+        "limitations"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("path", "value", "reseal"),
+    [
+        (("unexpected",), "extension", True),
+        (("context_sha256",), "f" * 64, False),
+        (("status",), "unavailable", True),
+        (("request_hash",), "b" * 64, True),
+        (("request", "request_hash"), "b" * 64, True),
+        (("source", "deployed_sha"), "bad", True),
+        (("pit", "chain_verified"), False, True),
+        (("rights", "status"), "pending_owner_review", True),
+        (("rights", "venue_proof_sha256_by_venue", "okx"), "bad", True),
+        (("authority", "can_route_order"), True, True),
+        (("coverage", "priced_venues"), ["binance"], True),
+        (("clocks", "expires_at"), "2026-09-02T12:00:00Z", True),
+    ],
+)
+def test_undertow_adversarial_native_context_fails_typed_unavailable(
+    path: tuple[str, ...], value: Any, reseal: bool
+) -> None:
+    request = _request()
+    request_hash = trade_safety_request_hash(request)
+    fake = FakeUpstream()
+    raw = _mutated_undertow(
+        path, value, request_hash=request_hash, reseal=reseal
+    )
+    fake.responses[UNDERTOW_URL] = raw
+    with _client(fake) as client:
+        response = _post_check(client, request)
+    receipt = response.json()
+    section = receipt["evidence"]["undertow"]
+    assert response.status_code == 200
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["source_sha256"] == hashlib.sha256(raw).hexdigest()
+    assert "undertow_trade_safety_context_unavailable_or_invalid" in section[
+        "limitations"
+    ]
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("result", "isError"), "false"),
+        (("result", "unexpected"), "extension"),
+        (("unexpected",), "extension"),
+        (("result", "content"), {"type": "text"}),
+    ],
+)
+def test_undertow_adversarial_mcp_envelope_fails_typed_unavailable(
+    path: tuple[str, ...], value: Any
+) -> None:
+    fake = FakeUpstream()
+    raw = _mutated_undertow_envelope(path, value)
+    fake.responses[UNDERTOW_URL] = raw
+    with _client(fake) as client:
+        receipt = _post_check(client, _request()).json()
+    section = receipt["evidence"]["undertow"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["facts"] == {}
+    assert section["source_sha256"] == hashlib.sha256(raw).hexdigest()
 
 
 def test_unsupported_and_invalid_size_never_calls_undertow() -> None:
@@ -496,14 +930,15 @@ def test_malformed_venue_cost_values_fail_closed() -> None:
     assert receipt["decision"]["outcome"] == "unavailable"
 
 
-def test_fresh_seiche_wrapper_does_not_reset_stale_observation_clock() -> None:
+def test_fresh_seiche_wrapper_cannot_hide_stale_native_evidence_clock() -> None:
     fake = FakeUpstream()
     fake.responses[SEICHE_URL] = _seiche_bytes(oldest_headline_asof="2026-08-20")
     with _client(fake) as client:
         receipt = _post_check(client, _request()).json()
-    assert receipt["evidence"]["seiche"]["as_of"] == "2026-08-20T00:00:00Z"
+    assert receipt["evidence"]["seiche"]["state"] == "unavailable"
+    assert receipt["evidence"]["seiche"]["as_of"] is None
     assert receipt["decision"]["outcome"] == "unavailable"
-    assert "seiche_evidence_too_old" in receipt["decision"]["reason_codes"]
+    assert "seiche_evidence_unavailable" in receipt["decision"]["reason_codes"]
 
 
 def test_every_section_and_broker_preview_bind_the_exact_order_hash() -> None:
@@ -539,6 +974,25 @@ def test_live_mode_is_deterministically_unavailable() -> None:
     assert receipt["broker_preview"]["facts"] == {}
     assert "broker_preview_unavailable" in receipt["decision"]["reason_codes"]
     assert receipt["authority"]["can_execute"] is False
+    assert not any(url == UNDERTOW_URL for _method, url, _body in fake.calls)
+
+
+def test_buy_order_never_reaches_sell_only_undertow_context() -> None:
+    fake = FakeUpstream()
+    request = _request()
+    request["order"]["side"] = "buy"
+    with _client(fake) as client:
+        receipt = _post_check(client, request).json()
+        authority = client.get("/v1/capabilities").json()["authority"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert receipt["evidence"]["undertow"]["limitations"] == [
+        "undertow_trade_safety_context_supports_only_sell_orders"
+    ]
+    assert not any(url == UNDERTOW_URL for _method, url, _body in fake.calls)
+    assert authority["can_execute"] is False
+    assert authority["can_route_order"] is False
+    assert authority["can_custody"] is False
+    assert authority["can_settle"] is False
 
 
 def test_liquilens_is_conditional_fixed_base_and_projects_only_allowed_facts() -> None:
