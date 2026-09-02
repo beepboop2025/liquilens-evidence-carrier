@@ -133,7 +133,7 @@ wheels = [
 
 [[package]]
 name = "liquilens-evidence"
-version = "0.18.0"
+version = "0.19.0"
 source = { editable = "../../" }
 
 [package.metadata]
@@ -149,7 +149,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "liquilens-trade-safety-gateway"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },

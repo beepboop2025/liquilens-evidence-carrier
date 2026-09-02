@@ -5,6 +5,10 @@ directory contains machine contracts and downstream gates that can be adopted
 without a negotiated marketplace listing:
 
 - `fdc3/` validates the namespaced financial-desktop context;
+- `typescript/` provides a dependency-free raw-UTF8 Trade Safety verifier,
+  TypeScript declarations, and authenticated paper-only order guard;
+- `openbb/` provides offline carrier and hash-only Trade Safety receipt
+  verification without accepting authentication secrets;
 - `trade-safety-gateway/` implements the fixed-upstream, read-only public
   sandbox; it has no broker credentials or execution route;
 - `openlineage/` validates the custom lineage facet;

@@ -26,9 +26,9 @@ def _working_tree_text(path: str) -> str:
 
 
 def test_current_candidate_metadata_passes_preflight_validation():
-    metadata = validate_candidate_metadata(_working_tree_text, "0.18.0")
+    metadata = validate_candidate_metadata(_working_tree_text, "0.19.0")
     assert metadata["mcpb_sha256"] == (
-        "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+        "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74"
     )
 
 
@@ -39,7 +39,7 @@ def test_version_mismatch_fails_before_tag_creation():
         return _working_tree_text(path)
 
     with pytest.raises(PreflightError, match="VERSION"):
-        validate_candidate_metadata(mismatched, "0.18.0")
+        validate_candidate_metadata(mismatched, "0.19.0")
 
 
 def test_placeholder_mcpb_digest_fails_before_tag_creation():
@@ -47,13 +47,30 @@ def test_placeholder_mcpb_digest_fails_before_tag_creation():
         text = _working_tree_text(path)
         if path == "server.json":
             return text.replace(
-                "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb",
+                "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74",
                 "0" * 64,
             )
         return text
 
     with pytest.raises(PreflightError, match="placeholder"):
-        validate_candidate_metadata(placeholder, "0.18.0")
+        validate_candidate_metadata(placeholder, "0.19.0")
+
+
+def test_protocol_catalog_keeps_schema_artifacts_separate_from_conformance():
+    catalog = __import__("json").loads(_working_tree_text("protocol/catalog.json"))
+    assert catalog["conformance"][0]["kind"] == "conformance-corpus"
+    assert all(item["path"].endswith(".schema.json") for item in catalog["artifacts"])
+
+    def misplaced(path: str) -> str:
+        if path != "protocol/catalog.json":
+            return _working_tree_text(path)
+        changed = dict(catalog)
+        changed["artifacts"] = [*catalog["artifacts"], catalog["conformance"][0]]
+        changed["conformance"] = []
+        return __import__("json").dumps(changed)
+
+    with pytest.raises(PreflightError, match="schema-only"):
+        validate_candidate_metadata(misplaced, "0.19.0")
 
 
 def test_manual_preflight_workflow_has_no_tag_write_authority():
@@ -85,7 +102,7 @@ def test_manual_preflight_workflow_has_no_tag_write_authority():
 def test_git_like_inputs_fail_before_any_network_call(field, value, message):
     arguments = {
         "commit": "a" * 40,
-        "version": "0.18.0",
+        "version": "0.19.0",
         "remote": "origin",
         "branch": "main",
     }

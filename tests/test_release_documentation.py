@@ -6,11 +6,14 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_VERSION = "0.18.0"
+SOURCE_VERSION = "0.19.0"
 SOURCE_MCPB_SHA256 = (
-    "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+    "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74"
 )
-GATEWAY_VERSION = "0.1.1"
+SOURCE_README_SHA256 = (
+    "2d1b4dce5431451510d786f70a5a8e401180f4dd8e4820025e101444e5a97aa6"
+)
+GATEWAY_VERSION = "0.1.2"
 CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
 CANONICAL_SITE_WORKFLOW = "33592149926"
 RELEASE_VERSION = "0.18.0"
@@ -87,6 +90,9 @@ def test_main_facing_docs_record_published_v0180_and_preserve_history():
     previous_release = (
         ROOT / f"docs/RELEASE-{PREVIOUS_VERSION}.md"
     ).read_text(encoding="utf-8")
+    candidate_release = (
+        ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md"
+    ).read_text(encoding="utf-8")
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     normalized_release = " ".join(release_receipt.split())
@@ -130,13 +136,18 @@ def test_main_facing_docs_record_published_v0180_and_preserve_history():
     for text in (readme, distribution, changelog, release_receipt):
         assert CANONICAL_SITE_REVISION in text
         assert CANONICAL_SITE_WORKFLOW in text
+    for text in (readme, distribution, changelog, candidate_release):
         assert SOURCE_MCPB_SHA256 in text
 
-    assert f"source checkpoint prepares `v{SOURCE_VERSION}`" not in readme
-    assert "not yet tagged, published, or registered" not in normalized_readme
+    assert f"source checkpoint prepares `v{SOURCE_VERSION}`" in readme
+    assert "not yet tagged, published, or registered" in normalized_readme
     assert "No v0.18.0 tag object" not in release_receipt
     assert f"## [{SOURCE_VERSION}] - 2026-09-02" in changelog
-    assert "No `v0.18.0` tag, GitHub release" not in changelog
+    assert "No `v0.19.0` tag, GitHub release" in changelog
+    assert "prepared source; not tagged, published, registered, or" in (
+        candidate_release
+    )
+    assert "There is no v0.19.0 tag object" in candidate_release
 
     for text in (readme, failed_release):
         assert FAILED_TAG_OBJECT in text
@@ -159,7 +170,7 @@ def test_main_facing_docs_record_published_v0180_and_preserve_history():
     assert "The release can publish" not in failed_release
     assert "Published release `v0.18.0` provides" in readme
 
-    published_record = f"{release_receipt}\n{distribution}"
+    published_record = release_receipt
     for stale_claim in (
         "not tagged, published, or registered",
         "No v0.18.0 tag object",
@@ -258,6 +269,17 @@ def test_published_v0180_embedded_readme_stays_reproducible():
     assert "not publication proof" in frozen_text
     assert "No such publication receipt is asserted" in normalized_frozen
     assert frozen.read_bytes() != (ROOT / "README.md").read_bytes()
+
+
+def test_candidate_v0190_embedded_readme_matches_registry_digest_input():
+    candidate = ROOT / "mcpb/release-readmes" / f"{SOURCE_VERSION}.md"
+    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == (
+        SOURCE_README_SHA256
+    )
+    normalized = " ".join(candidate.read_text(encoding="utf-8").split())
+    assert "bytes prepared for the v0.19.0 MCPB candidate" in normalized
+    assert "No such publication receipt is asserted" in normalized
+    assert candidate.read_bytes() != (ROOT / "README.md").read_bytes()
 
 
 def test_published_v0171_embedded_readme_stays_reproducible():

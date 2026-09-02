@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -82,6 +83,14 @@ def validate_candidate_metadata(
         read_text("integrations/trade-safety-gateway/pyproject.toml"),
         "integrations/trade-safety-gateway/pyproject.toml",
     )
+    openbb = _toml(
+        read_text("integrations/openbb/pyproject.toml"),
+        "integrations/openbb/pyproject.toml",
+    )
+    typescript = _json(
+        read_text("integrations/typescript/package.json"),
+        "integrations/typescript/package.json",
+    )
     root_lock = _toml(read_text("uv.lock"), "uv.lock")
     gateway_lock = _toml(
         read_text("integrations/trade-safety-gateway/uv.lock"),
@@ -140,8 +149,61 @@ def validate_candidate_metadata(
         raise PreflightError(
             "gateway dependency does not pin the exact candidate core version"
         )
+    _require_equal(
+        "gateway package version",
+        gateway.get("project", {}).get("version"),
+        "0.1.2",
+    )
+    _require_equal(
+        "OpenBB package version",
+        openbb.get("project", {}).get("version"),
+        "0.2.0",
+    )
+    expected_openbb_pin = (
+        "liquilens-evidence @ https://github.com/beepboop2025/"
+        "liquilens-evidence-carrier/releases/download/v0.18.0/"
+        "liquilens_evidence-0.18.0-py3-none-any.whl#sha256="
+        "9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef"
+    )
+    if expected_openbb_pin not in openbb.get("project", {}).get("dependencies", []):
+        raise PreflightError("OpenBB dependency must pin the released v0.18.0 wheel")
+    _require_equal("TypeScript package name", typescript.get("name"), "@liquilens/trade-safety")
+    _require_equal("TypeScript package version", typescript.get("version"), "0.1.0")
+    if "dependencies" in typescript:
+        raise PreflightError("TypeScript runtime must not declare dependencies")
+    schema_entries = catalog.get("artifacts", [])
+    if not isinstance(schema_entries, list) or not schema_entries:
+        raise PreflightError("catalog artifacts must be a non-empty schema list")
+    if any(
+        not isinstance(artifact, dict)
+        or not str(artifact.get("path", "")).endswith(".schema.json")
+        for artifact in schema_entries
+    ):
+        raise PreflightError("catalog artifacts must remain schema-only")
+    corpus_entries = [
+        artifact
+        for artifact in catalog.get("conformance", [])
+        if isinstance(artifact, dict)
+        and artifact.get("kind") == "conformance-corpus"
+    ]
+    if len(corpus_entries) != 1:
+        raise PreflightError("catalog must declare exactly one conformance corpus")
+    corpus_text = read_text("protocol/conformance/trade-safety-v1/corpus.json")
+    corpus_digest = hashlib.sha256(corpus_text.encode("utf-8")).hexdigest()
+    _require_equal(
+        "conformance corpus SHA-256",
+        corpus_entries[0].get("sha256"),
+        corpus_digest,
+    )
 
-    return {**versions, "mcpb_sha256": digest}
+    return {
+        **versions,
+        "gateway package": "0.1.2",
+        "OpenBB package": "0.2.0",
+        "TypeScript package": "0.1.0",
+        "conformance_sha256": corpus_digest,
+        "mcpb_sha256": digest,
+    }
 
 
 def _git(

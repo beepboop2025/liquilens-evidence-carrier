@@ -258,6 +258,11 @@ _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
         "catalog.json",
         "Version and SHA-256 catalog for the installed protocol artifacts.",
     ),
+    "liquilens-evidence://protocol/trade-safety-conformance": (
+        "Trade Safety v1 adversarial conformance corpus",
+        "conformance/trade-safety-v1/corpus.json",
+        "Raw-byte pass, non-pass, tamper, lexical, expiry and replay vectors.",
+    ),
 }
 
 

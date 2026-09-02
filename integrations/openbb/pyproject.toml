@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openbb-liquilens-evidence"
-version = "0.1.0"
+version = "0.2.0"
 description = "Offline LiquiLens evidence verification for OpenBB"
 readme = "README.md"
 license = "Apache-2.0"
@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "openbb-core>=1.6.13,<2",
-    "liquilens-evidence @ https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.14.0/liquilens_evidence-0.14.0-py3-none-any.whl#sha256=f0162affab57307c8e20acf91dcefc33840f91e8cf9969a8d5ec8d8df860cd24",
+    "liquilens-evidence @ https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.18.0/liquilens_evidence-0.18.0-py3-none-any.whl#sha256=9fbc7ee50f658e2a8d1d880f8f76d73dca8b07ef6f0747df33a7b9fc346495ef",
 ]
 
 [project.optional-dependencies]

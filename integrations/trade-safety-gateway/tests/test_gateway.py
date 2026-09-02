@@ -92,6 +92,8 @@ def _undertow_bytes(
     rung: float = 1_000.0,
     worst: float = 10.0,
     spread: float = 8.0,
+    unable: list[str] | None = None,
+    venue_costs: dict[str, Any] | None = None,
 ) -> bytes:
     return _mcp_response(
         "trade-safety-undertow-v1",
@@ -101,11 +103,12 @@ def _undertow_bytes(
             "asset": "BTC",
             "requested_size_usd": requested,
             "published_rung_used_usd": rung,
-            "sell_cost_bp_by_venue": {"venue-a": 2.0, "venue-b": worst},
+            "sell_cost_bp_by_venue": venue_costs
+            or {"venue-a": 2.0, "venue-b": worst},
             "best": {"venue": "venue-a", "sell_bp": 2.0},
             "worst": {"venue": "venue-b", "sell_bp": worst},
             "venue_spread_bp": spread,
-            "unable_at_observed_depth": [],
+            "unable_at_observed_depth": unable or [],
         },
     )
 
@@ -162,6 +165,7 @@ def _request(
     currency: str = "USD",
     institution_slug: str | None = None,
     extensions: dict[str, Any] | None = None,
+    venue: str | None = None,
 ) -> dict[str, Any]:
     scopes = {
         "observe": ["evidence:read"],
@@ -199,7 +203,7 @@ def _request(
             "quantity": None,
             "limit_price": None,
             "stop_price": None,
-            "venue": None,
+            "venue": venue,
             "time_in_force": "IOC",
         },
         "policy_ref": {"policy_id": "sandbox-default", "version": "1.0.0"},
@@ -255,7 +259,7 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         health = client.get("/healthz")
         assert health.status_code == 200
         assert health.json()["state"] == "read_only_sandbox"
-        assert health.json()["version"] == SERVICE_VERSION == "0.1.1"
+        assert health.json()["version"] == SERVICE_VERSION == "0.1.2"
         assert health.json()["source_revision"] == SERVICE_REVISION
         assert health.headers["x-trade-safety-execution"] == "disabled"
         assert health.headers["x-trade-safety-authority"] == "read-only"
@@ -355,6 +359,87 @@ def test_source_errors_and_nearest_rung_mismatch_fail_closed() -> None:
         assert section["state"] == "unavailable"
         assert section["facts"] == {}
         assert section["source_sha256"] == hashlib.sha256(mismatch_raw).hexdigest()
+
+
+def test_unmeasured_depth_and_forged_spread_make_undertow_unavailable() -> None:
+    unable_fake = FakeUpstream()
+    unable_raw = _undertow_bytes(unable=["venue-c"])
+    unable_fake.responses[UNDERTOW_URL] = unable_raw
+    with _client(unable_fake) as client:
+        receipt = _post_check(client, _request()).json()
+    section = receipt["evidence"]["undertow"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["facts"] == {}
+    assert section["source_sha256"] == hashlib.sha256(unable_raw).hexdigest()
+
+    spread_fake = FakeUpstream()
+    spread_raw = _undertow_bytes(spread=7.0)
+    spread_fake.responses[UNDERTOW_URL] = spread_raw
+    with _client(spread_fake) as client:
+        receipt = _post_check(client, _request()).json()
+    section = receipt["evidence"]["undertow"]
+    assert receipt["decision"]["outcome"] == "unavailable"
+    assert section["state"] == "unavailable"
+    assert section["source_sha256"] == hashlib.sha256(spread_raw).hexdigest()
+
+
+def test_unsupported_venue_and_malformed_sizes_never_reach_undertow() -> None:
+    for request in (
+        _request(venue="venue-a"),
+        _request(amount=5_000.0),
+        _request(amount=10**30),
+    ):
+        request["request_id"] = "gateway-paper-unsupported-undertow-input"
+        fake = FakeUpstream()
+        with _client(fake) as client:
+            receipt = _post_check(client, request).json()
+        assert receipt["decision"]["outcome"] == "unavailable"
+        assert receipt["evidence"]["undertow"]["state"] == "unavailable"
+        assert not any(url == UNDERTOW_URL for _method, url, _body in fake.calls)
+
+    for amount in (True, "1000", -1.0):
+        fake = FakeUpstream()
+        request = _request()
+        request["order"]["notional"]["amount"] = amount
+        with _client(fake) as client:
+            response = _post_check(client, request)
+        assert response.status_code == 422
+        assert fake.calls == []
+
+    fake = FakeUpstream()
+    body = _json_bytes({"request": _request(), "policy": _policy()}).replace(
+        b'"amount":1000.0', b'"amount":NaN'
+    )
+    with _client(fake) as client:
+        response = client.post(
+            "/v1/check", content=body, headers={"content-type": "application/json"}
+        )
+    assert response.status_code == 400
+    assert fake.calls == []
+
+
+def test_malformed_venue_cost_values_fail_closed() -> None:
+    malformed = (
+        {"venue-a": 2.0, "venue-b": True},
+        {"venue-a": 2.0, "venue-b": "10"},
+        {"venue-a": 2.0, "venue-b": -1.0},
+    )
+    for costs in malformed:
+        fake = FakeUpstream()
+        raw = _undertow_bytes(venue_costs=costs)
+        fake.responses[UNDERTOW_URL] = raw
+        with _client(fake) as client:
+            receipt = _post_check(client, _request()).json()
+        assert receipt["decision"]["outcome"] == "unavailable"
+        assert receipt["evidence"]["undertow"]["state"] == "unavailable"
+
+    fake = FakeUpstream()
+    raw = _undertow_bytes().replace(b'"venue-b":10.0', b'"venue-b":NaN')
+    fake.responses[UNDERTOW_URL] = raw
+    with _client(fake) as client:
+        receipt = _post_check(client, _request()).json()
+    assert receipt["decision"]["outcome"] == "unavailable"
 
 
 def test_fresh_seiche_wrapper_does_not_reset_stale_observation_clock() -> None:

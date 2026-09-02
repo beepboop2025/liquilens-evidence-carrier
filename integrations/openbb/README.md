@@ -4,10 +4,10 @@ This standalone OpenBB router extension verifies an already-supplied LiquiLens
 Evidence Carrier without fetching market data. It is deliberately not an OpenBB
 data-provider extension.
 
-The single command is exposed as `obb.liquilens.verify(data=...)` in the Python
-interface and `POST /api/v1/liquilens/verify` through OpenBB's REST interface.
-It verifies carrier identity, clocks, rights, and the strict export disposition,
-then returns only bounded status metadata. It never returns the carrier payload.
+The extension exposes `obb.liquilens.verify(data=...)` for evidence carriers and
+`obb.liquilens.verify_trade_safety(data=...)` for hash-only Trade Safety v1
+receipts. Both commands are offline and return bounded status metadata without
+returning the supplied carrier, request, policy, or evidence payload.
 
 ## Install
 
@@ -28,8 +28,10 @@ python -m pip install \
   "git+https://github.com/beepboop2025/liquilens-evidence-carrier.git@f4e9d6fb6bb20abbe6fc4625bd8c0f3279b48674#subdirectory=integrations/openbb"
 ```
 
-The package also pins the LiquiLens verifier dependency to the immutable v0.14.0
-GitHub release wheel and its SHA-256 digest.
+The package pins the LiquiLens verifier dependency to the immutable v0.18.0
+GitHub release wheel and SHA-256 digest. That is the first released core with
+the authenticated paper-order guard; this OpenBB command remains secret-free
+and read-only.
 
 ## Python interface
 
@@ -45,8 +47,30 @@ result = obb.liquilens.verify(
 print(result.results)
 ```
 
-Omit `evaluated_at` to evaluate policy at the current UTC instant. Supplying it
-explicitly makes a research notebook or audit replay deterministic.
+Verify a hash-only Trade Safety receipt at a required deterministic clock:
+
+```python
+result = obb.liquilens.verify_trade_safety(
+    data={
+        "receipt": receipt_json,
+        "evaluated_at": "2026-09-02T12:00:30Z",
+    }
+)
+print(result.results)
+```
+
+HMAC receipts fail closed here because sending tenant secrets through a general
+analytics router would widen the trust boundary. Authenticate and enforce those
+receipts only in the tenant-local Python or TypeScript paper-order guard.
+
+`verify_trade_safety` requires `evaluated_at` so notebook and audit replay is
+deterministic. The carrier-only `verify` command may omit its evaluation time
+and use the current UTC instant.
+
+OpenBB supplies an already-parsed Python object, so this command is a convenient
+offline status verifier, not a lossless raw-UTF8 boundary. Use the packaged
+Node verifier on original bytes when duplicate keys, invalid UTF-8, or exact
+numeric lexemes must be proven.
 
 ## Boundary
 

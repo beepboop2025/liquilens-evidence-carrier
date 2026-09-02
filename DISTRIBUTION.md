@@ -18,6 +18,16 @@ published 19 assets at `2026-09-02T05:14:06Z`; all 18 entries in the downloaded
 subjects. The official MCP Registry record was independently verified
 active/latest at 0.18.0.
 
+The source now prepares core `v0.19.0`, gateway `0.1.2`, OpenBB extension
+`0.2.0`, and TypeScript-compatible Node package `0.1.0`. These candidate assets
+add raw-byte conformance and paper-only enforcement but are not yet tagged,
+published, registered, or deployed. Until their exact protected-main release
+receipts exist, the public production pin remains v0.18.0 and live orders remain
+unconditionally held.
+The prepared deterministic MCPB SHA-256 is
+`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+the future asset URL is not claimed live.
+
 Core `v0.18.0` adds an authenticated paper-order guard, preserves the v1
 protocol bytes, and keeps live submission held. Its separately packaged Trade
 Safety gateway `0.1.1` raises the dependency floor beyond the identified
@@ -129,10 +139,12 @@ binds the exact index digest to candidate
 `906ca033a96ea862ab813c64db2a6b01c5ce8c4f` and `container.yml` on the v0.18.0
 tag.
 
-The independently versioned dedicated MCP image remains at its v0.15.0
-receipt. It defaults to the stdio server and runs as UID/GID 65532, but it does
-not contain the v0.18.0 Trade Safety verifier. Keep the evidence mount read-only
-and disable network access:
+The currently published independently versioned dedicated MCP image remains at
+its v0.15.0 receipt. It defaults to the stdio server and runs as UID/GID 65532,
+but it does not contain the v0.18.0 Trade Safety verifier. The source candidate
+updates its controlled workflow to target v0.19.0 and resolve the exact attested
+v0.19.0 core OCI digest before building; that future artifact has not yet been
+published. Keep the evidence mount read-only and disable network access:
 
 ```bash
 docker run --rm -i --network none --read-only \

@@ -22,9 +22,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  BASE_DIGEST: sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a
-  BASE_IMAGE: ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a
-  RELEASE_TAG: v0.15.0
+  BASE_DIGEST: sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e
+  BASE_IMAGE: ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e
+  RELEASE_TAG: v0.19.0
 
 jobs:
   dispatch-authority:
@@ -113,9 +113,9 @@ jobs:
           build-args: |
             BASE_IMAGE=${{ env.BASE_IMAGE }}
             BASE_DIGEST=${{ env.BASE_DIGEST }}
-            VERSION=0.15.0
+            VERSION=${{ steps.source.outputs.version }}
             BUILD_REVISION=${{ steps.source.outputs.revision }}
-            RELEASE_REVISION=0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c
+            RELEASE_REVISION=${{ steps.source.outputs.revision }}
             CREATED=${{ steps.source.outputs.created }}
             README_URL=https://raw.githubusercontent.com/${{ github.repository }}/${{ steps.source.outputs.revision }}/README.md
           cache-from: type=gha,scope=mcp-container-pr
@@ -140,6 +140,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - name: Verify protected source and signed carrier release
         id: release
         env:
@@ -165,8 +166,15 @@ jobs:
 
           version="${REQUESTED_TAG#v}"
           test "$(cat VERSION)" = "$version"
-          test "$release_commit" = "0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c"
-          gh attestation verify "oci://$BASE_IMAGE" \
+          base_tag="ghcr.io/${GITHUB_REPOSITORY}:${version}"
+          base_digest="$(docker buildx imagetools inspect "$base_tag" \
+            | awk '$1 == "Digest:" {print $2; exit}')"
+          if ! printf '%s\n' "$base_digest" \
+            | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            echo "could not resolve exact core OCI index digest" >&2
+            exit 1
+          fi
+          gh attestation verify "oci://${base_tag}@${base_digest}" \
             --repo "$GITHUB_REPOSITORY"
 
           {
@@ -175,11 +183,12 @@ jobs:
             echo "minor=${version%.*}"
             echo "build_revision=$(git rev-parse HEAD)"
             echo "release_revision=$release_commit"
+            echo "base_digest=$base_digest"
+            echo "base_image=ghcr.io/${GITHUB_REPOSITORY}@${base_digest}"
             echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "readme_url=https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$(git rev-parse HEAD)/README.md"
           } >>"$GITHUB_OUTPUT"
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
-      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
@@ -199,8 +208,8 @@ jobs:
             ${{ env.IMAGE }}:sha-${{ steps.release.outputs.build_revision }}
             ${{ env.IMAGE }}:latest
           build-args: |
-            BASE_IMAGE=${{ env.BASE_IMAGE }}
-            BASE_DIGEST=${{ env.BASE_DIGEST }}
+            BASE_IMAGE=${{ steps.release.outputs.base_image }}
+            BASE_DIGEST=${{ steps.release.outputs.base_digest }}
             VERSION=${{ steps.release.outputs.version }}
             BUILD_REVISION=${{ steps.release.outputs.build_revision }}
             RELEASE_REVISION=${{ steps.release.outputs.release_revision }}
@@ -218,7 +227,7 @@ jobs:
             org.opencontainers.image.vendor=LiquiLens
             org.opencontainers.image.version=${{ steps.release.outputs.version }}
             org.opencontainers.image.base.name=ghcr.io/${{ github.repository }}
-            org.opencontainers.image.base.digest=${{ env.BASE_DIGEST }}
+            org.opencontainers.image.base.digest=${{ steps.release.outputs.base_digest }}
             io.liquilens.evidence.release.revision=${{ steps.release.outputs.release_revision }}
             io.artifacthub.package.category=integration-delivery
             io.artifacthub.package.keywords=finance,evidence,provenance,mcp,offline,read-only
@@ -237,7 +246,7 @@ jobs:
             index:org.opencontainers.image.vendor=LiquiLens
             index:org.opencontainers.image.version=${{ steps.release.outputs.version }}
             index:org.opencontainers.image.base.name=ghcr.io/${{ github.repository }}
-            index:org.opencontainers.image.base.digest=${{ env.BASE_DIGEST }}
+            index:org.opencontainers.image.base.digest=${{ steps.release.outputs.base_digest }}
             index:io.liquilens.evidence.release.revision=${{ steps.release.outputs.release_revision }}
             index:io.artifacthub.package.category=integration-delivery
             index:io.artifacthub.package.keywords=finance,evidence,provenance,mcp,offline,read-only
@@ -260,6 +269,7 @@ jobs:
           EXPECTED_BUILD_REVISION: ${{ steps.release.outputs.build_revision }}
           EXPECTED_RELEASE_REVISION: ${{ steps.release.outputs.release_revision }}
           EXPECTED_VERSION: ${{ steps.release.outputs.version }}
+          EXPECTED_BASE_DIGEST: ${{ steps.release.outputs.base_digest }}
         run: |
           docker buildx imagetools inspect --raw "$IMAGE@$EXPECTED_DIGEST" >mcp-index.json
           python3 - <<'PY'
@@ -277,7 +287,9 @@ jobs:
           annotations = index["annotations"]
           assert annotations["org.opencontainers.image.version"] == os.environ["EXPECTED_VERSION"]
           assert annotations["org.opencontainers.image.revision"] == os.environ["EXPECTED_BUILD_REVISION"]
-          assert annotations["org.opencontainers.image.base.digest"] == os.environ["BASE_DIGEST"]
+          assert annotations["org.opencontainers.image.base.digest"] == os.environ[
+              "EXPECTED_BASE_DIGEST"
+          ]
           assert annotations["io.liquilens.evidence.release.revision"] == os.environ[
               "EXPECTED_RELEASE_REVISION"
           ]
@@ -291,8 +303,8 @@ jobs:
       - name: Smoke the published MCP digest
         env:
           EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
-          LIQUILENS_CLI_IMAGE: ${{ env.BASE_IMAGE }}
-          LIQUILENS_EXPECTED_BASE_DIGEST: ${{ env.BASE_DIGEST }}
+          LIQUILENS_CLI_IMAGE: ${{ steps.release.outputs.base_image }}
+          LIQUILENS_EXPECTED_BASE_DIGEST: ${{ steps.release.outputs.base_digest }}
           LIQUILENS_EXPECTED_RELEASE_REVISION: ${{ steps.release.outputs.release_revision }}
         run: |
           docker pull --platform linux/amd64 "$IMAGE@$EXPECTED_DIGEST"
@@ -310,7 +322,7 @@ jobs:
             echo "- Carrier release: \`${{ steps.release.outputs.tag }}\`"
             echo "- Image source revision: \`${{ steps.release.outputs.build_revision }}\`"
             echo "- Carrier release revision: \`${{ steps.release.outputs.release_revision }}\`"
-            echo "- Base image digest: \`$BASE_DIGEST\`"
+            echo "- Base image digest: \`${{ steps.release.outputs.base_digest }}\`"
             echo "- Platforms: \`linux/amd64\`, \`linux/arm64\`"
             echo "- BuildKit provenance: \`mode=max\`"
             echo "- BuildKit SBOM: enabled"

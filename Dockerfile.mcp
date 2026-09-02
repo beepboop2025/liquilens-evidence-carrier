@@ -1,12 +1,12 @@
-ARG BASE_IMAGE="ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a"
+ARG BASE_IMAGE="ghcr.io/beepboop2025/liquilens-evidence-carrier@sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e"
 
 FROM ${BASE_IMAGE}
 
-ARG VERSION="0.15.0"
-ARG BUILD_REVISION="afeb5ad9f7ab795a23882a9e714156c6aafd59c0"
-ARG RELEASE_REVISION="0d852c06b1a4b0be566c8b4586c9c4c8b8f8f31c"
+ARG VERSION="0.18.0"
+ARG BUILD_REVISION="906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
+ARG RELEASE_REVISION="906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
 ARG CREATED="2026-08-25T20:34:24Z"
-ARG BASE_DIGEST="sha256:d92d7b31850f1788ae910d56035137e422e331f7e07516cce5b546674dbde00a"
+ARG BASE_DIGEST="sha256:293a9ec61ad43f9bac22775936271b19651b486115ab53acbe7928cb177f8c4e"
 ARG README_URL="https://raw.githubusercontent.com/beepboop2025/liquilens-evidence-carrier/afeb5ad9f7ab795a23882a9e714156c6aafd59c0/README.md"
 ARG MAINTAINERS='[{"name":"LiquiLens maintainers","email":"beepboop2025@users.noreply.github.com"}]'
 

@@ -38,7 +38,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.1.1"
+SERVICE_VERSION = "0.1.2"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -699,21 +699,44 @@ def _undertow_section(
     )
     if not venue_costs:
         raise ValueError("Undertow venue costs are empty")
-    normalized_costs: list[float] = []
+    normalized_costs: dict[str, float] = {}
     for venue, cost in venue_costs.items():
         if not isinstance(venue, str) or not venue.strip():
             raise ValueError("Undertow venue name is invalid")
-        normalized_costs.append(_finite_number(cost, f"venue.{venue}"))
+        normalized_costs[venue] = _finite_number(cost, f"venue.{venue}")
+    best = _mapping(payload.get("best"), "best")
+    best_venue = best.get("venue")
+    best_sell = _finite_number(best.get("sell_bp"), "best.sell_bp")
+    if (
+        not isinstance(best_venue, str)
+        or best_venue not in normalized_costs
+        or abs(best_sell - normalized_costs[best_venue]) > 1e-9
+        or abs(best_sell - min(normalized_costs.values())) > 1e-9
+    ):
+        raise ValueError("Undertow best cost does not match venue costs")
     worst = _mapping(payload.get("worst"), "worst")
+    worst_venue = worst.get("venue")
     worst_sell = _finite_number(worst.get("sell_bp"), "worst.sell_bp")
-    if abs(worst_sell - max(normalized_costs)) > 1e-9:
+    if (
+        not isinstance(worst_venue, str)
+        or worst_venue not in normalized_costs
+        or abs(worst_sell - normalized_costs[worst_venue]) > 1e-9
+        or abs(worst_sell - max(normalized_costs.values())) > 1e-9
+    ):
         raise ValueError("Undertow worst cost does not match venue costs")
-    venue_spread = _finite_number(payload.get("venue_spread_bp"), "venue_spread_bp")
     unable = payload.get("unable_at_observed_depth")
     if not isinstance(unable, list) or not all(
-        isinstance(item, str) for item in unable
+        isinstance(item, str) and item.strip() for item in unable
     ):
         raise ValueError("Undertow unable-at-depth field is invalid")
+    if unable:
+        raise ValueError("Undertow could not measure every venue at requested depth")
+    claimed_venue_spread = _finite_number(
+        payload.get("venue_spread_bp"), "venue_spread_bp"
+    )
+    venue_spread = max(normalized_costs.values()) - min(normalized_costs.values())
+    if abs(claimed_venue_spread - venue_spread) > 1e-9:
+        raise ValueError("Undertow venue spread does not match exact venue costs")
     return {
         "product": "undertow",
         "request_hash": request_hash,
@@ -806,6 +829,8 @@ def _liquilens_section(
 
 def _undertow_eligibility(request: Mapping[str, Any]) -> tuple[bool, str]:
     order = request["order"]
+    if order["venue"] is not None:
+        return False, "undertow_has_no_canonical_order_venue_mapping"
     instrument = order["instrument"]
     symbol = str(instrument["symbol"]).strip().upper()
     if instrument["asset_class"] != "crypto" or symbol not in BTC_ALIASES:

@@ -80,7 +80,7 @@ from .trade_safety import (
     verify_trade_safety_receipt,
 )
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 __all__ = [
     "BROKER_PREVIEW_REFERENCE_SCHEMA",

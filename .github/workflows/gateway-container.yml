@@ -1,0 +1,211 @@
+name: Trade Safety Gateway Container
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/gateway-container.yml"
+      - "integrations/trade-safety-gateway/**"
+      - "src/liquilens_evidence/trade_safety.py"
+      - "uv.lock"
+      - "VERSION"
+  push:
+    tags:
+      - "v[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gateway-container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/liquilens-trade-safety-gateway
+
+jobs:
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - name: Resolve exact source identity
+        id: source
+        run: |
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "core_version=$(cat VERSION)"
+          } >>"$GITHUB_OUTPUT"
+      - name: Build native read-only sandbox image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: integrations/trade-safety-gateway/Dockerfile
+          load: true
+          platforms: linux/amd64
+          push: false
+          tags: liquilens-trade-safety-gateway:smoke
+          build-args: |
+            SOURCE_REVISION=${{ steps.source.outputs.revision }}
+            CREATED=${{ steps.source.outputs.created }}
+            CORE_VERSION=${{ steps.source.outputs.core_version }}
+      - name: Smoke health and authority without external network
+        run: |
+          container_id="$(docker run --detach --network none --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m --cap-drop ALL \
+            --security-opt no-new-privileges \
+            liquilens-trade-safety-gateway:smoke)"
+          trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_id" python -c \
+              "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=1).read()"; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 1
+          done
+          docker exec "$container_id" python -c \
+            "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/v1/capabilities')); assert value['state']=='read_only_sandbox'; assert value['receipt_integrity']=='sha256'; assert value['authority']['can_execute'] is False; assert value['authority']['has_order_submission'] is False"
+          test "$(docker inspect --format '{{.Config.Labels.io.liquilens.trade-safety.authority}}' "$container_id")" = \
+            "read-only-hash-only-sandbox"
+      - name: Build both target architectures
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: integrations/trade-safety-gateway/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          build-args: |
+            SOURCE_REVISION=${{ steps.source.outputs.revision }}
+            CREATED=${{ steps.source.outputs.created }}
+            CORE_VERSION=${{ steps.source.outputs.core_version }}
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify signed release and resolve versions
+        id: release
+        run: |
+          signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-tag --raw "$GITHUB_REF_NAME"
+          release_commit="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile="$signer_file" \
+            verify-commit --raw "$release_commit"
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$release_commit" origin/main
+          core_version="${GITHUB_REF_NAME#v}"
+          test "$(cat VERSION)" = "$core_version"
+          gateway_version="$(python3 -c \
+            'import tomllib; print(tomllib.load(open("integrations/trade-safety-gateway/pyproject.toml", "rb"))["project"]["version"])')"
+          test "$gateway_version" = "0.1.2"
+          {
+            echo "revision=$release_commit"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "core_version=$core_version"
+            echo "gateway_version=$gateway_version"
+          } >>"$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and publish attested multi-architecture sandbox
+        id: push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: integrations/trade-safety-gateway/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.release.outputs.gateway_version }}
+            ${{ env.IMAGE }}:core-${{ steps.release.outputs.core_version }}
+            ${{ env.IMAGE }}:sha-${{ steps.release.outputs.revision }}
+            ${{ env.IMAGE }}:latest
+          build-args: |
+            SOURCE_REVISION=${{ steps.release.outputs.revision }}
+            CREATED=${{ steps.release.outputs.created }}
+            CORE_VERSION=${{ steps.release.outputs.core_version }}
+          labels: |
+            org.opencontainers.image.created=${{ steps.release.outputs.created }}
+            org.opencontainers.image.description=Read-only hash-only Trade Safety sandbox; no broker submission or order authorization.
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.title=LiquiLens Trade Safety Gateway
+            org.opencontainers.image.version=${{ steps.release.outputs.gateway_version }}
+            io.liquilens.evidence.core.version=${{ steps.release.outputs.core_version }}
+            io.liquilens.trade-safety.authority=read-only-hash-only-sandbox
+          annotations: |
+            index:org.opencontainers.image.created=${{ steps.release.outputs.created }}
+            index:org.opencontainers.image.description=Read-only hash-only Trade Safety sandbox; no broker submission or order authorization.
+            index:org.opencontainers.image.licenses=Apache-2.0
+            index:org.opencontainers.image.revision=${{ steps.release.outputs.revision }}
+            index:org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            index:org.opencontainers.image.title=LiquiLens Trade Safety Gateway
+            index:org.opencontainers.image.version=${{ steps.release.outputs.gateway_version }}
+            index:io.liquilens.evidence.core.version=${{ steps.release.outputs.core_version }}
+            index:io.liquilens.trade-safety.authority=read-only-hash-only-sandbox
+          provenance: mode=max
+          sbom: true
+      - name: Attest published gateway index
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+      - name: Verify index identity and smoke published digest
+        env:
+          EXPECTED_DIGEST: ${{ steps.push.outputs.digest }}
+          EXPECTED_REVISION: ${{ steps.release.outputs.revision }}
+          EXPECTED_CORE_VERSION: ${{ steps.release.outputs.core_version }}
+          EXPECTED_GATEWAY_VERSION: ${{ steps.release.outputs.gateway_version }}
+        run: |
+          docker buildx imagetools inspect --raw "$IMAGE@$EXPECTED_DIGEST" >gateway-index.json
+          python3 - <<'PY'
+          import json
+          import os
+
+          index = json.load(open("gateway-index.json", encoding="utf-8"))
+          platforms = {
+              (item.get("platform", {}).get("os"), item.get("platform", {}).get("architecture"))
+              for item in index["manifests"]
+          }
+          assert {("linux", "amd64"), ("linux", "arm64")} <= platforms
+          labels = index["annotations"]
+          assert labels["org.opencontainers.image.revision"] == os.environ["EXPECTED_REVISION"]
+          assert labels["org.opencontainers.image.version"] == os.environ["EXPECTED_GATEWAY_VERSION"]
+          assert labels["io.liquilens.evidence.core.version"] == os.environ["EXPECTED_CORE_VERSION"]
+          assert labels["io.liquilens.trade-safety.authority"] == "read-only-hash-only-sandbox"
+          PY
+          docker pull --platform linux/amd64 "$IMAGE@$EXPECTED_DIGEST"
+          container_id="$(docker run --detach --network none --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m --cap-drop ALL \
+            --security-opt no-new-privileges "$IMAGE@$EXPECTED_DIGEST")"
+          trap 'docker rm --force "$container_id" >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_id" python -c \
+              "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=1)); assert value['version']=='$EXPECTED_GATEWAY_VERSION'; assert value['source_revision']=='$EXPECTED_REVISION'; assert value['can_execute'] is False"; then
+              break
+            fi
+            test "$attempt" -lt 30
+            sleep 1
+          done

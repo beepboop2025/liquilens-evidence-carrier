@@ -8,6 +8,10 @@ from liquilens_evidence.evidence_carrier import (
     EvidenceCarrierError,
     verify_evidence_carrier,
 )
+from liquilens_evidence.trade_safety import (
+    TradeSafetyError,
+    verify_trade_safety_receipt,
+)
 from openbb_core.app.model.obbject import OBBject
 from openbb_core.app.router import Router
 from openbb_core.provider.abstract.data import Data
@@ -28,6 +32,21 @@ class EvidenceCarrierRequest(Data):
             "Optional policy evaluation timestamp in UTC, ending in Z. "
             "Defaults to the current UTC instant."
         ),
+    )
+
+
+class TradeSafetyReceiptRequest(Data):
+    """A hash-only receipt supplied by the caller and a required replay clock."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    receipt: dict[str, Any] = Field(
+        description="Complete LiquiLens Trade Safety Receipt v1 JSON object."
+    )
+    evaluated_at: str = Field(
+        description=(
+            "Required deterministic verification timestamp in UTC, ending in Z."
+        )
     )
 
 
@@ -62,11 +81,35 @@ class EvidenceVerificationResult(Data):
     authority: AuthorityBoundary = Field(default_factory=AuthorityBoundary)
 
 
+class TradeSafetyVerificationResult(Data):
+    """Bounded receipt status without request, evidence, or policy disclosure."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    ok: bool
+    receipt_id: str | None = None
+    record_hash: str | None = None
+    request_hash: str | None = None
+    policy_hash: str | None = None
+    outcome: Literal["pass", "limit", "hold", "unavailable"] | None = None
+    enforced: bool | None = None
+    authenticated: Literal[False] = False
+    evaluated_at: str | None = None
+    error: str | None = None
+    payload_disclosed: Literal[False] = False
+    data_provider: Literal[False] = False
+    network_access: Literal[False] = False
+    telemetry: Literal[False] = False
+    can_submit_order: Literal[False] = False
+    authority: AuthorityBoundary = Field(default_factory=AuthorityBoundary)
+
+
 router = Router(
     prefix="",
     description=(
         "Offline, read-only verification of caller-supplied LiquiLens evidence "
-        "carriers. This router does not fetch market data, execute trades, make "
+        "carriers and hash-only Trade Safety receipts. This router does not fetch "
+        "market data, handle authentication secrets, execute trades, make "
         "recommendations, or grant redistribution rights."
     ),
 )
@@ -170,6 +213,71 @@ async def verify(data: Data) -> OBBject:
             data_provider=False,
             network_access=False,
             telemetry=False,
+            authority=_authority_boundary(),
+        )
+    )
+
+
+@router.command(
+    methods=["POST"],
+    openapi_extra={
+        "mcp_config": {
+            "description": (
+                "Verify one caller-supplied hash-only LiquiLens Trade Safety v1 "
+                "receipt offline. HMAC receipts fail closed because this command "
+                "does not accept tenant secrets. Never use it as execution authority."
+            )
+        }
+    },
+)
+async def verify_trade_safety(data: Data) -> OBBject:
+    """Verify a local hash-only receipt without returning embedded payloads."""
+
+    try:
+        request = TradeSafetyReceiptRequest.model_validate(data.model_dump())
+    except ValidationError:
+        return OBBject(
+            results=TradeSafetyVerificationResult(
+                ok=False,
+                error="request must contain only receipt and evaluated_at",
+                evaluated_at=None,
+                authority=_authority_boundary(),
+            )
+        )
+    try:
+        evaluated_at = _parse_evaluated_at(request.evaluated_at)
+        verified = verify_trade_safety_receipt(
+            request.receipt,
+            evaluated_at=evaluated_at,
+        )
+    except (TradeSafetyError, TypeError, ValueError) as error:
+        return OBBject(
+            results=TradeSafetyVerificationResult(
+                ok=False,
+                error=str(error),
+                evaluated_at=None,
+                authority=_authority_boundary(),
+            )
+        )
+
+    receipt = verified.receipt
+    return OBBject(
+        results=TradeSafetyVerificationResult(
+            ok=True,
+            receipt_id=receipt["receipt_id"],
+            record_hash=receipt["record_hash"],
+            request_hash=receipt["request_hash"],
+            policy_hash=receipt["policy_hash"],
+            outcome=verified.outcome.value,
+            enforced=receipt["decision"]["enforced"],
+            authenticated=False,
+            evaluated_at=_utc_text(evaluated_at),
+            error=None,
+            payload_disclosed=False,
+            data_provider=False,
+            network_access=False,
+            telemetry=False,
+            can_submit_order=False,
             authority=_authority_boundary(),
         )
     )

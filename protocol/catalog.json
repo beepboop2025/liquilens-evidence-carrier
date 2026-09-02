@@ -1,6 +1,6 @@
 {
   "schema": "liquilens.evidence-carrier-catalog.v1",
-  "release": "0.18.0",
+  "release": "0.19.0",
   "license": "Apache-2.0",
   "artifacts": [
     {
@@ -62,6 +62,15 @@
       "path": "../integrations/openlineage/liquilens-evidence-facet.schema.json",
       "canonical_url": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json",
       "sha256": "e4c6035452d75be280a7b717f85da87319a078dbf5563e62ac3a3cb83486e9a5"
+    }
+  ],
+  "conformance": [
+    {
+      "name": "LiquiLens Trade Safety v1 Conformance Corpus",
+      "kind": "conformance-corpus",
+      "path": "conformance/trade-safety-v1/corpus.json",
+      "canonical_url": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens-trade-safety-conformance-v1.json",
+      "sha256": "12b2e15ddef4989e9b999636ea557576c16b965444ad9ab00cb3cfa1f68c0729"
     }
   ]
 }

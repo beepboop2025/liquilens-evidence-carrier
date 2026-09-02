@@ -15,8 +15,15 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXED_ZIP_TIME = (2026, 8, 24, 0, 0, 0)
 _OFFLINE_ADOPTION_ASSETS = (
     Path("protocol/verify_hash_tree_v1.mjs"),
+    Path("protocol/conformance/trade-safety-v1/corpus.json"),
     Path("integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json"),
     Path("integrations/fdc3/trade-safety-intents.json"),
+    Path("integrations/typescript/package.json"),
+    Path("integrations/typescript/README.md"),
+    Path("integrations/typescript/LICENSE"),
+    Path("integrations/typescript/src/hash_tree_v1.mjs"),
+    Path("integrations/typescript/src/index.mjs"),
+    Path("integrations/typescript/src/index.d.ts"),
 )
 
 

@@ -9,12 +9,12 @@
     "source": "github",
     "id": "1344895874"
   },
-  "version": "0.18.0",
+  "version": "0.19.0",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.18.0/liquilens-evidence-carrier-mcp-0.18.0.mcpb",
-      "fileSha256": "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb",
+      "identifier": "https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens-evidence-carrier-mcp-0.19.0.mcpb",
+      "fileSha256": "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74",
       "transport": {
         "type": "stdio"
       }

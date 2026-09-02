@@ -93,10 +93,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.1.1 .
+  -t liquilens-trade-safety-gateway:0.1.2 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.1.1
+  -p 8080:8080 liquilens-trade-safety-gateway:0.1.2
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the
@@ -106,6 +106,11 @@ apply egress policy allowing only `api.seiche.info:443` and
 `api.liquilens.in:443`; application allowlisting is not a substitute for a
 network policy. A public edge must additionally apply a bounded request quota;
 the application does not trust client-supplied IP headers as a rate-limit key.
+
+The release workflow publishes an attested multi-architecture OCI package to
+GHCR. That registry artifact is distribution, not a hosted deployment or an
+order-authorizing service; it retains the same read-only, hash-only sandbox
+boundary and must be operated by the adopter.
 
 ## Focused tests
 

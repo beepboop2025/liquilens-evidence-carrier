@@ -9,13 +9,14 @@ import json
 import re
 import tomllib
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_VERSION = "0.18.0"
+SOURCE_VERSION = "0.19.0"
 SOURCE_MCPB_SHA256 = (
-    "f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb"
+    "692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74"
 )
-GATEWAY_VERSION = "0.1.1"
+GATEWAY_VERSION = "0.1.2"
 PUBLISHED_VERSION = "0.18.0"
 PUBLISHED_REVISION = "906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
 PUBLISHED_TREE = "0065206e14a21bb01ce25caed60bf14c9570d12f"
@@ -56,7 +57,7 @@ CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
 CANONICAL_SITE_WORKFLOW = "33592149926"
 
 
-def _json(path: Path) -> dict:
+def _json(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise TypeError(f"{path} must contain a JSON object")
@@ -158,6 +159,7 @@ def main() -> int:
     assert catalog["release"] == version
     canonical_urls: set[str] = set()
     for artifact in catalog["artifacts"]:
+        assert artifact["path"].endswith(".schema.json"), artifact["path"]
         path = (ROOT / "protocol" / artifact["path"]).resolve()
         assert path.is_relative_to(ROOT), artifact["path"]
         assert path.is_file(), path
@@ -166,6 +168,18 @@ def main() -> int:
         assert contract["$id"] == artifact["canonical_url"], path
         assert contract["$schema"] == "https://json-schema.org/draft/2020-12/schema"
         canonical_urls.add(artifact["canonical_url"])
+
+    assert len(catalog["conformance"]) == 1
+    conformance_entry = catalog["conformance"][0]
+    assert conformance_entry["kind"] == "conformance-corpus"
+    conformance_path = (ROOT / "protocol" / conformance_entry["path"]).resolve()
+    assert conformance_path.is_relative_to(ROOT)
+    assert _sha256(conformance_path) == conformance_entry["sha256"]
+    conformance = _json(conformance_path)
+    assert conformance["schema"] == "liquilens.trade-safety-conformance.v1"
+    assert conformance["protocol_schema"] == "liquilens.trade-safety-receipt.v1"
+    assert conformance["canonicalization"] == "liquilens-hash-tree-v1"
+    assert len(conformance["cases"]) >= 12
 
     full_url = "https://liquilens.in/protocol/liquilens-evidence-carrier-v1.schema.json"
     reference_url = (
@@ -240,7 +254,8 @@ def main() -> int:
         f"current signed and published core release is `v{PUBLISHED_VERSION}`"
         in readme
     )
-    assert "not yet tagged, published, or registered" not in normalized_readme
+    assert f"source checkpoint prepares `v{SOURCE_VERSION}`" in readme
+    assert "not yet tagged, published, or registered" in normalized_readme
     assert PUBLISHED_REVISION in readme
     assert PUBLISHED_TREE in readme
     assert PUBLISHED_TAG_OBJECT in readme
@@ -269,6 +284,7 @@ def main() -> int:
     assert f"current core implementation release is `v{PUBLISHED_VERSION}`" in (
         distribution
     )
+    assert f"source now prepares core `v{SOURCE_VERSION}`" in distribution
     assert CANONICAL_SITE_REVISION in distribution
     assert CANONICAL_SITE_WORKFLOW in distribution
     assert SOURCE_MCPB_SHA256 in distribution
@@ -317,14 +333,14 @@ def main() -> int:
         normalized_candidate_readme
     )
     assert "No such publication receipt is asserted" in candidate_readme
-    current_record = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
+    candidate_record = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
         encoding="utf-8"
     )
-    assert "signed, published, attested, and active/latest" in current_record
-    assert "No v0.18.0 tag object" not in current_record
-    assert CANONICAL_SITE_REVISION in current_record
-    assert CANONICAL_SITE_WORKFLOW in current_record
-    assert SOURCE_MCPB_SHA256 in current_record
+    assert "prepared source; not tagged, published, registered, or" in (
+        candidate_record
+    )
+    assert "There is no v0.19.0 tag object" in candidate_record
+    assert SOURCE_MCPB_SHA256 in candidate_record
     previous_record = ROOT / f"docs/RELEASE-{PREVIOUS_VERSION}.md"
     assert _sha256(previous_record) == PREVIOUS_RELEASE_RECORD_SHA256
     previous_text = previous_record.read_text(encoding="utf-8")
@@ -334,7 +350,7 @@ def main() -> int:
     assert _sha256(previous_readme) == PREVIOUS_README_SHA256
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
     assert f"## [{SOURCE_VERSION}] - 2026-09-02" in changelog
-    assert "No `v0.18.0` tag, GitHub release" not in changelog
+    assert "No `v0.19.0` tag, GitHub release" in changelog
     assert SOURCE_MCPB_SHA256 in changelog
     assert f"## [{PUBLISHED_VERSION}] - 2026-09-02" in changelog
     assert PUBLISHED_REVISION in changelog
@@ -379,6 +395,8 @@ def main() -> int:
         "liquilens-trade-safety-receipt-v1.schema.json",
         "com.liquilens.trade-safety-receipt.schema.json",
         "trade-safety-intents.json",
+        "liquilens-trade-safety-conformance-v1.json",
+        "liquilens-trade-safety-0.1.0.tgz",
     ):
         assert asset in release_workflow
     gateway_project = tomllib.loads(
@@ -446,6 +464,19 @@ def main() -> int:
         encoding="utf-8"
     )
     assert 'artifactKind === "trade-safety-receipt"' in verifier
+    typescript = _json(ROOT / "integrations/typescript/package.json")
+    assert typescript["name"] == "@liquilens/trade-safety"
+    assert typescript["version"] == "0.1.0"
+    assert "dependencies" not in typescript
+    assert "scripts/check_trade_safety_conformance.py" in release_workflow
+    openbb = tomllib.loads(
+        (ROOT / "integrations/openbb/pyproject.toml").read_text(encoding="utf-8")
+    )
+    assert openbb["project"]["version"] == "0.2.0"
+    assert any(
+        "v0.18.0/liquilens_evidence-0.18.0" in dependency
+        for dependency in openbb["project"]["dependencies"]
+    )
     return 0
 
 

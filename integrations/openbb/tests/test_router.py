@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import json
 from datetime import UTC, datetime
 from importlib.metadata import entry_points, version
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -11,9 +13,13 @@ from openbb_core.app.router import Router
 
 from openbb_liquilens_evidence.router import (
     EvidenceCarrierRequest,
+    TradeSafetyReceiptRequest,
     router,
     verify,
+    verify_trade_safety,
 )
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _carrier(*, expires_at: str = "2026-08-24T13:00:00Z") -> dict:
@@ -65,6 +71,14 @@ def _carrier(*, expires_at: str = "2026-08-24T13:00:00Z") -> dict:
 def _result_payload(result) -> dict:
     payload = result.model_dump(mode="json", exclude_none=False)
     return payload["results"]
+
+
+def _trade_safety_receipt() -> dict:
+    return json.loads(
+        (ROOT / "examples/trade-safety/receipt.paper.pass.json").read_text(
+            encoding="utf-8"
+        )
+    )
 
 
 def test_installed_entry_point_is_a_router_and_not_a_provider() -> None:
@@ -215,3 +229,61 @@ def test_verification_does_not_open_a_network_connection(monkeypatch) -> None:
         )
     )
     assert _result_payload(result)["ok"] is True
+
+
+def test_trade_safety_command_verifies_hash_only_receipt_without_payload() -> None:
+    receipt = _trade_safety_receipt()
+    result = __import__("asyncio").run(
+        verify_trade_safety(
+            TradeSafetyReceiptRequest(
+                receipt=receipt,
+                evaluated_at="2026-09-02T12:00:30Z",
+            )
+        )
+    )
+    payload = _result_payload(result)
+    assert payload == {
+        "ok": True,
+        "receipt_id": receipt["receipt_id"],
+        "record_hash": receipt["record_hash"],
+        "request_hash": receipt["request_hash"],
+        "policy_hash": receipt["policy_hash"],
+        "outcome": "pass",
+        "enforced": True,
+        "authenticated": False,
+        "evaluated_at": "2026-09-02T12:00:30Z",
+        "error": None,
+        "payload_disclosed": False,
+        "data_provider": False,
+        "network_access": False,
+        "telemetry": False,
+        "can_submit_order": False,
+        "authority": {
+            "financial_authority": "none",
+            "can_execute": False,
+            "can_recommend": False,
+            "is_credit_rating": False,
+        },
+    }
+    assert "request" not in payload
+    assert "evidence" not in payload
+    assert "policy" not in payload
+
+
+def test_trade_safety_command_fails_closed_on_tamper() -> None:
+    receipt = _trade_safety_receipt()
+    receipt["decision"]["outcome"] = "hold"
+    result = __import__("asyncio").run(
+        verify_trade_safety(
+            TradeSafetyReceiptRequest(
+                receipt=receipt,
+                evaluated_at="2026-09-02T12:00:30Z",
+            )
+        )
+    )
+    payload = _result_payload(result)
+    assert payload["ok"] is False
+    assert payload["receipt_id"] is None
+    assert payload["record_hash"] is None
+    assert payload["can_submit_order"] is False
+    assert "record_hash" in payload["error"]

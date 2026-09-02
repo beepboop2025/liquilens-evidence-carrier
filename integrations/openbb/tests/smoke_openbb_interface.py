@@ -33,6 +33,20 @@ def main() -> None:
     ]
     if paths != ["/api/v1/liquilens/verify"]:
         raise SystemExit(f"OpenBB REST route was not registered: {paths!r}")
+
+    receipt = json.loads(
+        (ROOT / "examples/trade-safety/receipt.paper.pass.json").read_text()
+    )
+    trade_safety = obb.liquilens.verify_trade_safety(
+        data={
+            "receipt": receipt,
+            "evaluated_at": "2026-09-02T12:00:30Z",
+        }
+    ).results
+    if not trade_safety.ok or trade_safety.can_submit_order:
+        raise SystemExit("OpenBB Trade Safety verification widened its boundary")
+    if trade_safety.receipt_id != receipt["receipt_id"]:
+        raise SystemExit("OpenBB Trade Safety result returned the wrong identity")
     print(
         "obb.liquilens.verify ok: "
         f"{payload.carrier_id} {payload.export_disposition} {paths[0]}"

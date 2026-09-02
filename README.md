@@ -27,6 +27,21 @@ The official MCP Registry record is active/latest at 0.18.0 and pins the
 published MCPB SHA-256
 `f57ce3fb488b693e633d8bc66f980b616af09a8080722a11c50507496f39a2bb`.
 
+This source checkpoint prepares `v0.19.0`; it is not yet tagged, published, or
+registered. The candidate preserves all Trade Safety v1 schema bytes and adds a
+deterministic adversarial corpus, a dependency-free TypeScript-compatible Node
+raw-UTF8 verifier and authenticated paper-only order guard, OpenBB 0.2.0
+hash-only receipt verification pinned to released core v0.18.0, and MCP corpus
+discovery. It also prepares attested multi-architecture MCP and read-only
+gateway OCI packaging; those are registry artifacts, not hosted deployment or
+order authority. Until protected-main preflight and the controlled release finish,
+`v0.18.0` remains the production pin. See
+[`docs/RELEASE-0.19.0.md`](docs/RELEASE-0.19.0.md); no v0.19.0 publication or
+deployment receipt is asserted here.
+The two deterministic local candidate builds currently hash to
+`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+this is prepared-byte identity, not publication proof.
+
 Release `v0.18.0` adds authenticated sync/async paper-order gateways around the
 low-level `before_order` verification boundary while keeping live submission
 held and the MCP server read-only. It also publishes Trade Safety gateway
@@ -169,6 +184,14 @@ never reaches broker code. A configured claim store blocks receipt replay; use a
 durable operator-owned store outside local paper/demo runs. Live submission
 remains held until the broker idempotency and uncertain-outcome reconciliation
 gates are complete.
+
+TypeScript and Node consumers can use the zero-runtime-dependency
+[`@liquilens/trade-safety` candidate](integrations/typescript/README.md). Its
+authoritative APIs consume raw UTF-8 bytes so `1000` and `1000.0` retain their
+different protocol identities, and it rejects malformed UTF-8, duplicate keys,
+tamper, cross-context use, expiry, replay, and every live request before the
+paper submit callback. The committed corpus and threat model are documented in
+[`TRADE-SAFETY-CONFORMANCE.md`](docs/TRADE-SAFETY-CONFORMANCE.md).
 
 ## Four-product fleet briefs
 

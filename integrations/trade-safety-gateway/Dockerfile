@@ -20,18 +20,21 @@ FROM python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f14
 
 ARG SOURCE_REVISION="source-checkout"
 ARG CREATED="1970-01-01T00:00:00Z"
+ARG CORE_VERSION="0.19.0"
 ARG ISSUER_ENDPOINT="https://liquilens.in/trade-safety-gateway"
 
 LABEL org.opencontainers.image.title="LiquiLens Trade Safety Gateway" \
       org.opencontainers.image.description="Read-only sandbox for order-bound Trade Safety Receipts." \
       org.opencontainers.image.created="${CREATED}" \
-      org.opencontainers.image.version="0.1.1" \
+      org.opencontainers.image.version="0.1.2" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/beepboop2025/liquilens-evidence-carrier" \
       org.opencontainers.image.documentation="https://liquilens.in/protocol/" \
       org.opencontainers.image.base.name="docker.io/library/python:3.12.11-slim-bookworm" \
-      org.opencontainers.image.base.digest="sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7"
+      org.opencontainers.image.base.digest="sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7" \
+      io.liquilens.evidence.core.version="${CORE_VERSION}" \
+      io.liquilens.trade-safety.authority="read-only-hash-only-sandbox"
 
 ENV PATH="/opt/trade-safety/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \

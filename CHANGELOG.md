@@ -5,6 +5,32 @@ public merely because it appears in this file: the signed GitHub release,
 checksums, attestations, and distribution receipts remain the publication
 authority.
 
+## [0.19.0] - 2026-09-02
+
+- Add a deterministic adversarial Trade Safety v1 corpus spanning pass, limit,
+  hold, unavailable, numeric-lexeme mismatch, >53-bit integers, duplicate keys,
+  invalid UTF-8, tamper, HMAC failure, future request/receipt clocks, account,
+  policy, issuer and key binding, replay, and live rejection.
+- Add a zero-runtime-dependency, TypeScript-compatible Node ESM verifier and
+  authenticated paper-only order guard whose authoritative boundary is raw
+  UTF-8 bytes and whose only submit callback remains live-disabled.
+- Add OpenBB extension 0.2.0 offline hash-only receipt verification pinned to
+  the immutable v0.18.0 core wheel; HMAC secrets and order submission remain
+  outside the analytics router.
+- Expose the conformance corpus through the protocol catalog and offline MCP
+  resources, and add repeatable Node/package gates to CI and release preflight.
+- Prepare read-only Trade Safety gateway 0.1.2 against core 0.19.0 without a
+  broker route, hosted deployment, or live-money activation.
+- Prepare signed-release workflows for attested amd64/arm64 dedicated MCP and
+  gateway OCI packages. The latter remains a read-only, hash-only sandbox and
+  the workflows publish registry artifacts only, not hosted services.
+
+No `v0.19.0` tag, GitHub release, Registry publication, or deployment receipt
+exists at this source checkpoint. Version 0.18.0 remains the production pin.
+The reproducible local MCPB candidate SHA-256 is
+`692f19b3b202fe9a6a8601532e0728f36e406665dfddd09643a1d737d2b5ef74`;
+it is not a download receipt.
+
 ## [0.18.0] - 2026-09-02
 
 - Add synchronous and asynchronous authenticated paper-order gateways that bind

@@ -20,6 +20,9 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24"
       - name: Verify signed tag, commit, ancestry, and version
         run: |
           signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
@@ -44,6 +47,7 @@ jobs:
           python -m pip install uv==0.12.5
           uv sync --locked --extra dev
           uv run --locked --extra dev pytest -q
+          uv run --locked --extra dev python scripts/check_trade_safety_conformance.py
           uv run --locked --extra dev python scripts/validate_kit.py
           uv sync --project integrations/trade-safety-gateway --locked --extra test
           uv run --project integrations/trade-safety-gateway --locked --extra test \
@@ -52,6 +56,10 @@ jobs:
           SOURCE_DATE_EPOCH="$source_date_epoch" uv build --out-dir dist
           SOURCE_DATE_EPOCH="$source_date_epoch" \
             uv build --project integrations/trade-safety-gateway --out-dir dist
+          SOURCE_DATE_EPOCH="$source_date_epoch" \
+            uv build --project integrations/openbb --out-dir dist
+          npm pack ./integrations/typescript --pack-destination dist
+          test -f dist/liquilens-trade-safety-0.1.0.tgz
           cp protocol/liquilens-evidence-carrier-v1.schema.json dist/
           cp protocol/liquilens-evidence-carrier-reference-v1.schema.json dist/
           cp protocol/liquilens-fleet-brief-v1.schema.json dist/
@@ -60,6 +68,8 @@ jobs:
           cp protocol/liquilens-broker-preview-reference-v1.schema.json dist/
           cp protocol/liquilens-trade-safety-receipt-v1.schema.json dist/
           cp protocol/verify_hash_tree_v1.mjs dist/
+          cp protocol/conformance/trade-safety-v1/corpus.json \
+            dist/liquilens-trade-safety-conformance-v1.json
           cp integrations/fdc3/com.liquilens.evidence.schema.json dist/
           cp integrations/fdc3/com.liquilens.trade-safety-receipt.schema.json dist/
           cp integrations/fdc3/trade-safety-intents.json dist/
@@ -97,7 +107,9 @@ jobs:
             dist/liquilens_trade_safety_gateway-*.tar.gz
             dist/liquilens-evidence-carrier-*.tar.gz
             dist/*.mcpb
+            dist/*.tgz
             dist/*.schema.json
+            dist/liquilens-trade-safety-conformance-v1.json
             dist/trade-safety-intents.json
             dist/verify_hash_tree_v1.mjs
       - name: Publish public release

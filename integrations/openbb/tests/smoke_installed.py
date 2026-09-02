@@ -19,7 +19,7 @@ def main() -> None:
     paths = {
         route.path: sorted(route.methods or set()) for route in router._api_router.routes
     }
-    if paths != {"/verify": ["POST"]}:
+    if paths != {"/verify": ["POST"], "/verify_trade_safety": ["POST"]}:
         raise SystemExit(f"unexpected router surface: {paths!r}")
     print(
         "verified openbb-liquilens-evidence "
