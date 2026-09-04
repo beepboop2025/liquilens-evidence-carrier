@@ -131,9 +131,10 @@ def test_only_implemented_eip3009_transfer_method_is_advertised(
     environment["TRADE_SAFETY_X402_ASSET_TRANSFER_METHOD"] = "eip3009"
     runtime = x402_runtime_from_env(environment)
     assert runtime is not None
-    assert runtime.gate.config.payment_requirements()["extra"][
-        "assetTransferMethod"
-    ] == "eip3009"
+    assert (
+        runtime.gate.config.payment_requirements()["extra"]["assetTransferMethod"]
+        == "eip3009"
+    )
     asyncio.run(runtime.aclose())
 
 

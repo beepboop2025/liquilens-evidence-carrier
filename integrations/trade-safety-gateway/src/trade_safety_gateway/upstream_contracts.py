@@ -20,8 +20,7 @@ SEICHE_SCHEMA = "seiche.risk-context.v1"
 SEICHE_CANONICALIZATION = "python-json-sort-keys-utf8-no-nan-server-internal-v1"
 UNDERTOW_SCHEMA = "undertow.trade-safety-exit-context.v1"
 UNDERTOW_SCHEMA_URL = (
-    "https://liquilens-undertow.com/"
-    "undertow-trade-safety-exit-context-v1.schema.json"
+    "https://liquilens-undertow.com/undertow-trade-safety-exit-context-v1.schema.json"
 )
 UNDERTOW_PACK_SCHEMA = "undertow.crypto_desk.v2"
 UNDERTOW_RIGHTS_SCHEMA = "undertow.trade-safety-exit-rights.v1"
@@ -536,17 +535,11 @@ def _validate_undertow_rights(
     venue_reviewed = _venue_timestamp_map(
         rights["venue_reviewed_at_by_venue"], "undertow_venue_rights_reviewed_at"
     )
-    if (
-        max(venue_reviewed.values()) != reviewed_at
-        or any(
-            clock > knowledge_at or clock > reviewed_at
-            for clock in venue_reviewed.values()
-        )
+    if max(venue_reviewed.values()) != reviewed_at or any(
+        clock > knowledge_at or clock > reviewed_at for clock in venue_reviewed.values()
     ):
         raise NativeContractError("undertow_venue_rights_clock_mismatch")
-    _venue_sha_map(
-        rights["venue_proof_sha256_by_venue"], "undertow_venue_rights_proof"
-    )
+    _venue_sha_map(rights["venue_proof_sha256_by_venue"], "undertow_venue_rights_proof")
     return rights
 
 
