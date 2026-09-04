@@ -13,7 +13,7 @@ SOURCE_MCPB_SHA256 = (
 SOURCE_README_SHA256 = (
     "2d1b4dce5431451510d786f70a5a8e401180f4dd8e4820025e101444e5a97aa6"
 )
-GATEWAY_VERSION = "0.1.3"
+GATEWAY_VERSION = "0.2.0"
 CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"
 CANONICAL_SITE_WORKFLOW = "33592149926"
 RELEASE_VERSION = "0.19.0"
@@ -48,6 +48,14 @@ RELEASE_README_SHA256 = (
 RELEASE_ATTESTATION = "44695012"
 RELEASE_CONTAINER_ATTESTATION = "44695462"
 RELEASE_GATEWAY_CONTAINER_ATTESTATION = "44695195"
+GATEWAY_013_TAG_OBJECT = "757c18928c8036910ab50c80ec073679d7434abf"
+GATEWAY_013_COMMIT = "fa8e25ae8e0e992611706b8d66e951342d594243"
+GATEWAY_013_TREE = "7680694bf3397a0844f2388fb29067ff402f066d"
+GATEWAY_013_WORKFLOW = "33651560380"
+GATEWAY_013_ATTESTATION = "44751184"
+GATEWAY_013_OCI_DIGEST = (
+    "9b8f704547ecf6c43039b34149d6cca842de5d66cba13c040199cf5f3f216d61"
+)
 HISTORICAL_VERSION = "0.18.0"
 HISTORICAL_CANDIDATE = "906ca033a96ea862ab813c64db2a6b01c5ce8c4f"
 HISTORICAL_TAG_OBJECT = "42dd412ef27b470841b71b8bc73c0ed63a5e4a6b"
@@ -253,6 +261,33 @@ def test_published_gateway_identity_and_security_floors_are_consistent():
         "pytest": "9.1.1",
         "starlette": "1.6.0",
     }
+
+
+def test_independent_gateway_013_receipt_preserves_exact_historical_boundary():
+    receipt = (
+        ROOT / "docs/RELEASE-TRADE-SAFETY-GATEWAY-0.1.3.md"
+    ).read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+
+    for text in (receipt, readme, changelog):
+        for identity in (
+            GATEWAY_013_TAG_OBJECT,
+            GATEWAY_013_COMMIT,
+            GATEWAY_013_TREE,
+            GATEWAY_013_WORKFLOW,
+            GATEWAY_013_ATTESTATION,
+            GATEWAY_013_OCI_DIGEST,
+        ):
+            assert identity in text
+
+    normalized = " ".join(receipt.split())
+    assert "not a GitHub Release" in normalized
+    assert "no GitHub Release object" in normalized
+    assert "Nothing in this receipt proves a public endpoint" in normalized
+    assert "paid-route activation" in normalized
+    assert "order-path enforcement" in normalized
+    assert "trade-safety-gateway-v0.2.0" not in receipt
 
 
 def test_published_v016_records_and_embedded_readme_stay_reproducible():

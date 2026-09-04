@@ -45,6 +45,21 @@ published and smoke-tested gateway index
 binds it to the same commit. These are package and registry artifacts, not a
 hosted gateway, live-order activation, or financial authority.
 
+A later independent gateway-only publication used signed annotated tag
+`trade-safety-gateway-v0.1.3`, tag object
+`757c18928c8036910ab50c80ec073679d7434abf`, targeting signed commit
+`fa8e25ae8e0e992611706b8d66e951342d594243` and tree
+`7680694bf3397a0844f2388fb29067ff402f066d`.
+[Gateway run 33651560380](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33651560380)
+published and smoke-tested the amd64/arm64 index
+`sha256:9b8f704547ecf6c43039b34149d6cca842de5d66cba13c040199cf5f3f216d61`;
+[attestation 44751184](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44751184)
+binds that digest to the tagged source. The run recorded semantic,
+source-commit, and signed-tag-object aliases without moving `latest` or a
+`core-*` alias. There is no corresponding GitHub Release object and no hosted
+deployment or paid-route activation is claimed. See the exact
+[`gateway 0.1.3 publication receipt`](docs/RELEASE-TRADE-SAFETY-GATEWAY-0.1.3.md).
+
 See [`docs/RELEASE-0.19.0.md`](docs/RELEASE-0.19.0.md) for the complete release,
 Registry, artifact, and OCI receipt. GitHub reports the Release record itself as
 `immutable: false`; version-tag ruleset `21288366` blocks `v*` tag update and
@@ -173,6 +188,14 @@ credit-rating, and executable-quote authority false. See
 [`adoption plan`](docs/TRADE-SAFETY-ADOPTION-PLAN.md), and the
 [`read-only sandbox gateway`](integrations/trade-safety-gateway/README.md).
 
+The gateway `0.2.0` source candidate adds a server-owned policy floor and an
+optional x402 v2/Bazaar access route for AI agents. Payment purchases access to
+the exact receipt only; it never relaxes policy, changes an outcome, extends
+evidence freshness, or becomes execution authority. x402 is disabled without a
+complete operator configuration, and no hosted `0.2.0` activation or paid-use
+claim is made here. See the [`x402 operating contract`](docs/TRADE-SAFETY-X402.md)
+and [`traction measurement contract`](docs/TRADE-SAFETY-TRACTION.md).
+
 Python broker and agent runtimes can place the fail-closed, paper-only
 [`before_order` guard](docs/TRADE-SAFETY-ORDER-GUARD.md) around their only
 submit callable. Its agent-facing gateway requires tenant-authenticated HMAC
@@ -262,6 +285,11 @@ bundle for compatible desktop clients. Registry identity:
 - [`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md) defines
   strict order, policy, evidence, broker-preview, receipt and verification
   semantics; the companion adoption plan separates discovery from enforcement.
+- [`docs/TRADE-SAFETY-X402.md`](docs/TRADE-SAFETY-X402.md) defines optional paid
+  access, Bazaar discovery, durable replay/reconciliation, and activation gates;
+  [`docs/TRADE-SAFETY-TRACTION.md`](docs/TRADE-SAFETY-TRACTION.md) keeps reach,
+  activation, settlement, release, protected orders, payers, and revenue as
+  separate evidence layers.
 - [`CHANGELOG.md`](CHANGELOG.md), the
   [`v0.19.0 publication receipt`](docs/RELEASE-0.19.0.md), the preserved
   [`v0.18.0 receipt`](docs/RELEASE-0.18.0.md), and the unchanged

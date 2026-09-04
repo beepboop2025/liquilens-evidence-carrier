@@ -7,7 +7,7 @@ authority.
 
 ## [Unreleased]
 
-- Prepare independently versioned Trade Safety gateway `0.1.3` against the
+- Prepare independently versioned Trade Safety gateway `0.2.0` against the
   unchanged core `0.19.0` protocol: consume Seiche
   `seiche.risk-context.v1` and Undertow
   `trade_safety_exit_context` instead of their legacy convenience views.
@@ -17,11 +17,49 @@ authority.
   authority.
 - Fail typed unavailable on producer-unavailable, malformed, mismatched,
   tampered, stale, incomplete-rights, or unverified-proof responses, while
-  keeping observe/paper-only and no execution, routing, custody, or settlement.
-- Add the independently signed `trade-safety-gateway-v0.1.3` release lane,
-  pinned to core `0.19.0`, with main-ancestry and target-commit verification,
-  immutable OCI identity checks, provenance, SBOM, and no floating gateway-only
-  image aliases.
+  keeping observe/paper-only and no execution, routing, custody, or trade
+  settlement.
+- Add a server-owned, tighten-only policy-admission envelope so a caller cannot
+  remove mandatory products or `STRESS` holds, expand evidence-age or risk
+  limits, disable fail-closed/live requirements, or bypass an optional exact
+  policy-hash allowlist before evidence I/O or payment verification.
+- Add a dormant-by-default x402 v2 exact-payment route at `/v1/x402/check` with
+  body/resource/offer/extension binding, fixed-facilitator verification,
+  Bazaar discovery metadata, private durable settlement state, exact-response
+  replay, explicit reconciliation states, and strict separation between
+  payment identity and Trade Safety authority.
+- Make the x402 HTTP path transport-conformant for malformed payments and
+  terminal failed settlements; retain pending/ambiguous outcomes for offline
+  reconciliation, forbid serving-runtime maintenance mutation, reject
+  unsupported transfer methods, and prevent cross-agent cookies.
+- Add confirmed, age-bounded offline retirement of cached successful and failed
+  settlement responses with permanent anti-replay tombstones, SQLite secure
+  deletion, and WAL truncation checks.
+- Reject ambiguous quantity-plus-notional requests until a broker-normalized
+  economic-order digest and reference-price contract exist; payment never
+  changes a `pass`, `limit`, `hold`, or `unavailable` outcome.
+- Add opt-in, privacy-minimized local telemetry with a closed adoption funnel
+  for MCP activation, assessment outcomes, x402 offers, settlement, and release;
+  it records no caller, wallet, order, evidence, or free-form diagnostic data.
+- Prepare the independent gateway-only lane for a future signed
+  `trade-safety-gateway-v0.2.0` tag, pinned to core `0.19.0`, with main-ancestry
+  and target-commit verification, immutable OCI identity checks, provenance,
+  SBOM, and no floating gateway-only image aliases.
+
+## Trade Safety Gateway 0.1.3 - 2026-09-02
+
+- Publish the first independent gateway-only signed tag without moving the core
+  `v0.19.0` identity. Annotated tag object
+  `757c18928c8036910ab50c80ec073679d7434abf` targets signed commit
+  `fa8e25ae8e0e992611706b8d66e951342d594243` and tree
+  `7680694bf3397a0844f2388fb29067ff402f066d`.
+- [Gateway run 33651560380](https://github.com/beepboop2025/liquilens-evidence-carrier/actions/runs/33651560380)
+  published and smoke-tested the amd64/arm64 index
+  `sha256:9b8f704547ecf6c43039b34149d6cca842de5d66cba13c040199cf5f3f216d61`.
+  [Attestation 44751184](https://github.com/beepboop2025/liquilens-evidence-carrier/attestations/44751184)
+  binds that digest to the source. There was no GitHub Release, hosted gateway,
+  x402 activation, customer, broker path, or financial authority. See the
+  [full gateway 0.1.3 receipt](docs/RELEASE-TRADE-SAFETY-GATEWAY-0.1.3.md).
 
 ## [0.19.0] - 2026-09-02
 

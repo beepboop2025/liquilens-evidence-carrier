@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liquilens-trade-safety-gateway"
-version = "0.1.3"
+version = "0.2.0"
 description = "Read-only sandbox gateway for hash-bound LiquiLens Trade Safety Receipts"
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.11,<3.15"
 authors = [{name = "LiquiLens"}]
-keywords = ["ai-agents", "fastapi", "mcp", "risk-controls", "trade-safety"]
+keywords = ["ai-agents", "fastapi", "mcp", "risk-controls", "trade-safety", "x402"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -38,6 +39,7 @@ test = [
 
 [project.scripts]
 liquilens-trade-safety-gateway = "trade_safety_gateway.__main__:main"
+liquilens-trade-safety-x402-reconcile = "trade_safety_gateway.x402_reconcile:main"
 
 [project.urls]
 Homepage = "https://liquilens.in/protocol/"

@@ -79,9 +79,12 @@ def test_gateway_container_is_attested_multiarch_distribution_not_authority():
         "no broker submission or order authorization",
         "--network none --read-only",
         "/v1/capabilities",
+        "value['x402_access']['state']=='disabled'",
     ):
         assert token in workflow
-    assert 'org.opencontainers.image.version="0.1.3"' in dockerfile
+    assert 'org.opencontainers.image.version="0.2.0"' in dockerfile
+    assert "trade_safety_gateway.asgi:app" in dockerfile
+    assert "trade_safety_gateway.app:app" not in dockerfile
     assert 'io.liquilens.evidence.core.version="${CORE_VERSION}"' in dockerfile
     assert 'io.liquilens.trade-safety.authority="read-only-hash-only-sandbox"' in (
         dockerfile
@@ -120,7 +123,7 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
         "^trade-safety-gateway-v([0-9]+\\.[0-9]+\\.[0-9]+)$" in workflow
     )
     assert 'test "$source_gateway_version" = "$tag_gateway_version"' in workflow
-    assert 'EXPECTED_GATEWAY_VERSION: "0.1.3"' in workflow
+    assert 'EXPECTED_GATEWAY_VERSION: "0.2.0"' in workflow
     assert 'EXPECTED_GATEWAY_CORE_VERSION: "0.19.0"' in workflow
     assert 'test "$source_core_version" = "$EXPECTED_GATEWAY_CORE_VERSION"' in (
         workflow
@@ -131,6 +134,22 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
     assert "provenance: mode=max" in workflow
     assert "sbom: true" in workflow
     assert "actions/attest-build-provenance" in workflow
+    test_step = workflow.split(
+        "- name: Test and build the exact tagged gateway source", maxsplit=1
+    )[1].split("- uses: docker/setup-qemu-action", maxsplit=1)[0]
+    assert "uv sync --project integrations/trade-safety-gateway --locked --extra test" in (
+        test_step
+    )
+    assert "pytest -q integrations/trade-safety-gateway/tests" in test_step
+    assert "ruff check integrations/trade-safety-gateway/src" in test_step
+    assert "uv build --project integrations/trade-safety-gateway" in test_step
+    assert "PathDistribution(metadata_root)" in test_step
+    assert 'assert distribution.version == "0.2.0"' in test_step
+    assert 'distribution.metadata.get_all("License-File")' in test_step
+    assert 'for legal_name in ("LICENSE", "NOTICE")' in test_step
+    assert '"liquilens-trade-safety-x402-reconcile"' in test_step
+    assert "entry.load()" in test_step
+    assert "trade_safety_gateway/asgi.py" in test_step
 
     gateway_case = workflow.split("trade-safety-gateway-v*)", maxsplit=1)[1].split(
         ";;", maxsplit=1
@@ -138,13 +157,22 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
     assert "${IMAGE}:latest" not in gateway_case
     assert "${IMAGE}:core-${core_version}" not in gateway_case
 
+    core_case = workflow.split("            v*)", maxsplit=1)[1].split(
+        ";;", maxsplit=1
+    )[0]
+    assert "${IMAGE}:core-${core_version}" in core_case
+    assert "${IMAGE}:core-sha-${release_commit}" in core_case
+    assert "${IMAGE}:latest" in core_case
+    assert "${IMAGE}:${gateway_version}" not in core_case
+    assert '"${IMAGE}:sha-${release_commit}"' not in core_case
+
 
 def test_gateway_release_documentation_preserves_core_tag_identity():
     guide = (
         ROOT / "integrations/trade-safety-gateway/README.md"
     ).read_text(encoding="utf-8")
     for token in (
-        "trade-safety-gateway-v0.1.3",
+        "trade-safety-gateway-v0.2.0",
         "immutable core `v0.19.0` tag",
         "lightweight or unsigned tag",
         "`origin/main`",

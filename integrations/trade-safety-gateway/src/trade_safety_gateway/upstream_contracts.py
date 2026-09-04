@@ -147,7 +147,10 @@ def _finite(
 ) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise NativeContractError(f"{label}_not_finite_number")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise NativeContractError(f"{label}_not_finite_number") from exc
     if not math.isfinite(number):
         raise NativeContractError(f"{label}_not_finite_number")
     if minimum is not None and number < minimum:

@@ -9,10 +9,13 @@ issues SHA-256-only receipts.
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import hashlib
 import json
 import os
 import re
+import time as monotonic_time
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -29,26 +32,59 @@ from liquilens_evidence.trade_safety import (
     TRADE_SAFETY_REQUEST_SCHEMA,
     TradeSafetyError,
     issue_trade_safety_receipt,
+    trade_safety_policy_hash,
     trade_safety_request_hash,
     validate_trade_safety_policy,
     validate_trade_safety_request,
+    verify_trade_safety_receipt,
 )
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .http_safety import cookie_free_jar
+from .policy_guard import PolicyAdmissionError, PolicyAdmissionGuard
+from .telemetry import (
+    ASSESSMENT_ACCEPTED,
+    ASSESSMENT_OUTCOME,
+    ASSESSMENT_REJECTED,
+    MCP_ACTIVATION,
+    X402_OFFERED,
+    X402_RELEASE_FAILED,
+    X402_RELEASED,
+    X402_SETTLE_FAILED,
+    X402_SETTLED,
+    X402_VERIFY_FAILED,
+    TelemetryEmitter,
+    telemetry_from_env,
+)
 from .upstream_contracts import (
     NativeContractError,
     ProjectedContext,
     parse_seiche_context,
     parse_undertow_context,
 )
+from .x402_access import (
+    PAYMENT_RESPONSE_HEADER,
+    CompletedAccess,
+    PaymentSettlementFailed,
+    PreparedAccess,
+    X402AccessError,
+    X402AccessGate,
+    extract_payment_signature,
+)
+from .x402_runtime import X402Runtime, x402_runtime_from_env
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.1.3"
+SERVICE_VERSION = "0.2.0"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
+MCP_SUPPORTED_PROTOCOL_VERSIONS = (
+    MCP_PROTOCOL_VERSION,
+    MCP_LEGACY_PROTOCOL_VERSION,
+)
+MCP_HEADER_VALUE_MAX_BYTES = 512
 
 SERVICE_REVISION = os.environ.get("TRADE_SAFETY_SOURCE_REVISION", "source-checkout")
 if (
@@ -65,12 +101,23 @@ ISSUER_ENDPOINT = os.environ.get(
     "TRADE_SAFETY_ISSUER_ENDPOINT", "https://liquilens.in/trade-safety-gateway"
 )
 _issuer_url = urlparse(ISSUER_ENDPOINT)
+try:
+    _issuer_port = _issuer_url.port
+except ValueError as exc:
+    raise RuntimeError("TRADE_SAFETY_ISSUER_ENDPOINT must be an HTTPS URL") from exc
 if (
     _issuer_url.scheme != "https"
     or not _issuer_url.netloc
+    or not _issuer_url.hostname
     or _issuer_url.username is not None
+    or _issuer_url.password is not None
 ):
     raise RuntimeError("TRADE_SAFETY_ISSUER_ENDPOINT must be an HTTPS URL")
+_MCP_ALLOWED_ORIGIN = (
+    _issuer_url.scheme,
+    _issuer_url.hostname.lower(),
+    _issuer_port or 443,
+)
 
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_UPSTREAM_BYTES = 1024 * 1024
@@ -106,6 +153,9 @@ SANDBOX_HEADERS = (
     (b"x-trade-safety-execution", b"disabled"),
     (b"x-trade-safety-revision", SERVICE_REVISION.encode("ascii")),
 )
+SANDBOX_RESPONSE_HEADERS = {
+    name.decode("ascii"): value.decode("ascii") for name, value in SANDBOX_HEADERS
+}
 
 
 class CheckEnvelope(BaseModel):
@@ -190,11 +240,72 @@ async def _send_json(
     await send({"type": "http.response.body", "body": body})
 
 
+def _mcp_origin_allowed(raw_headers: list[tuple[bytes, bytes]]) -> bool:
+    values = [value for name, value in raw_headers if name.lower() == b"origin"]
+    if not values:
+        # Non-browser MCP clients normally omit Origin.
+        return True
+    if len(values) != 1 or len(values[0]) > MCP_HEADER_VALUE_MAX_BYTES:
+        return False
+    try:
+        origin = values[0].decode("ascii", errors="strict")
+        parsed = urlparse(origin)
+        port = parsed.port
+    except (UnicodeDecodeError, ValueError):
+        return False
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        return False
+    return (
+        parsed.scheme,
+        parsed.hostname.lower(),
+        port or 443,
+    ) == _MCP_ALLOWED_ORIGIN
+
+
 class SafetyEnvelopeMiddleware:
     """Bound request bodies, require strict JSON, and stamp sandbox authority."""
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        telemetry: TelemetryEmitter,
+        x402_enabled: bool,
+    ) -> None:
         self.app = app
+        self.telemetry = telemetry
+        self.x402_enabled = x402_enabled
+
+    def _record_rejection(self, scope: Scope) -> None:
+        path = scope.get("path")
+        if path == "/v1/check":
+            self.telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="rest",
+                reason="invalid_request",
+            )
+        elif path == "/v1/x402/check" and self.x402_enabled:
+            self.telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="x402",
+                reason="invalid_request",
+            )
+        elif path == "/mcp":
+            self.telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                operation="transport",
+                outcome="error",
+            )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -213,11 +324,23 @@ class SafetyEnvelopeMiddleware:
                 message["headers"] = headers
             await send(message)
 
+        raw_headers = scope.get("headers", [])
+        if scope.get("path") == "/mcp" and not _mcp_origin_allowed(raw_headers):
+            self._record_rejection(scope)
+            await _send_json(
+                sandbox_send,
+                status=403,
+                payload={
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32600, "message": "Invalid Origin"},
+                },
+            )
+            return
         if scope["method"].upper() != "POST":
             await self.app(scope, receive, sandbox_send)
             return
 
-        raw_headers = scope.get("headers", [])
         content_lengths = [
             value for name, value in raw_headers if name.lower() == b"content-length"
         ]
@@ -225,6 +348,7 @@ class SafetyEnvelopeMiddleware:
             try:
                 declared = int(content_lengths[-1])
             except ValueError:
+                self._record_rejection(scope)
                 await _send_json(
                     sandbox_send,
                     status=400,
@@ -232,6 +356,7 @@ class SafetyEnvelopeMiddleware:
                 )
                 return
             if declared < 0 or declared > MAX_REQUEST_BYTES:
+                self._record_rejection(scope)
                 await _send_json(
                     sandbox_send,
                     status=413,
@@ -248,6 +373,7 @@ class SafetyEnvelopeMiddleware:
             else ""
         )
         if media_type != "application/json":
+            self._record_rejection(scope)
             await _send_json(
                 sandbox_send,
                 status=415,
@@ -266,6 +392,7 @@ class SafetyEnvelopeMiddleware:
             chunk = message.get("body", b"")
             total += len(chunk)
             if total > MAX_REQUEST_BYTES:
+                self._record_rejection(scope)
                 await _send_json(
                     sandbox_send,
                     status=413,
@@ -279,6 +406,7 @@ class SafetyEnvelopeMiddleware:
         try:
             decoded = _strict_json_object(body, "request body")
         except ValueError as exc:
+            self._record_rejection(scope)
             await _send_json(
                 sandbox_send,
                 status=400,
@@ -286,6 +414,7 @@ class SafetyEnvelopeMiddleware:
             )
             return
         scope.setdefault("state", {})["strict_json"] = decoded
+        scope["state"]["raw_body"] = bytes(body)
 
         delivered = False
 
@@ -299,21 +428,186 @@ class SafetyEnvelopeMiddleware:
         await self.app(scope, replay, sandbox_send)
 
 
-def _bounded_response(payload: Mapping[str, Any], status_code: int = 200) -> Response:
-    body = json.dumps(
+def _canonical_json_bytes(payload: Mapping[str, Any]) -> bytes:
+    return json.dumps(
         payload,
         allow_nan=False,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
+
+
+def _bounded_response(
+    payload: Mapping[str, Any],
+    status_code: int = 200,
+    *,
+    headers: Mapping[str, str] | None = None,
+) -> Response:
+    body = _canonical_json_bytes(payload)
     if len(body) > MAX_RESPONSE_BYTES:
         body = (
             b'{"detail":"gateway response exceeded its fixed byte budget",'
             b'"state":"unavailable"}'
         )
         status_code = 502
-    return Response(body, status_code=status_code, media_type="application/json")
+        headers = None
+    response_headers = dict(SANDBOX_RESPONSE_HEADERS)
+    response_headers.update(headers or {})
+    return Response(
+        body,
+        status_code=status_code,
+        media_type="application/json",
+        headers=response_headers,
+    )
+
+
+class CompletedAccessExpired(ValueError):
+    """A paid journal entry contains a receipt that is no longer actionable."""
+
+
+def _completed_access_outcome(
+    completed: CompletedAccess,
+    *,
+    evaluated_at: datetime,
+    expected_request_hash: str,
+    expected_policy_hash: str,
+) -> str:
+    """Validate cached protected bytes before release and extract a safe outcome."""
+
+    if (
+        completed.status_code != 200
+        or completed.content_type != "application/json"
+        or len(completed.response_body) > MAX_RESPONSE_BYTES
+        or not completed.payment_response_header
+    ):
+        raise ValueError("completed x402 access metadata is invalid")
+    payload = _strict_json_object(completed.response_body, "protected response")
+    expiry = _parse_timestamp(payload.get("expires_at"), "receipt.expires_at")
+    instant = _utc_instant(evaluated_at, "evaluated_at")
+    if instant >= expiry:
+        raise CompletedAccessExpired("settled Trade Safety receipt is expired")
+    try:
+        verified = verify_trade_safety_receipt(
+            payload,
+            evaluated_at=instant,
+            hmac_key=None,
+        )
+    except TradeSafetyError as exc:
+        raise ValueError("settled Trade Safety receipt is invalid") from exc
+    verified_receipt = verified.receipt
+    if (
+        verified_receipt["request_hash"] != expected_request_hash
+        or verified_receipt["policy_hash"] != expected_policy_hash
+    ):
+        raise ValueError("settled Trade Safety receipt has the wrong request binding")
+    return verified.outcome.value
+
+
+def _completed_access_response(
+    completed: CompletedAccess,
+    *,
+    evaluated_at: datetime,
+    expected_request_hash: str,
+    expected_policy_hash: str,
+) -> Response:
+    """Release only the exact response bytes bound to successful settlement."""
+
+    _completed_access_outcome(
+        completed,
+        evaluated_at=evaluated_at,
+        expected_request_hash=expected_request_hash,
+        expected_policy_hash=expected_policy_hash,
+    )
+    return Response(
+        completed.response_body,
+        status_code=completed.status_code,
+        media_type=completed.content_type,
+        headers={PAYMENT_RESPONSE_HEADER: completed.payment_response_header},
+    )
+
+
+def _settled_access_error_response(
+    completed: CompletedAccess,
+    *,
+    detail: str,
+    state: str,
+    status_code: int,
+) -> Response:
+    """Return settlement proof without releasing invalid or expired receipt bytes."""
+
+    return _bounded_response(
+        {"detail": detail, "state": state},
+        status_code=status_code,
+        headers={PAYMENT_RESPONSE_HEADER: completed.payment_response_header},
+    )
+
+
+def _x402_verify_telemetry_reason(error: X402AccessError) -> str:
+    if error.code == "payment_signature_required":
+        return "payment_missing"
+    if error.code in {
+        "duplicate_payment_signature",
+        "invalid_json_value",
+        "invalid_payment_extension",
+        "invalid_payment_payload",
+        "invalid_payment_payload_shape",
+        "invalid_x402_version",
+        "malformed_json",
+        "malformed_payment_signature",
+        "payment_payload_mismatch",
+        "payment_signature_too_large",
+    }:
+        return "payment_malformed"
+    if error.code in {
+        "accepted_offer_mismatch",
+        "binding_extension_mismatch",
+        "invalid_network",
+        "journal_binding_mismatch",
+        "resource_mismatch",
+    }:
+        return "offer_mismatch"
+    if error.code == "facilitator_unavailable":
+        return "facilitator_unavailable"
+    if error.code == "payment_verification_failed":
+        return "payment_rejected"
+    if error.code == "payment_processing":
+        return "replay_in_progress"
+    if error.code in {"journal_full", "journal_terminal_capacity"}:
+        return "capacity_exhausted"
+    return "internal_error"
+
+
+def _x402_settle_telemetry_reason(error: X402AccessError) -> str:
+    if error.code == "settlement_uncertain":
+        return "settlement_uncertain"
+    if error.code == "facilitator_unavailable":
+        return "facilitator_unavailable"
+    if error.code == "payment_verification_failed":
+        return "payment_rejected"
+    if error.code == "payment_processing":
+        return "replay_in_progress"
+    return "internal_error"
+
+
+def _elapsed_ms(started_ns: int) -> float:
+    """Return monotonic elapsed milliseconds without exposing wall-clock detail."""
+
+    return max(0, monotonic_time.monotonic_ns() - started_ns) / 1_000_000
+
+
+def _assessment_rejection_reason(error: Exception) -> str:
+    """Reduce detailed validation failures to the closed telemetry vocabulary."""
+
+    if isinstance(error, PolicyAdmissionError):
+        return "policy_not_admitted"
+    return "invalid_request"
+
+
+def _assessment_rejection_detail(error: Exception) -> str:
+    if isinstance(error, TradeSafetyError):
+        return str(error)
+    return "numeric input is outside the supported range"
 
 
 class UpstreamUnavailable(RuntimeError):
@@ -362,15 +656,21 @@ def _is_allowed_upstream(method: str, url: str) -> bool:
 class HttpxUpstreamTransport:
     """HTTP transport with fixed destinations, no redirects, proxies, or cookies."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         timeout = httpx.Timeout(
             UPSTREAM_TOTAL_TIMEOUT_SECONDS,
             connect=UPSTREAM_CONNECT_TIMEOUT_SECONDS,
         )
         self._client = httpx.AsyncClient(
+            cookies=cookie_free_jar(),
             timeout=timeout,
             follow_redirects=False,
             trust_env=False,
+            transport=transport,
             headers={
                 "Accept": "application/json",
                 "Accept-Encoding": "identity",
@@ -440,11 +740,17 @@ class HttpxUpstreamTransport:
                         ) from exc
                 chunks: list[bytes] = []
                 total = 0
-                async for chunk in response.aiter_raw():
-                    total += len(chunk)
+                if response.is_stream_consumed:
+                    chunks.append(response.content)
+                    total = len(response.content)
                     if total > MAX_UPSTREAM_BYTES:
                         raise UpstreamUnavailable("upstream body is too large")
-                    chunks.append(chunk)
+                else:
+                    async for chunk in response.aiter_raw():
+                        total += len(chunk)
+                        if total > MAX_UPSTREAM_BYTES:
+                            raise UpstreamUnavailable("upstream body is too large")
+                        chunks.append(chunk)
                 return RawUpstreamResponse(body=b"".join(chunks))
         except (TimeoutError, httpx.HTTPError, OSError) as exc:
             raise UpstreamUnavailable("fixed upstream is unreachable") from exc
@@ -749,6 +1055,14 @@ def _undertow_eligibility(request: Mapping[str, Any]) -> tuple[bool, str]:
     if request["mode"] not in {"observe", "paper"}:
         return False, "undertow_trade_safety_context_is_observe_or_paper_only"
     order = request["order"]
+    if order["quantity"] is not None:
+        # Request v1 carries both notional and an optional quantity but has no
+        # broker-normalized economic-order digest or reference-price contract.
+        # Until that exists, accepting both would let a tiny notional conceal
+        # an arbitrarily large quantity from the notional policy and Undertow
+        # size checks.  Preserve the request in the receipt, but make the
+        # mandatory Undertow dependency explicitly unavailable.
+        return False, "quantity_requires_broker_normalized_economic_order_binding"
     if order["venue"] is not None:
         return False, "undertow_has_no_canonical_order_venue_mapping"
     if order["side"] != "sell":
@@ -813,18 +1127,31 @@ class TradeSafetyGateway:
         upstream: UpstreamTransport,
         *,
         clock: Callable[[], datetime] = _utc_now,
+        policy_guard: PolicyAdmissionGuard | None = None,
     ) -> None:
         self._upstream = upstream
         self._clock = clock
+        self._policy_guard = policy_guard or PolicyAdmissionGuard.from_env()
 
-    async def assess(
+    def _admit(
         self,
         request: Mapping[str, Any],
         policy: Mapping[str, Any],
-    ) -> dict[str, Any]:
-        started_at = _utc_instant(self._clock(), "clock")
-        normalized_request = validate_trade_safety_request(request)
-        normalized_policy = validate_trade_safety_policy(policy)
+        *,
+        evaluated_at: datetime,
+    ) -> tuple[dict[str, Any], dict[str, Any], datetime]:
+        """Validate the local request/policy boundary without network I/O."""
+
+        try:
+            normalized_request = validate_trade_safety_request(request)
+            normalized_policy = validate_trade_safety_policy(policy)
+            # A schema-valid policy is still caller-authored. Admit it against the
+            # server's immutable safety envelope before anything leaves this process.
+            self._policy_guard.admit(normalized_policy)
+        except OverflowError as exc:
+            raise TradeSafetyError(
+                "numeric input is outside the supported range"
+            ) from exc
         if normalized_request["policy_ref"] != {
             "policy_id": normalized_policy["policy_id"],
             "version": normalized_policy["version"],
@@ -836,10 +1163,43 @@ class TradeSafetyGateway:
         request_expires_at = _parse_timestamp(
             normalized_request["expires_at"], "request.expires_at"
         )
-        if started_at < request_created_at:
+        if evaluated_at < request_created_at:
             raise TradeSafetyError("request is not yet valid")
-        if started_at >= request_expires_at:
+        if evaluated_at >= request_expires_at:
             raise TradeSafetyError("request is expired")
+        # Validate the only request-derived path component during preflight too.
+        _institution_slug(normalized_request)
+        return normalized_request, normalized_policy, request_expires_at
+
+    def preflight(
+        self,
+        request: Mapping[str, Any],
+        policy: Mapping[str, Any],
+    ) -> tuple[str, str]:
+        """Fail invalid paid requests locally before payment verification."""
+
+        evaluated_at = _utc_instant(self._clock(), "clock")
+        normalized_request, normalized_policy, _expires_at = self._admit(
+            request,
+            policy,
+            evaluated_at=evaluated_at,
+        )
+        return (
+            trade_safety_request_hash(normalized_request),
+            trade_safety_policy_hash(normalized_policy),
+        )
+
+    async def assess(
+        self,
+        request: Mapping[str, Any],
+        policy: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        started_at = _utc_instant(self._clock(), "clock")
+        normalized_request, normalized_policy, request_expires_at = self._admit(
+            request,
+            policy,
+            evaluated_at=started_at,
+        )
 
         slug = _institution_slug(normalized_request)
         undertow_allowed, undertow_limitation = _undertow_eligibility(
@@ -888,9 +1248,9 @@ class TradeSafetyGateway:
                     request_hash=request_hash,
                     retrieved_at=retrieved_at,
                     request_expires_at=request_expires_at,
-                    max_age_seconds=normalized_policy[
-                        "max_evidence_age_seconds"
-                    ]["seiche"],
+                    max_age_seconds=normalized_policy["max_evidence_age_seconds"][
+                        "seiche"
+                    ],
                 )
             except (ValueError, TradeSafetyError):
                 seiche = _unavailable_section(
@@ -929,9 +1289,9 @@ class TradeSafetyGateway:
                         expected_request=undertow_request,
                         retrieved_at=retrieved_at,
                         request_expires_at=request_expires_at,
-                        max_age_seconds=normalized_policy[
-                            "max_evidence_age_seconds"
-                        ]["undertow"],
+                        max_age_seconds=normalized_policy["max_evidence_age_seconds"][
+                            "undertow"
+                        ],
                     )
                 except (ValueError, TradeSafetyError):
                     undertow = _unavailable_section(
@@ -1026,9 +1386,15 @@ class TradeSafetyGateway:
         )
 
 
-def capabilities() -> dict[str, Any]:
+def capabilities(
+    policy_guard: PolicyAdmissionGuard | None = None,
+    x402_gate: X402AccessGate | None = None,
+    telemetry: TelemetryEmitter | None = None,
+) -> dict[str, Any]:
     """Return the static authority and integration contract, without probing."""
 
+    guard = policy_guard or PolicyAdmissionGuard.from_env()
+    policy_config = guard.config
     return {
         "service": SERVICE_NAME,
         "version": SERVICE_VERSION,
@@ -1041,6 +1407,54 @@ def capabilities() -> dict[str, Any]:
         "policy_schema": TRADE_SAFETY_POLICY_SCHEMA,
         "receipt_integrity": "sha256",
         "live_outcome": "unavailable",
+        "telemetry": (
+            telemetry.status
+            if telemetry is not None
+            else {"state": "disabled", "delivery_failures": 0}
+        ),
+        "policy_admission": {
+            "mode": "server_owned_safety_envelope",
+            "required_products": sorted(policy_config.required_products),
+            "required_hold_regimes": sorted(policy_config.hold_regimes),
+            "max_evidence_age_seconds": dict(policy_config.max_evidence_age_seconds),
+            "max_notional_usd": policy_config.max_notional_usd,
+            "max_exit_cost_bps": policy_config.max_exit_cost_bps,
+            "max_venue_spread_bps": policy_config.max_venue_spread_bps,
+            "exact_policy_allowlist": (policy_config.allowed_policy_sha256 is not None),
+        },
+        "x402_access": {
+            "state": "configured" if x402_gate is not None else "disabled",
+            "protocol_version": 2,
+            "payment_flow": "authorization",
+            "protected_path": ("/v1/x402/check" if x402_gate is not None else None),
+            "resource_url": (
+                x402_gate.config.resource_url if x402_gate is not None else None
+            ),
+            "network": (x402_gate.config.network if x402_gate is not None else None),
+            "amount_atomic": (
+                x402_gate.config.amount if x402_gate is not None else None
+            ),
+            "asset": x402_gate.config.asset if x402_gate is not None else None,
+            "pay_to": x402_gate.config.pay_to if x402_gate is not None else None,
+            "discovery_extensions": (
+                sorted(
+                    {
+                        *x402_gate.config.required_extensions,
+                        "liquilens",
+                    }
+                )
+                if x402_gate is not None
+                else []
+            ),
+            "free_routes": [
+                "/healthz",
+                "/v1/capabilities",
+                "/v1/check",
+                "/mcp",
+            ],
+            "payment_changes_safety_outcome": False,
+            "payment_identity_in_safety_receipt": False,
+        },
         "authority": {
             "can_execute": False,
             "can_recommend": False,
@@ -1073,8 +1487,7 @@ def capabilities() -> dict[str, Any]:
             "liquilens": {
                 "url_base": LIQUILENS_BASE_URL,
                 "trigger": (
-                    "request.order.instrument.identifiers."
-                    "liquilens_institution_slug"
+                    "request.order.instrument.identifiers.liquilens_institution_slug"
                 ),
                 "state": "conditional_context_only",
             },
@@ -1188,22 +1601,171 @@ def _exact_keys(value: Mapping[str, Any], expected: set[str]) -> bool:
     return set(value) == expected
 
 
+def _mcp_ascii_header(request: Request, name: bytes) -> str | None:
+    values = [
+        value
+        for header_name, value in request.scope.get("headers", [])
+        if header_name.lower() == name.lower()
+    ]
+    if not values:
+        return None
+    if len(values) != 1 or not 0 < len(values[0]) <= MCP_HEADER_VALUE_MAX_BYTES:
+        raise ValueError("MCP header must occur exactly once within its byte budget")
+    try:
+        decoded = values[0].decode("ascii", errors="strict")
+    except UnicodeDecodeError as exc:
+        raise ValueError("MCP header must be ASCII") from exc
+    if any(ord(character) < 0x21 or ord(character) > 0x7E for character in decoded):
+        raise ValueError("MCP header must contain visible ASCII")
+    return decoded
+
+
+def _decode_mcp_name_header(value: str) -> str:
+    prefix = "=?base64?"
+    suffix = "?="
+    if not (value.startswith(prefix) and value.endswith(suffix)):
+        return value
+    encoded = value[len(prefix) : -len(suffix)]
+    if not encoded or len(encoded) % 4:
+        raise ValueError("Mcp-Name base64 sentinel is malformed")
+    try:
+        raw = base64.b64decode(encoded.encode("ascii"), validate=True)
+        if base64.b64encode(raw).decode("ascii") != encoded:
+            raise ValueError("Mcp-Name base64 sentinel is not canonical")
+        decoded = raw.decode("utf-8", errors="strict")
+    except (binascii.Error, UnicodeDecodeError, ValueError) as exc:
+        raise ValueError("Mcp-Name base64 sentinel is malformed") from exc
+    if not decoded or len(raw) > MCP_HEADER_VALUE_MAX_BYTES:
+        raise ValueError("Mcp-Name decoded value is outside its byte budget")
+    return decoded
+
+
+def _mcp_header_mismatch(envelope: MCPEnvelope) -> Response:
+    return _bounded_response(
+        _rpc_error(
+            envelope.id,
+            -32020,
+            "MCP request headers are missing, malformed, or inconsistent",
+        ),
+        status_code=400,
+    )
+
+
+def _mcp_transport_error(
+    request: Request,
+    envelope: MCPEnvelope,
+    *,
+    modern: bool,
+) -> Response | None:
+    try:
+        protocol = _mcp_ascii_header(request, b"mcp-protocol-version")
+        method = _mcp_ascii_header(request, b"mcp-method")
+        encoded_name = _mcp_ascii_header(request, b"mcp-name")
+        name = None if encoded_name is None else _decode_mcp_name_header(encoded_name)
+    except ValueError:
+        return _mcp_header_mismatch(envelope)
+
+    if protocol is not None and protocol not in MCP_SUPPORTED_PROTOCOL_VERSIONS:
+        requested = (
+            protocol if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", protocol) else ""
+        )
+        return _bounded_response(
+            _rpc_error(
+                envelope.id,
+                -32022,
+                "Unsupported protocol version",
+                {
+                    "supported": list(MCP_SUPPORTED_PROTOCOL_VERSIONS),
+                    "requested": requested,
+                },
+            ),
+            status_code=400,
+        )
+
+    if modern:
+        meta = envelope.params.get("_meta")
+        body_version = (
+            meta.get("io.modelcontextprotocol/protocolVersion")
+            if isinstance(meta, dict)
+            else None
+        )
+        if protocol is None or body_version != protocol or method != envelope.method:
+            return _mcp_header_mismatch(envelope)
+        if body_version != MCP_PROTOCOL_VERSION:
+            return _bounded_response(
+                _rpc_error(
+                    envelope.id,
+                    -32022,
+                    "Unsupported protocol version",
+                    {
+                        "supported": [MCP_PROTOCOL_VERSION],
+                        "requested": (
+                            body_version
+                            if isinstance(body_version, str)
+                            and re.fullmatch(
+                                r"[0-9]{4}-[0-9]{2}-[0-9]{2}", body_version
+                            )
+                            else ""
+                        ),
+                    },
+                ),
+                status_code=400,
+            )
+        body_name = envelope.params.get("name")
+        if envelope.method == "tools/call" and (
+            not isinstance(body_name, str) or name != body_name
+        ):
+            return _mcp_header_mismatch(envelope)
+    else:
+        if protocol == MCP_PROTOCOL_VERSION:
+            return _mcp_header_mismatch(envelope)
+        if envelope.method != "initialize" and protocol is None:
+            return _mcp_header_mismatch(envelope)
+        if method is not None and method != envelope.method:
+            return _mcp_header_mismatch(envelope)
+        body_name = envelope.params.get("name")
+        if name is not None and name != body_name:
+            return _mcp_header_mismatch(envelope)
+    return None
+
+
 def create_app(
     *,
     upstream: UpstreamTransport | None = None,
     clock: Callable[[], datetime] = _utc_now,
+    policy_guard: PolicyAdmissionGuard | None = None,
+    telemetry: TelemetryEmitter | None = None,
+    x402_runtime: X402Runtime | None = None,
 ) -> FastAPI:
     """Create an application; tests can inject a byte-exact fake transport."""
 
     owns_transport = upstream is None
     active_transport = upstream or HttpxUpstreamTransport()
-    gateway = TradeSafetyGateway(active_transport, clock=clock)
+    active_policy_guard = policy_guard or PolicyAdmissionGuard.from_env()
+    active_telemetry = telemetry or telemetry_from_env(
+        SERVICE_VERSION,
+        SERVICE_REVISION,
+    )
+    owns_x402_runtime = x402_runtime is None
+    active_x402_runtime = x402_runtime or x402_runtime_from_env()
+    active_x402_gate = (
+        active_x402_runtime.gate if active_x402_runtime is not None else None
+    )
+    gateway = TradeSafetyGateway(
+        active_transport,
+        clock=clock,
+        policy_guard=active_policy_guard,
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-        yield
-        if owns_transport:
-            await active_transport.aclose()
+        try:
+            yield
+        finally:
+            if owns_x402_runtime and active_x402_runtime is not None:
+                await active_x402_runtime.aclose()
+            if owns_transport:
+                await active_transport.aclose()
 
     application = FastAPI(
         title="LiquiLens Trade Safety Gateway",
@@ -1211,23 +1773,59 @@ def create_app(
         description=(
             "Read-only sandbox assessment over fixed public evidence sources. "
             "There is no broker credential, order preview, recommendation, "
-            "routing, custody, settlement, or execution surface."
+            "routing, custody, trade settlement, or execution surface. Optional "
+            "x402 settlement buys access only and cannot affect the assessment."
         ),
         lifespan=lifespan,
     )
-    application.add_middleware(SafetyEnvelopeMiddleware)
+    application.add_middleware(
+        SafetyEnvelopeMiddleware,
+        telemetry=active_telemetry,
+        x402_enabled=active_x402_gate is not None,
+    )
     application.state.gateway = gateway
     application.state.upstream = active_transport
+    application.state.telemetry = active_telemetry
+    application.state.x402_runtime = active_x402_runtime
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(
-        _request: Request, _error: RequestValidationError
+        request: Request, _error: RequestValidationError
     ) -> Response:
         # FastAPI's default validation response includes rejected input values.
         # Keep malformed envelopes useful but never reflect accidental secrets.
+        if request.url.path == "/v1/check":
+            active_telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="rest",
+                reason="invalid_request",
+            )
+        elif request.url.path == "/v1/x402/check":
+            active_telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="x402",
+                reason="invalid_request",
+            )
+        elif request.url.path == "/mcp":
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                operation="transport",
+                outcome="error",
+            )
         return _bounded_response(
             {"detail": "invalid request envelope", "state": "invalid_request"},
             status_code=422,
+        )
+
+    @application.exception_handler(Exception)
+    async def unexpected_error(_request: Request, _error: Exception) -> Response:
+        # Starlette's outer error middleware can bypass user middleware. This
+        # response therefore carries its own sandbox headers and reflects no
+        # backend exception text, journal path, payment data, or request data.
+        return _bounded_response(
+            {"detail": "gateway unavailable", "state": "unavailable"},
+            status_code=500,
         )
 
     @application.get("/healthz", response_model=None)
@@ -1243,38 +1841,648 @@ def create_app(
                 "mode": GATEWAY_MODE,
                 "state": "read_only_sandbox",
                 "can_execute": False,
+                "telemetry": active_telemetry.status,
             }
         )
 
     @application.get("/v1/capabilities", response_model=None)
     async def get_capabilities() -> Response:
-        return _bounded_response(capabilities())
+        return _bounded_response(
+            capabilities(
+                active_policy_guard,
+                active_x402_gate,
+                active_telemetry,
+            )
+        )
 
     @application.post("/v1/check", response_model=None)
     async def check(envelope: CheckEnvelope) -> Response:
+        started_ns = monotonic_time.monotonic_ns()
         try:
             receipt = await gateway.assess(envelope.request, envelope.policy)
         except TradeSafetyError as exc:
-            return _bounded_response(
-                {"detail": str(exc), "state": "invalid_request"}, status_code=422
+            active_telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="rest",
+                duration_ms=_elapsed_ms(started_ns),
+                reason=_assessment_rejection_reason(exc),
             )
+            return _bounded_response(
+                {
+                    "detail": _assessment_rejection_detail(exc),
+                    "state": "invalid_request",
+                },
+                status_code=422,
+            )
+        active_telemetry.emit(
+            ASSESSMENT_ACCEPTED,
+            transport="rest",
+            duration_ms=_elapsed_ms(started_ns),
+        )
+        active_telemetry.emit(
+            ASSESSMENT_OUTCOME,
+            transport="rest",
+            duration_ms=_elapsed_ms(started_ns),
+            outcome=receipt["decision"]["outcome"],
+        )
         return _bounded_response(receipt)
+
+    if active_x402_gate is not None:
+
+        def x402_challenge_response(
+            body: bytes,
+            *,
+            error: str = "PAYMENT-SIGNATURE header is required",
+        ) -> Response:
+            challenge = active_x402_gate.challenge(
+                body,
+                resource=active_x402_gate.config.resource_url,
+                error=error,
+            )
+            return _bounded_response(
+                challenge.payment_required,
+                status_code=402,
+                headers=challenge.response_headers,
+            )
+
+        @application.post("/v1/x402/check", response_model=None)
+        async def x402_check(
+            envelope: CheckEnvelope,
+            request: Request,
+        ) -> Response:
+            started_ns = monotonic_time.monotonic_ns()
+            raw_body = request.scope.get("state", {}).get("raw_body")
+            if not isinstance(raw_body, bytes):
+                active_telemetry.emit(
+                    ASSESSMENT_REJECTED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason="internal_error",
+                )
+                return _bounded_response(
+                    {
+                        "detail": "paid request snapshot unavailable",
+                        "state": "unavailable",
+                    },
+                    status_code=500,
+                )
+
+            # Never solicit or verify payment for an envelope the local safety
+            # boundary already knows it cannot assess.
+            try:
+                expected_request_hash, expected_policy_hash = gateway.preflight(
+                    envelope.request,
+                    envelope.policy,
+                )
+            except TradeSafetyError as exc:
+                active_telemetry.emit(
+                    ASSESSMENT_REJECTED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason=_assessment_rejection_reason(exc),
+                )
+                return _bounded_response(
+                    {
+                        "detail": _assessment_rejection_detail(exc),
+                        "state": "invalid_request",
+                    },
+                    status_code=422,
+                )
+
+            try:
+                payment_signature = extract_payment_signature(
+                    request.scope.get("headers", []),
+                    max_header_bytes=(active_x402_gate.config.max_payment_header_bytes),
+                )
+            except X402AccessError as exc:
+                reason = _x402_verify_telemetry_reason(exc)
+                if exc.http_status == 402:
+                    response = x402_challenge_response(
+                        raw_body,
+                        error="Payment authorization was not accepted",
+                    )
+                    active_telemetry.emit(
+                        X402_OFFERED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                    )
+                else:
+                    response = _bounded_response(
+                        {"detail": "x402 payment is invalid", "state": reason},
+                        status_code=exc.http_status,
+                    )
+                active_telemetry.emit(
+                    X402_VERIFY_FAILED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason=reason,
+                )
+                return response
+
+            if payment_signature is None:
+                response = x402_challenge_response(raw_body)
+                active_telemetry.emit(
+                    X402_OFFERED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                )
+                active_telemetry.emit(
+                    X402_VERIFY_FAILED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason="payment_missing",
+                )
+                return response
+
+            try:
+                access = await active_x402_gate.authorize(
+                    raw_body,
+                    resource=active_x402_gate.config.resource_url,
+                    payment_signature=payment_signature,
+                )
+            except PaymentSettlementFailed as exc:
+                # ``authorize`` can surface only a journaled terminal result.
+                # The original settle attempt already emitted the failure; a
+                # replay is not another attempt and must not inflate the funnel.
+                return _bounded_response(
+                    {},
+                    status_code=exc.http_status,
+                    headers={
+                        PAYMENT_RESPONSE_HEADER: exc.payment_response_header,
+                    },
+                )
+            except X402AccessError as exc:
+                if exc.code == "settlement_uncertain":
+                    # This is a read of sticky reconciliation state, not a new
+                    # settle call. The initial attempt owns the failure event.
+                    return _bounded_response(
+                        {
+                            "detail": "x402 settlement requires reconciliation",
+                            "state": "settlement_uncertain",
+                        },
+                        status_code=exc.http_status,
+                    )
+                if exc.code == "settled_response_retired":
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="replay",
+                        reason="response_retired",
+                    )
+                    return _bounded_response(
+                        {
+                            "detail": "settled response retention ended; the "
+                            "authorization cannot be charged again",
+                            "state": "settled_response_retired",
+                        },
+                        status_code=exc.http_status,
+                    )
+                if exc.code == "payment_authorization_retired":
+                    active_telemetry.emit(
+                        X402_VERIFY_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason="authorization_retired",
+                    )
+                    return _bounded_response(
+                        {
+                            "detail": "payment authorization was retired and "
+                            "cannot be reused",
+                            "state": "payment_authorization_retired",
+                        },
+                        status_code=exc.http_status,
+                    )
+                reason = _x402_verify_telemetry_reason(exc)
+                if exc.http_status == 402:
+                    response = x402_challenge_response(
+                        raw_body,
+                        error="Payment authorization was not accepted",
+                    )
+                    active_telemetry.emit(
+                        X402_OFFERED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                    )
+                else:
+                    response = _bounded_response(
+                        {"detail": "x402 access unavailable", "state": reason},
+                        status_code=exc.http_status,
+                    )
+                active_telemetry.emit(
+                    X402_VERIFY_FAILED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason=reason,
+                )
+                return response
+
+            if isinstance(access, CompletedAccess):
+                evaluated_at = _utc_instant(clock(), "clock")
+                try:
+                    outcome = _completed_access_outcome(
+                        access,
+                        evaluated_at=evaluated_at,
+                        expected_request_hash=expected_request_hash,
+                        expected_policy_hash=expected_policy_hash,
+                    )
+                    response = _completed_access_response(
+                        access,
+                        evaluated_at=evaluated_at,
+                        expected_request_hash=expected_request_hash,
+                        expected_policy_hash=expected_policy_hash,
+                    )
+                except CompletedAccessExpired:
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="replay",
+                        reason="response_expired",
+                    )
+                    return _settled_access_error_response(
+                        access,
+                        detail=(
+                            "settled safety receipt is expired; submit a fresh "
+                            "request and payment"
+                        ),
+                        state="settled_response_expired",
+                        status_code=409,
+                    )
+                except ValueError:
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="replay",
+                        reason="response_invalid",
+                    )
+                    return _settled_access_error_response(
+                        access,
+                        detail="settled safety response is invalid",
+                        state="settled_response_invalid",
+                        status_code=503,
+                    )
+                active_telemetry.emit(
+                    X402_RELEASED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    delivery="replay",
+                    outcome=outcome,
+                )
+                return response
+
+            if not isinstance(access, PreparedAccess):
+                active_telemetry.emit(
+                    X402_VERIFY_FAILED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    reason="internal_error",
+                )
+                return _bounded_response(
+                    {"detail": "x402 access unavailable", "state": "internal_error"},
+                    status_code=500,
+                )
+
+            settlement_invoked = False
+            try:
+                try:
+                    receipt = await gateway.assess(envelope.request, envelope.policy)
+                except TradeSafetyError as exc:
+                    active_telemetry.emit(
+                        ASSESSMENT_REJECTED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason=_assessment_rejection_reason(exc),
+                    )
+                    if not active_x402_gate.abort(access):
+                        return _bounded_response(
+                            {
+                                "detail": "payment claim reconciliation required",
+                                "state": "internal_error",
+                            },
+                            status_code=503,
+                        )
+                    return _bounded_response(
+                        {
+                            "detail": _assessment_rejection_detail(exc),
+                            "state": "invalid_request",
+                        },
+                        status_code=422,
+                    )
+                except Exception:
+                    active_telemetry.emit(
+                        ASSESSMENT_REJECTED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason="internal_error",
+                    )
+                    if not active_x402_gate.abort(access):
+                        return _bounded_response(
+                            {
+                                "detail": "payment claim reconciliation required",
+                                "state": "internal_error",
+                            },
+                            status_code=503,
+                        )
+                    return _bounded_response(
+                        {"detail": "assessment unavailable", "state": "unavailable"},
+                        status_code=500,
+                    )
+
+                response_body = _canonical_json_bytes(receipt)
+                receipt_outcome = receipt["decision"]["outcome"]
+                active_telemetry.emit(
+                    ASSESSMENT_ACCEPTED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                )
+                active_telemetry.emit(
+                    ASSESSMENT_OUTCOME,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    outcome=receipt_outcome,
+                )
+                if len(response_body) > MAX_RESPONSE_BYTES:
+                    if not active_x402_gate.abort(access):
+                        return _bounded_response(
+                            {
+                                "detail": "payment claim reconciliation required",
+                                "state": "internal_error",
+                            },
+                            status_code=503,
+                        )
+                    return _bounded_response(
+                        {
+                            "detail": "assessment response exceeded its byte budget",
+                            "state": "unavailable",
+                        },
+                        status_code=502,
+                    )
+
+                if (
+                    len(response_body)
+                    > active_x402_gate.config.max_cached_response_bytes
+                ):
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="initial",
+                        reason="response_too_large",
+                    )
+                    if not active_x402_gate.abort(access):
+                        return _bounded_response(
+                            {
+                                "detail": "payment claim reconciliation required",
+                                "state": "internal_error",
+                            },
+                            status_code=503,
+                        )
+                    return _bounded_response(
+                        {
+                            "detail": "assessment response exceeds the paid "
+                            "cache byte budget",
+                            "state": "response_too_large",
+                        },
+                        status_code=502,
+                    )
+
+                settlement_invoked = True
+                try:
+                    completed = await active_x402_gate.settle(
+                        access,
+                        response_body,
+                        status_code=200,
+                        content_type="application/json",
+                    )
+                except PaymentSettlementFailed as exc:
+                    active_telemetry.emit(
+                        X402_SETTLE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason="payment_rejected",
+                    )
+                    return _bounded_response(
+                        {},
+                        status_code=exc.http_status,
+                        headers={
+                            PAYMENT_RESPONSE_HEADER: exc.payment_response_header,
+                        },
+                    )
+                except X402AccessError as exc:
+                    reason = _x402_settle_telemetry_reason(exc)
+                    active_telemetry.emit(
+                        X402_SETTLE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason=reason,
+                    )
+                    return _bounded_response(
+                        {
+                            "detail": "x402 settlement unavailable",
+                            "state": reason,
+                        },
+                        status_code=exc.http_status,
+                    )
+                except Exception:
+                    active_telemetry.emit(
+                        X402_SETTLE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        reason="settlement_uncertain",
+                    )
+                    return _bounded_response(
+                        {
+                            "detail": "x402 settlement unavailable",
+                            "state": "settlement_uncertain",
+                        },
+                        status_code=503,
+                    )
+
+                active_telemetry.emit(
+                    X402_SETTLED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                )
+                try:
+                    evaluated_at = _utc_instant(clock(), "clock")
+                    outcome = _completed_access_outcome(
+                        completed,
+                        evaluated_at=evaluated_at,
+                        expected_request_hash=expected_request_hash,
+                        expected_policy_hash=expected_policy_hash,
+                    )
+                except CompletedAccessExpired:
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="initial",
+                        reason="response_expired",
+                    )
+                    return _settled_access_error_response(
+                        completed,
+                        detail=(
+                            "settled safety receipt expired before delivery; "
+                            "submit a fresh request and payment"
+                        ),
+                        state="settled_response_expired",
+                        status_code=409,
+                    )
+                except ValueError:
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="initial",
+                        reason="response_invalid",
+                    )
+                    return _settled_access_error_response(
+                        completed,
+                        detail="settled safety response failed validation",
+                        state="settled_response_invalid",
+                        status_code=503,
+                    )
+                if outcome != receipt_outcome:
+                    active_telemetry.emit(
+                        X402_RELEASE_FAILED,
+                        transport="x402",
+                        duration_ms=_elapsed_ms(started_ns),
+                        delivery="initial",
+                        reason="response_invalid",
+                    )
+                    return _settled_access_error_response(
+                        completed,
+                        detail="settled safety response failed validation",
+                        state="settled_response_invalid",
+                        status_code=503,
+                    )
+                active_telemetry.emit(
+                    X402_RELEASED,
+                    transport="x402",
+                    duration_ms=_elapsed_ms(started_ns),
+                    delivery="initial",
+                    outcome=outcome,
+                )
+                return _completed_access_response(
+                    completed,
+                    evaluated_at=evaluated_at,
+                    expected_request_hash=expected_request_hash,
+                    expected_policy_hash=expected_policy_hash,
+                )
+            except BaseException:
+                # Cancellation before settlement must not strand a reusable
+                # authorization in processing. Once settle is invoked the gate's
+                # sticky state owns reconciliation and must never be auto-aborted.
+                if not settlement_invoked:
+                    active_x402_gate.abort(access)
+                raise
 
     @application.post("/mcp", response_model=None)
     async def mcp(envelope: MCPEnvelope, _request: Request) -> Response:
-        if envelope.jsonrpc != "2.0":
-            return _bounded_response(
-                _rpc_error(envelope.id, -32600, "invalid JSON-RPC version")
+        started_ns = monotonic_time.monotonic_ns()
+        is_notification = "id" not in envelope.model_fields_set
+        modern = (
+            envelope.method not in {"initialize", "notifications/initialized"}
+            and "_meta" in envelope.params
+        )
+        transport_error = _mcp_transport_error(
+            _request,
+            envelope,
+            modern=modern,
+        )
+        if transport_error is not None:
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="transport",
+                outcome="error",
             )
+            return transport_error
+        if envelope.jsonrpc != "2.0":
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="transport",
+                outcome="error",
+            )
+            return _bounded_response(
+                _rpc_error(envelope.id, -32600, "invalid JSON-RPC version"),
+                status_code=400,
+            )
+        if not is_notification and envelope.id is None:
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="transport",
+                outcome="error",
+            )
+            return _bounded_response(
+                _rpc_error(None, -32600, "JSON-RPC request id must be non-null"),
+                status_code=400,
+            )
+        if is_notification:
+            if not envelope.method.startswith("notifications/"):
+                active_telemetry.emit(
+                    MCP_ACTIVATION,
+                    transport="mcp",
+                    duration_ms=_elapsed_ms(started_ns),
+                    operation="transport",
+                    outcome="error",
+                )
+                return _bounded_response(
+                    _rpc_error(None, -32600, "JSON-RPC requests require an id"),
+                    status_code=400,
+                )
+            if (
+                envelope.method == "notifications/initialized"
+                and envelope.params
+                and (
+                    set(envelope.params) != {"_meta"}
+                    or not isinstance(envelope.params.get("_meta"), dict)
+                )
+            ):
+                active_telemetry.emit(
+                    MCP_ACTIVATION,
+                    transport="mcp",
+                    duration_ms=_elapsed_ms(started_ns),
+                    operation="transport",
+                    outcome="error",
+                )
+                return _bounded_response(
+                    _rpc_error(None, -32602, "invalid initialized notification"),
+                    status_code=400,
+                )
+            # Notifications never receive a JSON-RPC response. Unknown legacy
+            # notifications are deliberately accepted as bounded no-ops.
+            return Response(status_code=202)
         if envelope.method == "initialize":
             if (
                 not isinstance(envelope.params.get("protocolVersion"), str)
                 or not isinstance(envelope.params.get("capabilities"), dict)
                 or not isinstance(envelope.params.get("clientInfo"), dict)
             ):
+                active_telemetry.emit(
+                    MCP_ACTIVATION,
+                    transport="mcp",
+                    duration_ms=_elapsed_ms(started_ns),
+                    operation="initialize",
+                    outcome="error",
+                )
                 return _bounded_response(
                     _rpc_error(envelope.id, -32602, "invalid initialize params")
                 )
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="initialize",
+                outcome="success",
+            )
             return _bounded_response(
                 _rpc_result(
                     envelope.id,
@@ -1289,13 +2497,12 @@ def create_app(
                         "instructions": (
                             "Read-only public sandbox. Live results fail closed; "
                             "there is no broker preview, recommendation, order "
-                            "route, resize, credential, custody, settlement, or "
-                            "execution tool."
+                            "route, resize, credential, custody, trade settlement, "
+                            "or execution tool. Optional x402 buys access only."
                         ),
                     },
                 )
             )
-        modern = "_meta" in envelope.params
         operation_params = {
             key: value for key, value in envelope.params.items() if key != "_meta"
         }
@@ -1318,6 +2525,19 @@ def create_app(
                         },
                     )
                 )
+            client_capabilities = meta.get("io.modelcontextprotocol/clientCapabilities")
+            client_info = meta.get("io.modelcontextprotocol/clientInfo")
+            if not isinstance(client_capabilities, dict) or (
+                client_info is not None
+                and (
+                    not isinstance(client_info, dict)
+                    or not isinstance(client_info.get("name"), str)
+                    or not isinstance(client_info.get("version"), str)
+                )
+            ):
+                return _bounded_response(
+                    _rpc_error(envelope.id, -32602, "invalid request metadata")
+                )
         if envelope.method == "server/discover":
             return _bounded_response(
                 _rpc_result(
@@ -1339,9 +2559,23 @@ def create_app(
             return _bounded_response(_rpc_result(envelope.id, {}, modern=modern))
         if envelope.method == "tools/list":
             if operation_params:
+                active_telemetry.emit(
+                    MCP_ACTIVATION,
+                    transport="mcp",
+                    duration_ms=_elapsed_ms(started_ns),
+                    operation="tools_list",
+                    outcome="error",
+                )
                 return _bounded_response(
                     _rpc_error(envelope.id, -32602, "tools/list accepts no params")
                 )
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="tools_list",
+                outcome="success",
+            )
             return _bounded_response(
                 _rpc_result(
                     envelope.id,
@@ -1355,7 +2589,8 @@ def create_app(
             )
         if envelope.method != "tools/call":
             return _bounded_response(
-                _rpc_error(envelope.id, -32601, "method not found")
+                _rpc_error(envelope.id, -32601, "method not found"),
+                status_code=404 if modern else 200,
             )
         if not _exact_keys(operation_params, {"name", "arguments"}):
             return _bounded_response(
@@ -1369,10 +2604,28 @@ def create_app(
             )
         if name == "trade_safety_capabilities":
             if arguments:
+                active_telemetry.emit(
+                    MCP_ACTIVATION,
+                    transport="mcp",
+                    duration_ms=_elapsed_ms(started_ns),
+                    operation="trade_safety_capabilities",
+                    outcome="error",
+                )
                 return _bounded_response(
                     _rpc_error(envelope.id, -32602, "capabilities accepts no arguments")
                 )
-            result = capabilities()
+            result = capabilities(
+                active_policy_guard,
+                active_x402_gate,
+                active_telemetry,
+            )
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="trade_safety_capabilities",
+                outcome="success",
+            )
             return _bounded_response(
                 _rpc_result(
                     envelope.id,
@@ -1395,7 +2648,24 @@ def create_app(
             tool_input = CheckEnvelope.model_validate(arguments)
             receipt = await gateway.assess(tool_input.request, tool_input.policy)
         except (TradeSafetyError, ValidationError) as exc:
-            message = str(exc) if isinstance(exc, TradeSafetyError) else "invalid input"
+            message = (
+                "invalid input"
+                if isinstance(exc, ValidationError)
+                else _assessment_rejection_detail(exc)
+            )
+            active_telemetry.emit(
+                ASSESSMENT_REJECTED,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                reason=_assessment_rejection_reason(exc),
+            )
+            active_telemetry.emit(
+                MCP_ACTIVATION,
+                transport="mcp",
+                duration_ms=_elapsed_ms(started_ns),
+                operation="assess_trade_safety",
+                outcome="error",
+            )
             return _bounded_response(
                 _rpc_result(
                     envelope.id,
@@ -1412,6 +2682,24 @@ def create_app(
                     modern=modern,
                 )
             )
+        active_telemetry.emit(
+            ASSESSMENT_ACCEPTED,
+            transport="mcp",
+            duration_ms=_elapsed_ms(started_ns),
+        )
+        active_telemetry.emit(
+            ASSESSMENT_OUTCOME,
+            transport="mcp",
+            duration_ms=_elapsed_ms(started_ns),
+            outcome=receipt["decision"]["outcome"],
+        )
+        active_telemetry.emit(
+            MCP_ACTIVATION,
+            transport="mcp",
+            duration_ms=_elapsed_ms(started_ns),
+            operation="assess_trade_safety",
+            outcome="success",
+        )
         return _bounded_response(
             _rpc_result(
                 envelope.id,
@@ -1436,9 +2724,6 @@ def create_app(
     return application
 
 
-app = create_app()
-
-
 __all__ = [
     "BTC_ALIASES",
     "LIQUILENS_BASE_URL",
@@ -1451,7 +2736,6 @@ __all__ = [
     "RawUpstreamResponse",
     "TradeSafetyGateway",
     "UpstreamTransport",
-    "app",
     "capabilities",
     "create_app",
 ]

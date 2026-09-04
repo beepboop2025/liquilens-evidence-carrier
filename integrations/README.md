@@ -11,7 +11,8 @@ without a negotiated marketplace listing:
   verification without accepting authentication secrets;
 - `trade-safety-gateway/` implements the fixed-upstream, read-only public
   sandbox over Seiche and Undertow's native Trade Safety contracts; it has no
-  broker credentials, execution route, custody, or settlement surface;
+  broker credentials, execution route, custody, or trade-settlement surface;
+  optional x402 v2 access-payment settlement remains a separate authority;
 - `openlineage/` validates the custom lineage facet;
 - `dbt/` rejects warehouse rows that strip clocks, rights, or redaction state;
   and

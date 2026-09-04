@@ -1,8 +1,10 @@
 # Trade Safety Infrastructure and Adoption Plan
 
-Status: implementation plan and staged delivery contract  
-Owner: Liquidity Lab  
-Initial products: Seiche, Undertow, LiquiLens  
+Status: staged delivery contract; core published, gateway `0.2.0` source candidate
+
+Owner: Liquidity Lab
+
+Initial products: Seiche, Undertow, LiquiLens
 Initial operating boundary: observation and paper trading; live trading fails closed
 
 ## 1. Objective
@@ -19,6 +21,22 @@ brokers, OMS/EMS systems, funds, and agent runtimes—technically mandatory.
 The enforceable product is not another trading model. It is a deterministic
 pre-trade safety gateway that issues a short-lived receipt bound to one exact
 order and one operator-owned policy.
+
+### Current state as of 2026-09-04
+
+Implemented in the gateway `0.2.0` source candidate:
+
+- fixed Seiche, Undertow, and conditional LiquiLens native-contract adapters;
+- strict request, policy, source, rights, clock, proof, and receipt validation;
+- a server-owned safety envelope that callers can tighten but cannot weaken;
+- dormant x402 v2 paid access with exact request/offer/extension binding,
+  Bazaar discovery, durable replay and reconciliation state; and
+- opt-in privacy-minimized MCP, assessment, and x402 funnel telemetry.
+
+Not yet claimed: a merged or published `0.2.0` artifact, a hosted paid gateway,
+an owner-authorized settlement canary, active design partners, unique agents or
+payers, broker/OMS enforcement, or a live-money route. Existing product-level
+x402 experiments are separate surfaces and do not prove this gateway is active.
 
 ## 2. Non-negotiable boundaries
 
@@ -163,11 +181,13 @@ reading from another product.
 
 ### Seiche adapter
 
-Initial source: hosted MCP `funding_stress_now` plus `data_health` where needed.
+Current gateway source: fixed cache-only REST projection
+`GET /api/trade-safety/risk-context`, schema `seiche.risk-context.v1`.
 
 Near-term work:
 
-- create a sealed cache-only `risk_context_receipt` projection;
+- add authenticated snapshot identity without changing the projection's
+  context-only authority;
 - normalize ready/warn/hold/unavailable and freshness reason codes;
 - bind public payload hashes to existing notary/attestation identity;
 - reject invalid subscriber credentials instead of silently downgrading when a
@@ -177,8 +197,9 @@ Near-term work:
 
 ### Undertow adapter
 
-Initial source: hosted MCP `exit_cost`, restricted to BTC, USD, and exact
-published rungs of USD 1,000, 10,000, 100,000, or 1,000,000.
+Current gateway source: hosted MCP tool `trade_safety_exit_context`, restricted
+to observe/paper BTC/USD sells and exact published rungs of USD 1,000, 10,000,
+100,000, or 1,000,000.
 
 The read-only sandbox adapter treats the current committed roster—Binance,
 Bitfinex, Coinbase, Gemini, Kraken, and OKX—as an explicit coverage contract.
@@ -228,6 +249,7 @@ One canonical schema and conformance suite feed every channel:
 | Channel | Role | Enforcement |
 |---|---|---|
 | REST/OpenAPI | deterministic assessment and verification | yes, when placed on order path |
+| x402 v2 + Bazaar | accountless paid access and machine discovery for one exact assessment | access control only; never order authority |
 | MCP | agent discovery, assessment and explanation | no by itself |
 | A2A | long-running portfolio/scenario tasks and artifacts | no by itself |
 | Python SDK | decorators, middleware, receipt verifier | yes in wrapped clients |
@@ -332,7 +354,9 @@ Target operating model:
 - GitHub: source and immutable release artifacts only;
 - Hetzner: scheduled collection, sealed snapshot creation, builds, tests,
   conformance and release orchestration;
-- Railway: stateless public gateway/API runtime and live public routes; and
+- Railway: stateless free/read-only public routes; an x402-enabled gateway must
+  instead run as a stateful single writer with its private persistent journal
+  volume, or use a separately reviewed shared transactional journal; and
 - broker/customer environment: credentials, policy secrets, HMAC keys, receipt
   consumption and any order submission.
 
@@ -364,12 +388,15 @@ proof of semantic freshness or exact release identity.
 
 - Apache-licensed schemas, verifier, conformance tests and client middleware;
 - public sandbox with small quotas;
+- free `/v1/check` and MCP assessment for adoption and evaluation;
 - public Seiche/Undertow context and evidence health; and
 - transparent status, methods, limitations and misses.
 
 ### Professional layer
 
 - higher quotas, richer Undertow/Seiche views, replay, webhooks and team policy;
+- accountless x402 access after an edge-enforced free quota, with the same
+  safety outcome and no claim that payment buys favorable treatment;
 - OpenBB/LEAN/copilot integrations; and
 - post-trade calibration and audit export.
 
@@ -382,6 +409,12 @@ proof of semantic freshness or exact release identity.
 The durable moat is the verified history of evidence, policy, decisions,
 overrides, misses, and expected-versus-realized outcomes—not a generic LLM or a
 claim that public data alone predicts returns.
+
+The source gateway itself has no application-level quota, and its x402 route
+currently returns the same assessment as free `/v1/check`. Therefore Bazaar
+discovery or a configured 402 response is not a commercial conversion. A paid
+deployment needs an honest, published free quota or another reviewed service
+difference at the edge, followed by reconciled settlements and repeat use.
 
 ## 12. Adoption metrics
 
@@ -403,14 +436,21 @@ not a large number of optional MCP installs.
 
 ## 13. Immediate implementation sequence
 
-1. Merge and publish the core v1 contract and verifier.
-2. Deploy the public read-only sandbox with live mode hard-blocked.
-3. Patch Undertow's invalid/nearest-rung size behavior and publish typed output.
-4. Add Seiche's cache-only readiness projection with signed snapshot identity.
-5. Ship Python/TypeScript middleware and OpenBB/LEAN/Alpaca-paper integrations.
-6. Recruit three shadow design partners and collect forward evidence.
-7. Add broker preview, asymmetric signing, replay store and one narrow owner-
-   authorized live canary only after the promotion gates pass.
+1. Finish independent review of the gateway `0.2.0` x402 journal, policy floor,
+   telemetry, packaging and recovery behavior; merge through protected main.
+2. Publish the independently signed, attested `0.2.0` gateway artifact without
+   describing artifact availability as hosted activation.
+3. Deploy the free read-only sandbox with live mode hard-blocked and prove exact
+   source/build identity, semantic freshness, rollback, edge limits and uptime.
+4. Run one owner-authorized, low-value x402 settlement canary; reconcile local,
+   facilitator and chain evidence before announcing paid availability.
+5. Publish framework-neutral client examples and submit Bazaar/catalog metadata;
+   measure activation and repeat calls with the privacy-safe scorecard in
+   `TRADE-SAFETY-TRACTION.md`.
+6. Ship the first broker-adjacent paper wrapper that makes a fresh verified
+   receipt structurally unavoidable, then recruit three shadow design partners.
+7. Add broker preview, asymmetric signing, protected-order telemetry and one
+   narrow owner-authorized live canary only after all promotion gates pass.
 
 This sequence makes the system useful immediately without pretending that the
 current research products already possess execution authority.
@@ -418,6 +458,8 @@ current research products already possess execution authority.
 ## 14. Primary interoperability references
 
 - [Model Context Protocol 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28)
+- [x402 protocol specification v2](https://github.com/x402-foundation/x402/blob/main/specs/x402-specification-v2.md)
+- [x402 Bazaar discovery extension](https://github.com/x402-foundation/x402/blob/main/specs/extensions/bazaar.md)
 - [OpenAPI 3.2](https://spec.openapis.org/oas/v3.2.0.html)
 - [RFC 9727 API Catalog](https://www.rfc-editor.org/rfc/rfc9727.html)
 - [Agent2Agent v1.0](https://a2a-protocol.org/v1.0.0/specification/)

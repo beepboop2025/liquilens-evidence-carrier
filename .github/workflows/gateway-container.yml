@@ -71,7 +71,7 @@ jobs:
             sleep 1
           done
           docker exec "$container_id" python -c \
-            "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/v1/capabilities')); assert value['state']=='read_only_sandbox'; assert value['receipt_integrity']=='sha256'; assert value['authority']['can_execute'] is False; assert value['authority']['has_order_submission'] is False"
+            "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/v1/capabilities')); assert value['state']=='read_only_sandbox'; assert value['receipt_integrity']=='sha256'; assert value['authority']['can_execute'] is False; assert value['authority']['has_order_submission'] is False; assert value['x402_access']['state']=='disabled'; assert value['x402_access']['protected_path'] is None"
           test "$(docker inspect --format '{{index .Config.Labels "io.liquilens.trade-safety.authority"}}' "$container_id")" = \
             "read-only-hash-only-sandbox"
       - name: Build both target architectures
@@ -103,11 +103,14 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
       - name: Verify signed release and resolve versions
         id: release
         env:
           EXPECTED_GATEWAY_CORE_VERSION: "0.19.0"
-          EXPECTED_GATEWAY_VERSION: "0.1.3"
+          EXPECTED_GATEWAY_VERSION: "0.2.0"
         run: |
           signer_file="ops/release/liquilens-evidence-carrier.allowed_signers"
           tag_name="$GITHUB_REF_NAME"
@@ -151,9 +154,8 @@ jobs:
               gateway_version="$source_gateway_version"
               core_version="$source_core_version"
               image_tags="$(printf '%s\n' \
-                "${IMAGE}:${gateway_version}" \
                 "${IMAGE}:core-${core_version}" \
-                "${IMAGE}:sha-${release_commit}" \
+                "${IMAGE}:core-sha-${release_commit}" \
                 "${IMAGE}:latest")"
               immutable_tags=""
               ;;
@@ -176,6 +178,78 @@ jobs:
             printf '%s\n' "$immutable_tags"
             echo "EOF"
           } >>"$GITHUB_OUTPUT"
+      - name: Test and build the exact tagged gateway source
+        run: |
+          python -m pip install uv==0.12.5
+          uv sync --project integrations/trade-safety-gateway --locked --extra test
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            pytest -q integrations/trade-safety-gateway/tests
+          uv run --project integrations/trade-safety-gateway --locked --extra test \
+            ruff check integrations/trade-safety-gateway/src \
+              integrations/trade-safety-gateway/tests
+          uv build --project integrations/trade-safety-gateway \
+            --out-dir "$RUNNER_TEMP/gateway-dist"
+          GATEWAY_WHEEL_ROOT="$RUNNER_TEMP/gateway-wheel" \
+            integrations/trade-safety-gateway/.venv/bin/python - <<'PY'
+          import os
+          import sys
+          import tarfile
+          import zipfile
+          from pathlib import Path
+
+          dist = Path(os.environ["RUNNER_TEMP"]) / "gateway-dist"
+          wheels = list(dist.glob("*.whl"))
+          sdists = list(dist.glob("*.tar.gz"))
+          assert len(wheels) == 1
+          assert len(sdists) == 1
+          root = Path(os.environ["GATEWAY_WHEEL_ROOT"])
+          with zipfile.ZipFile(wheels[0]) as archive:
+              archive.extractall(root)
+          with tarfile.open(sdists[0], "r:gz") as archive:
+              names = archive.getnames()
+              for legal_name in ("LICENSE", "NOTICE"):
+                  member = next(
+                      member
+                      for member in archive.getmembers()
+                      if member.name.endswith(f"/{legal_name}")
+                  )
+                  extracted = archive.extractfile(member)
+                  assert extracted is not None
+                  assert extracted.read() == Path(
+                      f"integrations/trade-safety-gateway/{legal_name}"
+                  ).read_bytes()
+          assert any(name.endswith("/pyproject.toml") for name in names)
+          assert any(name.endswith("/README.md") for name in names)
+          sys.path.insert(0, str(root))
+          from importlib.metadata import PathDistribution
+
+          metadata_root = next(root.glob("*.dist-info"))
+          distribution = PathDistribution(metadata_root)
+          assert distribution.version == "0.2.0"
+          assert distribution.metadata.get_all("License-File") == [
+              "LICENSE",
+              "NOTICE",
+          ]
+          for legal_name in ("LICENSE", "NOTICE"):
+              assert (metadata_root / "licenses" / legal_name).read_bytes() == Path(
+                  f"integrations/trade-safety-gateway/{legal_name}"
+              ).read_bytes()
+          entry_points = {
+              entry.name: entry
+              for entry in distribution.entry_points
+              if entry.group == "console_scripts"
+          }
+          assert set(entry_points) == {
+              "liquilens-trade-safety-gateway",
+              "liquilens-trade-safety-x402-reconcile",
+          }
+          assert (root / "trade_safety_gateway/asgi.py").is_file()
+          for entry in entry_points.values():
+              loaded = entry.load()
+              assert callable(loaded)
+              module = sys.modules[loaded.__module__]
+              assert Path(module.__file__).resolve().is_relative_to(root.resolve())
+          PY
       - uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -299,3 +373,5 @@ jobs:
             test "$attempt" -lt 30
             sleep 1
           done
+          docker exec "$container_id" python -c \
+            "import json,urllib.request; value=json.load(urllib.request.urlopen('http://127.0.0.1:8080/v1/capabilities')); assert value['x402_access']['state']=='disabled'; assert value['x402_access']['protected_path'] is None"

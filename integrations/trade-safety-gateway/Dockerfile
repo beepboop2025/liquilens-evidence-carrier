@@ -26,7 +26,7 @@ ARG ISSUER_ENDPOINT="https://liquilens.in/trade-safety-gateway"
 LABEL org.opencontainers.image.title="LiquiLens Trade Safety Gateway" \
       org.opencontainers.image.description="Read-only sandbox for order-bound Trade Safety Receipts." \
       org.opencontainers.image.created="${CREATED}" \
-      org.opencontainers.image.version="0.1.3" \
+      org.opencontainers.image.version="0.2.0" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.source="https://github.com/beepboop2025/liquilens-evidence-carrier" \
@@ -52,4 +52,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()"]
 
-CMD ["uvicorn", "trade_safety_gateway.app:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--workers", "1"]
+CMD ["uvicorn", "trade_safety_gateway.asgi:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log", "--workers", "1"]
