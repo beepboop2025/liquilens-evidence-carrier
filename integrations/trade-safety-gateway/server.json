@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.beepboop2025/liquilens-trade-safety-gateway",
+  "title": "LiquiLens Trade Safety Gateway",
+  "description": "Read-only checks for proposed orders against evidence and policy; no trading or payment authority.",
+  "version": "0.2.0",
+  "repository": {
+    "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+    "source": "github",
+    "id": "1344895874",
+    "subfolder": "integrations/trade-safety-gateway"
+  },
+  "websiteUrl": "https://liquilens.in/protocol/trade-safety/",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://trade-safety.liquilens.in/mcp"
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "protocolVersions": [
+        "2026-07-28",
+        "2025-11-25"
+      ],
+      "mode": "read-only-sandbox",
+      "financialAuthority": "none",
+      "executionAuthority": false,
+      "brokerCredentials": false,
+      "orderSubmission": false,
+      "x402Access": "disabled",
+      "sourceRevision": "5f46ff09288a8ee1024715db75615ab5882465fa",
+      "ociImage": "ghcr.io/beepboop2025/liquilens-trade-safety-gateway@sha256:2d741addefa972e25d65f2617ce75f639321345ffe74dd02d5f3b4f668154762"
+    }
+  }
+}

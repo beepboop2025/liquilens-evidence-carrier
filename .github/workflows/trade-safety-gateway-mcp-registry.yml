@@ -1,0 +1,220 @@
+name: Publish Trade Safety Gateway MCP Registry
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: trade-safety-gateway-mcp-registry
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Require current protected main
+        timeout-minutes: 1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          branch="$(gh api "repos/$GITHUB_REPOSITORY/branches/main")"
+          python3 - "$GITHUB_SHA" "$branch" <<'PY'
+          import json
+          import sys
+
+          expected, raw = sys.argv[1:]
+          branch = json.loads(raw)
+          assert branch["protected"] is True
+          assert branch["commit"]["sha"] == expected
+          PY
+      - name: Prove the exact public read-only gateway
+        timeout-minutes: 3
+        env:
+          BASE_URL: https://trade-safety.liquilens.in
+          EXPECTED_REVISION: 5f46ff09288a8ee1024715db75615ab5882465fa
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import ssl
+          import time
+          import urllib.request
+
+          base_url = os.environ["BASE_URL"]
+          expected_revision = os.environ["EXPECTED_REVISION"]
+          context = ssl.create_default_context()
+
+          def request(path, *, body=None, headers=None):
+              data = None if body is None else json.dumps(body).encode("utf-8")
+              request_headers = {"accept": "application/json"}
+              request_headers.update(headers or {})
+              if data is not None:
+                  request_headers["content-type"] = "application/json"
+              last_error = None
+              for attempt in range(12):
+                  try:
+                      req = urllib.request.Request(
+                          base_url + path,
+                          data=data,
+                          headers=request_headers,
+                          method="POST" if data is not None else "GET",
+                      )
+                      with urllib.request.urlopen(
+                          req, timeout=10, context=context
+                      ) as response:
+                          assert response.status == 200
+                          assert response.headers["cache-control"] == "no-store"
+                          assert (
+                              response.headers["x-trade-safety-authority"]
+                              == "read-only"
+                          )
+                          assert (
+                              response.headers["x-trade-safety-execution"]
+                              == "disabled"
+                          )
+                          return json.load(response)
+                  except Exception as error:
+                      last_error = error
+                      if attempt == 11:
+                          raise
+                      time.sleep(5)
+              raise AssertionError(last_error)
+
+          health = request("/healthz")
+          assert health["status"] == "ok"
+          assert health["version"] == "0.2.0"
+          assert health["source_revision"] == expected_revision
+          assert health["issuer_endpoint"] == base_url
+          assert health["state"] == "read_only_sandbox"
+          assert health["can_execute"] is False
+          assert health["telemetry"]["state"] == "disabled"
+
+          capabilities = request("/v1/capabilities")
+          assert capabilities["version"] == "0.2.0"
+          assert capabilities["source_revision"] == expected_revision
+          assert capabilities["issuer_endpoint"] == base_url
+          assert capabilities["state"] == "read_only_sandbox"
+          assert capabilities["x402_access"]["state"] == "disabled"
+          assert capabilities["x402_access"]["protected_path"] is None
+          assert capabilities["execution_tools"] == []
+          assert capabilities["mcp_tools"] == [
+              "assess_trade_safety",
+              "trade_safety_capabilities",
+          ]
+          assert all(value is False for value in capabilities["authority"].values())
+
+          openapi = request("/openapi.json")
+          paths = set(openapi["paths"])
+          assert {"/healthz", "/v1/capabilities", "/v1/check", "/mcp"} <= paths
+          assert "/v1/x402/check" not in paths
+          assert not any("broker" in path or "order" in path for path in paths)
+
+          initialized = request(
+              "/mcp",
+              body={
+                  "jsonrpc": "2.0",
+                  "id": "registry-proof",
+                  "method": "initialize",
+                  "params": {
+                      "protocolVersion": "2025-11-25",
+                      "capabilities": {},
+                      "clientInfo": {
+                          "name": "liquilens-registry-proof",
+                          "version": "1",
+                      },
+                  },
+              },
+          )
+          assert initialized["result"]["protocolVersion"] == "2025-11-25"
+          assert initialized["result"]["serverInfo"] == {
+              "name": "liquilens-trade-safety-gateway",
+              "title": "LiquiLens Trade Safety Gateway",
+              "version": "0.2.0",
+          }
+
+          listed = request(
+              "/mcp",
+              body={
+                  "jsonrpc": "2.0",
+                  "id": "registry-tools",
+                  "method": "tools/list",
+                  "params": {},
+              },
+              headers={"MCP-Protocol-Version": "2025-11-25"},
+          )
+          tools = listed["result"]["tools"]
+          assert {tool["name"] for tool in tools} == {
+              "assess_trade_safety",
+              "trade_safety_capabilities",
+          }
+          assert all(tool["annotations"]["readOnlyHint"] is True for tool in tools)
+          assert all(
+              tool["annotations"]["destructiveHint"] is False for tool in tools
+          )
+          PY
+      - name: Install pinned MCP publisher
+        timeout-minutes: 1
+        run: |
+          curl --fail --location --silent --show-error \
+            --output mcp-publisher.tar.gz \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          printf '%s  %s\n' \
+            'a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc' \
+            'mcp-publisher.tar.gz' \
+            | sha256sum --check --strict
+          tar --extract --gzip --file mcp-publisher.tar.gz mcp-publisher
+          ./mcp-publisher --version
+      - name: Validate Registry metadata
+        run: >-
+          ./mcp-publisher validate
+          integrations/trade-safety-gateway/server.json
+      - name: Authenticate to the official Registry
+        run: ./mcp-publisher login github-oidc
+      - name: Publish to the official MCP Registry
+        run: >-
+          ./mcp-publisher publish
+          integrations/trade-safety-gateway/server.json
+      - name: Require official Registry convergence
+        timeout-minutes: 2
+        run: |
+          python3 - <<'PY'
+          import json
+          import time
+          import urllib.parse
+          import urllib.request
+
+          name = "io.github.beepboop2025/liquilens-trade-safety-gateway"
+          url = (
+              "https://registry.modelcontextprotocol.io/v0.1/servers/"
+              + urllib.parse.quote(name, safe="")
+              + "/versions/0.2.0"
+          )
+          for attempt in range(12):
+              try:
+                  with urllib.request.urlopen(url, timeout=10) as response:
+                      payload = json.load(response)["server"]
+                  assert payload["name"] == name
+                  assert payload["version"] == "0.2.0"
+                  assert payload["remotes"] == [
+                      {
+                          "type": "streamable-http",
+                          "url": "https://trade-safety.liquilens.in/mcp",
+                      }
+                  ]
+                  break
+              except Exception:
+                  if attempt == 11:
+                      raise
+                  time.sleep(5)
+          PY
