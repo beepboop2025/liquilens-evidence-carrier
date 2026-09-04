@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liquilens-alpaca-paper"
+version = "0.1.0"
+description = "Fail-closed Alpaca paper-order adapter for LiquiLens Trade Safety Receipts"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.15"
+authors = [{name = "LiquiLens"}]
+keywords = ["ai-agents", "alpaca", "paper-trading", "risk-controls", "trade-safety"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+]
+dependencies = [
+    "alpaca-py==0.44.0",
+    "liquilens-evidence==0.19.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "mypy>=1.17,<2",
+    "pytest>=9.0.3,<10",
+    "ruff>=0.15,<0.16",
+]
+
+[project.urls]
+Homepage = "https://liquilens.in/protocol/"
+Documentation = "https://github.com/beepboop2025/liquilens-evidence-carrier/tree/main/integrations/alpaca-paper"
+Repository = "https://github.com/beepboop2025/liquilens-evidence-carrier"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+liquilens_alpaca_paper = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../../src"]
+addopts = "-q"
+
+[tool.mypy]
+files = ["src"]
+strict = true
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.uv.sources]
+liquilens-evidence = {path = "../..", editable = true}

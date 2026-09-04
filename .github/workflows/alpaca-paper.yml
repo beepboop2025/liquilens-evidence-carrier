@@ -1,0 +1,47 @@
+name: Alpaca paper adapter
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/alpaca-paper.yml"
+      - "integrations/alpaca-paper/**"
+      - "src/liquilens_evidence/order_guard.py"
+      - "src/liquilens_evidence/trade_safety.py"
+      - "examples/trade-safety/**"
+  pull_request:
+    paths:
+      - ".github/workflows/alpaca-paper.yml"
+      - "integrations/alpaca-paper/**"
+      - "src/liquilens_evidence/order_guard.py"
+      - "src/liquilens_evidence/trade_safety.py"
+      - "examples/trade-safety/**"
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install locked adapter environment
+        run: |
+          python -m pip install uv==0.12.5
+          uv sync --project integrations/alpaca-paper --locked --extra test
+      - name: Verify fail-closed adapter
+        run: |
+          uv run --project integrations/alpaca-paper --locked --extra test \
+            pytest -q integrations/alpaca-paper/tests
+          uv run --project integrations/alpaca-paper --locked --extra test \
+            ruff check integrations/alpaca-paper/src \
+              integrations/alpaca-paper/tests
+          uv run --project integrations/alpaca-paper --locked --extra test \
+            mypy integrations/alpaca-paper/src
+      - name: Build package
+        run: uv build --project integrations/alpaca-paper
