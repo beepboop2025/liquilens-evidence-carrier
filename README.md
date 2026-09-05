@@ -98,6 +98,11 @@ separately identified reference rather than silently upgraded.
 
 ## Install and verify
 
+The [installation guide](docs/INSTALLATION.md) covers ordinary conda-forge
+`0.15.0`, the listed Dev Container Feature (Carrier `0.14.0`), and SchemaStore
+editor setup. Those channels have their own versions; use the signed `0.19.0`
+wheel below for the current core release and Trade Safety verification.
+
 ```bash
 # Source checkout (main may contain post-release documentation)
 uv sync --locked

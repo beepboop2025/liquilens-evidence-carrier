@@ -285,8 +285,9 @@ Use the public Dev Container Feature by immutable OCI digest in
 
 An anonymous non-root consumer resolved that digest, revalidated the exact
 carrier wheel, and exercised both the CLI and MCP server. The feature is
-available directly from GHCR; inclusion in the community index remains under
-external review.
+available directly from GHCR and listed in the
+[official feature index](https://containers.dev/features). Feature `1.0.0`
+installs Carrier `0.14.0`; see the [installation guide](docs/INSTALLATION.md).
 
 ## Browser and notebooks
 
@@ -330,6 +331,10 @@ offline verifier for caller-supplied JSON, not a market-data provider.
   lists the LiquiLens Evidence Carrier Features collection.
 - [SchemaStore catalog #6238](https://github.com/SchemaStore/schemastore/pull/6238)
   is merged for the Carrier and redacted-reference schemas.
+- [conda-forge staged recipe #34616](https://github.com/conda-forge/staged-recipes/pull/34616)
+  is merged. Carrier `0.15.0` installs from the ordinary `conda-forge` channel;
+  the [installation guide](docs/INSTALLATION.md) records the tested command,
+  exact artifact, and version boundaries.
 
 Fleet Brief v1 is not claimed as a SchemaStore listing; its follow-up entry
 waits for the canonical site schema to be deployed and verified.
@@ -339,7 +344,6 @@ waits for the canonical site schema to be deployed and verified.
 These submissions are open for external review and are not described as live
 upstream listings:
 
-- [conda-forge staged recipe #34616](https://github.com/conda-forge/staged-recipes/pull/34616)
 - [FINOS Labs FDC3 App Directory #40](https://github.com/finos-labs/FDC3-App-Directory/pull/40)
 - [dbt HubCap #446](https://github.com/dbt-labs/hubcap/pull/446)
 - [Docker MCP Registry: Evidence Carrier #4766](https://github.com/docker/mcp-registry/pull/4766)
