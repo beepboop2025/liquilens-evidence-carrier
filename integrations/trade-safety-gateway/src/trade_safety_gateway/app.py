@@ -76,7 +76,7 @@ from .x402_access import (
 from .x402_runtime import X402Runtime, x402_runtime_from_env
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.2.0"
+SERVICE_VERSION = "0.2.1"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -308,6 +308,10 @@ class SafetyEnvelopeMiddleware:
             )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        with self.telemetry.request_context(scope.get("headers", [])):
+            await self._call(scope, receive, send)
+
+    async def _call(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return

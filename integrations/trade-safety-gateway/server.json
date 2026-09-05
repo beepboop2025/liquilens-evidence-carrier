@@ -3,7 +3,7 @@
   "name": "io.github.beepboop2025/liquilens-trade-safety-gateway",
   "title": "LiquiLens Trade Safety Gateway",
   "description": "Read-only checks for proposed orders against evidence and policy; no trading or payment authority.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "repository": {
     "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
     "source": "github",
@@ -28,9 +28,7 @@
       "executionAuthority": false,
       "brokerCredentials": false,
       "orderSubmission": false,
-      "x402Access": "disabled",
-      "sourceRevision": "5f46ff09288a8ee1024715db75615ab5882465fa",
-      "ociImage": "ghcr.io/beepboop2025/liquilens-trade-safety-gateway@sha256:2d741addefa972e25d65f2617ce75f639321345ffe74dd02d5f3b4f668154762"
+      "x402Access": "disabled"
     }
   }
 }

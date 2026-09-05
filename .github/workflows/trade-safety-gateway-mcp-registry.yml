@@ -2,8 +2,14 @@ name: Publish Trade Safety Gateway MCP Registry
 
 on:
   workflow_dispatch:
+    inputs:
+      gateway_image_digest:
+        description: "Attested gateway index digest, sha256 followed by 64 hex digits"
+        required: true
+        type: string
 
 permissions:
+  attestations: read
   contents: read
   id-token: write
 
@@ -42,7 +48,7 @@ jobs:
         timeout-minutes: 3
         env:
           BASE_URL: https://trade-safety.liquilens.in
-          EXPECTED_REVISION: 5f46ff09288a8ee1024715db75615ab5882465fa
+          EXPECTED_REVISION: ${{ github.sha }}
         run: |
           python3 - <<'PY'
           import json
@@ -57,7 +63,7 @@ jobs:
 
           def request(path, *, body=None, headers=None):
               data = None if body is None else json.dumps(body).encode("utf-8")
-              request_headers = {"accept": "application/json"}
+              request_headers = {"accept": "application/json", "X-Liquilens-Traffic-Class": "synthetic"}
               request_headers.update(headers or {})
               if data is not None:
                   request_headers["content-type"] = "application/json"
@@ -93,15 +99,15 @@ jobs:
 
           health = request("/healthz")
           assert health["status"] == "ok"
-          assert health["version"] == "0.2.0"
+          assert health["version"] == "0.2.1"
           assert health["source_revision"] == expected_revision
           assert health["issuer_endpoint"] == base_url
           assert health["state"] == "read_only_sandbox"
           assert health["can_execute"] is False
-          assert health["telemetry"]["state"] == "disabled"
+          assert health["telemetry"]["state"] == "ready"
 
           capabilities = request("/v1/capabilities")
-          assert capabilities["version"] == "0.2.0"
+          assert capabilities["version"] == "0.2.1"
           assert capabilities["source_revision"] == expected_revision
           assert capabilities["issuer_endpoint"] == base_url
           assert capabilities["state"] == "read_only_sandbox"
@@ -140,7 +146,7 @@ jobs:
           assert initialized["result"]["serverInfo"] == {
               "name": "liquilens-trade-safety-gateway",
               "title": "LiquiLens Trade Safety Gateway",
-              "version": "0.2.0",
+              "version": "0.2.1",
           }
 
           listed = request(
@@ -175,6 +181,32 @@ jobs:
             | sha256sum --check --strict
           tar --extract --gzip --file mcp-publisher.tar.gz mcp-publisher
           ./mcp-publisher --version
+      - name: Bind Registry metadata to the attested gateway release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_DIGEST: ${{ inputs.gateway_image_digest }}
+        run: |
+          set -euo pipefail
+          [[ "$IMAGE_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image="ghcr.io/beepboop2025/liquilens-trade-safety-gateway@$IMAGE_DIGEST"
+          gh attestation verify "oci://$image" --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/gateway-container.yml"
+          docker buildx imagetools inspect --raw "$image" >gateway-index.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          index = json.loads(Path("gateway-index.json").read_text())
+          assert index["annotations"]["org.opencontainers.image.revision"] == os.environ["GITHUB_SHA"]
+          assert index["annotations"]["org.opencontainers.image.version"] == "0.2.1"
+          path = Path("integrations/trade-safety-gateway/server.json")
+          document = json.loads(path.read_text())
+          metadata = document["_meta"]["io.modelcontextprotocol.registry/publisher-provided"]
+          metadata["sourceRevision"] = os.environ["GITHUB_SHA"]
+          metadata["ociImage"] = "ghcr.io/beepboop2025/liquilens-trade-safety-gateway@" + os.environ["IMAGE_DIGEST"]
+          path.write_text(json.dumps(document, indent=2) + "\n")
+          PY
       - name: Validate Registry metadata
         run: >-
           ./mcp-publisher validate
@@ -198,14 +230,14 @@ jobs:
           url = (
               "https://registry.modelcontextprotocol.io/v0.1/servers/"
               + urllib.parse.quote(name, safe="")
-              + "/versions/0.2.0"
+              + "/versions/0.2.1"
           )
           for attempt in range(12):
               try:
                   with urllib.request.urlopen(url, timeout=10) as response:
                       payload = json.load(response)["server"]
                   assert payload["name"] == name
-                  assert payload["version"] == "0.2.0"
+                  assert payload["version"] == "0.2.1"
                   assert payload["remotes"] == [
                       {
                           "type": "streamable-http",

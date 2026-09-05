@@ -498,3 +498,106 @@ def test_append_sink_enforces_single_bounded_line(tmp_path) -> None:
     # Configuration probes the destination eagerly so a broken opt-in cannot
     # masquerade as enabled collection before the first request arrives.
     assert path.read_bytes() == b""
+
+
+def test_provider_sink_is_explicit_and_does_not_reveal_client_identity(
+    monkeypatch, capsys
+):
+    from trade_safety_gateway.telemetry import (
+        TELEMETRY_IDENTITY_ENV,
+        TELEMETRY_STDOUT_ENV,
+    )
+
+    monkeypatch.delenv(TELEMETRY_PATH_ENV, raising=False)
+    monkeypatch.setenv(TELEMETRY_STDOUT_ENV, "1")
+    monkeypatch.setenv(TELEMETRY_IDENTITY_ENV, "ab" * 32)
+    emitter = telemetry_from_env("0.2.0", REVISION)
+    client = b"8cd0e592-2eb7-44b8-999f-abfb8cc0fa3e"
+    with emitter.request_context(
+        [(b"x-liquilens-client-id", client), (b"authorization", b"secret-token")]
+    ):
+        emitter.emit(ASSESSMENT_OUTCOME, transport="rest", outcome="hold")
+    output = capsys.readouterr().out
+    record = json.loads(output.removeprefix("TRADE_SAFETY_TRACTION "))
+    assert record["schema"] == "liquilens.trade-safety-traction.v2"
+    assert len(record["installation_key"]) == 64
+    assert record["traffic_class"] == "unattributed"
+    assert (
+        client.decode() not in output
+        and "secret-token" not in output
+        and "ab" * 32 not in output
+    )
+    assert emitter.status == {"state": "ready", "delivery_failures": 0}
+
+
+@pytest.mark.parametrize("configured", ["", "yes", "0"])
+def test_stdout_opt_in_rejects_ambiguous_values(monkeypatch, configured):
+    monkeypatch.setenv("TRADE_SAFETY_TELEMETRY_STDOUT", configured)
+    with pytest.raises(ValueError):
+        telemetry_from_env("0.2.0", REVISION)
+
+
+def test_provider_sink_rejects_dual_sinks_and_invalid_identity_key(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("TRADE_SAFETY_TELEMETRY_STDOUT", "1")
+    monkeypatch.setenv(TELEMETRY_PATH_ENV, str(tmp_path / "events.jsonl"))
+    with pytest.raises(ValueError, match="exactly one"):
+        telemetry_from_env("0.2.0", REVISION)
+    monkeypatch.delenv(TELEMETRY_PATH_ENV)
+    monkeypatch.setenv("TRADE_SAFETY_TELEMETRY_IDENTITY_KEY", "secret-invalid")
+    with pytest.raises(ValueError) as error:
+        telemetry_from_env("0.2.0", REVISION)
+    assert "secret-invalid" not in str(error.value)
+
+
+def test_request_context_is_stable_classified_and_isolated_across_tasks():
+    import asyncio
+
+    sink = InMemoryTelemetrySink()
+    emitter = TelemetryEmitter(
+        service_version="0.2.0",
+        source_revision=REVISION,
+        sink=sink,
+        identity_key=b"k" * 32,
+    )
+    clients = [
+        b"8cd0e592-2eb7-44b8-999f-abfb8cc0fa3e",
+        b"93183944-859a-44b6-8ec5-9bb3e4da46df",
+    ]
+
+    async def request(client, headers):
+        with emitter.request_context([(b"x-liquilens-client-id", client), *headers]):
+            await asyncio.sleep(0)
+            emitter.emit(ASSESSMENT_ACCEPTED, transport="rest")
+            await asyncio.sleep(0)
+            emitter.emit(ASSESSMENT_OUTCOME, transport="rest", outcome="hold")
+
+    async def together():
+        await asyncio.gather(
+            request(clients[0], [(b"x-liquilens-traffic-class", b"synthetic")]),
+            request(clients[1], [(b"user-agent", b"MCPBeat/1")]),
+        )
+
+    asyncio.run(together())
+    records = [json.loads(line) for line in sink.lines]
+    groups = {
+        kind: [r for r in records if r["traffic_class"] == kind]
+        for kind in ["synthetic", "automation"]
+    }
+    assert all(len(group) == 2 for group in groups.values())
+    assert len({r["installation_key"] for r in records}) == 2
+    assert len({r["installation_key"] for r in groups["synthetic"]}) == 1
+    emitter.emit(ASSESSMENT_ACCEPTED, transport="rest")
+    assert json.loads(sink.lines[-1])["installation_key"] is None
+    assert json.loads(sink.lines[-1])["traffic_class"] == "unattributed"
+    for headers in [
+        [(b"x-liquilens-client-id", b"private@example.test")],
+        [
+            (b"x-liquilens-client-id", clients[0]),
+            (b"x-liquilens-client-id", clients[1]),
+        ],
+    ]:
+        with emitter.request_context(headers):
+            emitter.emit(ASSESSMENT_ACCEPTED, transport="rest")
+        assert json.loads(sink.lines[-1])["installation_key"] is None

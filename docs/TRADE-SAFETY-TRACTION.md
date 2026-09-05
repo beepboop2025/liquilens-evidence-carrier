@@ -26,7 +26,9 @@ The emitter cannot accept a raw request, order, account, tenant or agent ID, IP
 address, wallet or payment payload, transaction hash, URL, evidence, exception
 text, prompt, bearer token, institution, instrument, or free-form reason. Unknown
 event names, properties and values are rejected before serialization. There is
-no correlation, session, installation, device, or pseudonymous caller ID.
+no session, device, or caller ID in the default v1 stream. The optional v2
+installation extension below stores only a keyed hash of a caller-supplied
+random UUID, never the raw UUID or an IP address.
 
 ## Event contract
 
@@ -70,9 +72,9 @@ aggregate transitions within a reporting window.
 
 ## Enabling a local sink
 
-The application factory reads exactly one optional setting:
-`TRADE_SAFETY_TELEMETRY_PATH`. With that variable absent, construction is a
-null configuration and no path is opened or written:
+The application factory supports an explicit local path or an explicit stdout
+sink. With both settings absent, construction is a null configuration and no
+path is opened or written:
 
 ```python
 telemetry = telemetry_from_env(SERVICE_VERSION, SERVICE_REVISION)
@@ -88,8 +90,10 @@ export TRADE_SAFETY_TELEMETRY_PATH=/var/lib/liquilens/traction.jsonl
 The directory must already exist and should be owned by the gateway service.
 An empty value, relative path, missing parent, symlink, non-regular existing
 target, wrong owner, or group/world-accessible existing target fails startup;
-it does not silently disable telemetry. No `*_ENABLED`, OpenTelemetry, GA, or
-other environment setting activates this sink.
+it does not silently disable telemetry. Alternatively,
+`TRADE_SAFETY_TELEMETRY_STDOUT=1` emits bounded records to private provider logs,
+prefixed with `TRADE_SAFETY_TRACTION `. Configuring both sinks is an error.
+No `*_ENABLED`, OpenTelemetry, or GA setting activates either sink.
 
 The sink creates and opens the file with mode `0600` during startup, rejects
 symlinks, hard links, read-only targets, and insecure existing files, caps each
@@ -153,11 +157,62 @@ expected and must never be added to settlement or revenue counts. Compare
 service version and source revision before attributing a change to product
 behavior.
 
+## Optional installation cohorts (v2)
+
+For repeat-installation measurement, an operator may configure
+`TRADE_SAFETY_TELEMETRY_IDENTITY_KEY` with a securely generated 32-byte secret
+encoded as 64 lowercase hexadecimal characters. Keep it in the deployment's
+secret store and stable across the intended reporting interval. It requires an
+enabled sink. The key never appears in telemetry or public capabilities.
+
+An integration may persist one random UUIDv4 locally and send it in
+`X-Liquilens-Client-Id`. The header is optional; every free route works without
+it. Do not use a user, account, email, wallet or institution identifier. The
+gateway stores a domain-separated HMAC of the UUID. Duplicate or malformed ID
+headers are ignored. A shared UUID represents a shared installation; a new UUID
+looks like a new installation. These are **unverified installation counts**,
+not people or authenticated customers.
+
+Mark all operator QA with `X-Liquilens-Traffic-Class: synthetic`. Known monitor
+user-agent names are classified as `automation`; all other requests remain
+`unattributed`. Headers are self-declared, so this filter cannot prove that the
+remaining traffic is external or human. No raw user agent or IP is stored.
+
+V2 adds a server-generated event UUID for duplicate log-export removal, an
+identity-key epoch, the installation hash (or null), and the finite traffic
+class. Context is reset after each ASGI request, including errors.
+
+To aggregate a private Railway JSONL export or raw prefixed telemetry lines:
+
+```sh
+python -m trade_safety_gateway.traction_report \
+  --start 2026-09-05T00:00:00Z \
+  --end 2026-09-13T00:00:00Z \
+  --coverage-start 2026-09-05T00:00:00Z < gateway-private-logs.jsonl
+```
+
+Export the full declared coverage interval. Provider limits and retention can
+truncate an export; the report labels coverage as operator-declared rather
+than proven complete. It does not fill missing time with zeros. Mixed key
+epochs, conflicting event duplicates and malformed telemetry refuse a report.
+
+Only completed `pass`, `limit` and `hold` assessment outcomes count as useful
+assessments. `unavailable`, MCP initialization, listing and capability checks
+are separate; MCP wrapper events never double-count an assessment. Synthetic
+and known automation events are excluded. Anonymous outcomes count as calls
+but cannot produce installation retention.
+
+D1/D7 report returned/eligible installations first observed in the reporting
+window, using full UTC calendar days. Prior observed installations and the
+first partial coverage day cannot enter a new cohort. A return day must finish
+before its cohort becomes eligible. These are first-observed cohorts within
+available logs, not lifetime acquisition or a guarantee of external usage.
+
 ## What this implementation cannot measure
 
 It cannot prove network receipt by a caller or determine unique agents,
 organizations, tenants, wallets, payers,
-sessions, cohorts, D1/D7 retention, attribution source, revenue, settlement
+sessions, person-level cohorts or D1/D7 retention, attribution source, revenue, settlement
 amount, protected-order volume, prevented loss, broker coverage, or whether an
 assessment affected a later order. It also cannot prove that an event came from
 the public edge rather than an authorized internal probe.
@@ -166,4 +221,5 @@ Those omissions are intentional. Reach needs source-specific distribution data;
 unique payer and revenue claims need independent payment reconciliation;
 protected-order claims need a fresh receipt enforced on the broker-adjacent
 order path. None should be reconstructed by adding identity or payment payloads
-to this telemetry stream.
+to this telemetry stream. The v2 installation report does not change these
+boundaries. It reports unknown people, payers and revenue as null, not zero.

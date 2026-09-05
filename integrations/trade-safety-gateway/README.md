@@ -181,10 +181,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.2.0 .
+  -t liquilens-trade-safety-gateway:0.2.1 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.2.0
+  -p 8080:8080 liquilens-trade-safety-gateway:0.2.1
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the
@@ -206,10 +206,10 @@ boundary and must be operated by the adopter. The independent gateway-tag lane
 publishes OCI only; it builds a wheel as validation evidence but does not publish
 that wheel, an sdist, or a GitHub Release.
 
-Gateway `0.2.0` has an independent release identity so publishing it does not
+Gateway `0.2.1` has an independent release identity so publishing it does not
 move or reuse the immutable core `v0.19.0` tag. After the release commit has
 landed on `origin/main`, an allowlisted release owner may create and push the
-annotated, signed tag `trade-safety-gateway-v0.2.0`. The workflow rejects a
+annotated, signed tag `trade-safety-gateway-v0.2.1`. The workflow rejects a
 lightweight or unsigned tag, an unsigned target commit, a target outside
 `origin/main`, a gateway/tag version mismatch, or any core `VERSION` other than
 `0.19.0`. It also rejects pre-existing gateway version, source-commit, or signed
@@ -246,3 +246,33 @@ The tests inject byte-exact fake upstream responses and cover:
 
 This directory is an implementation artifact only. Building or testing it does
 not deploy or register a public service.
+
+## Optional installation measurement
+
+All public checks and MCP tools work without an account or tracking header.
+An integration may opt into repeat-installation measurement by generating one
+random UUIDv4, keeping it across runs, and sending it as
+`X-Liquilens-Client-Id`. Never send an account, email, wallet or institution ID.
+The gateway records only a keyed hash; an installation is not a verified person.
+
+```python
+import os
+import uuid
+from pathlib import Path
+
+identity_path = Path(".liquilens-installation-id")
+try:
+    descriptor = os.open(identity_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+except FileExistsError:
+    pass
+else:
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(str(uuid.uuid4()))
+headers = {"X-Liquilens-Client-Id": identity_path.read_text().strip()}
+# Add these optional headers to your existing REST or MCP HTTP client.
+```
+
+Operator smoke tests must additionally send
+`X-Liquilens-Traffic-Class: synthetic`. See
+[the measurement contract](../../docs/TRADE-SAFETY-TRACTION.md) for private
+stdout configuration, cohort limits and the scorecard command.

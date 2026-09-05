@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "liquilens-trade-safety-gateway"
-version = "0.2.0"
+version = "0.2.1"
 description = "Read-only sandbox gateway for hash-bound LiquiLens Trade Safety Receipts"
 readme = "README.md"
 license = "Apache-2.0"

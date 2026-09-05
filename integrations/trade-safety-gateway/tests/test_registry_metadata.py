@@ -4,11 +4,6 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_REVISION = "5f46ff09288a8ee1024715db75615ab5882465fa"
-OCI_IMAGE = (
-    "ghcr.io/beepboop2025/liquilens-trade-safety-gateway@"
-    "sha256:2d741addefa972e25d65f2617ce75f639321345ffe74dd02d5f3b4f668154762"
-)
 
 
 def test_registry_metadata_is_remote_read_only_and_exact() -> None:
@@ -25,7 +20,7 @@ def test_registry_metadata_is_remote_read_only_and_exact() -> None:
             "Read-only checks for proposed orders against evidence and policy; "
             "no trading or payment authority."
         ),
-        "version": "0.2.0",
+        "version": "0.2.1",
         "repository": {
             "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
             "source": "github",
@@ -48,8 +43,6 @@ def test_registry_metadata_is_remote_read_only_and_exact() -> None:
                 "brokerCredentials": False,
                 "orderSubmission": False,
                 "x402Access": "disabled",
-                "sourceRevision": SOURCE_REVISION,
-                "ociImage": OCI_IMAGE,
             }
         },
     }
@@ -72,7 +65,10 @@ def test_registry_publication_is_manual_exact_and_live_proof_gated() -> None:
     assert proof < publish
     workflow_lines = set(workflow.splitlines())
     assert "          BASE_URL: https://trade-safety.liquilens.in" in workflow_lines
-    assert SOURCE_REVISION in workflow
+    assert "EXPECTED_REVISION: ${{ github.sha }}" in workflow
+    assert "gh attestation verify" in workflow
+    assert 'metadata["sourceRevision"] = os.environ["GITHUB_SHA"]' in workflow
+    assert 'assert health["telemetry"]["state"] == "ready"' in workflow
     assert 'capabilities["x402_access"]["state"] == "disabled"' in workflow
     assert 'capabilities["execution_tools"] == []' in workflow
     assert 'all(value is False for value in capabilities["authority"].values())' in (

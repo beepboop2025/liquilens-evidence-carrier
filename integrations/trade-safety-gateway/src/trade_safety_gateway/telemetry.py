@@ -8,13 +8,19 @@ collection by itself.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import math
 import os
 import re
 import stat
+import sys
 import threading
+import uuid
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -23,6 +29,25 @@ from typing import Final, Protocol
 TELEMETRY_SCHEMA: Final = "liquilens.trade-safety-traction.v1"
 MAX_TELEMETRY_LINE_BYTES: Final = 2048
 TELEMETRY_PATH_ENV: Final = "TRADE_SAFETY_TELEMETRY_PATH"
+TELEMETRY_STDOUT_ENV: Final = "TRADE_SAFETY_TELEMETRY_STDOUT"
+TELEMETRY_IDENTITY_ENV: Final = "TRADE_SAFETY_TELEMETRY_IDENTITY_KEY"
+TELEMETRY_CONTEXT_SCHEMA: Final = "liquilens.trade-safety-traction.v2"
+_REQUEST_CONTEXT: ContextVar[tuple[str, str | None]] = ContextVar(
+    "trade_safety_traction_context", default=("unattributed", None)
+)
+
+
+class StdoutJsonlSink:
+    """Emit bounded private provider-log records without local disk growth."""
+
+    def write(self, line: bytes, /) -> None:
+        if not isinstance(line, bytes) or b"\n" in line or b"\r" in line:
+            raise ValueError("telemetry line must contain one record")
+        if len(line) + 1 > MAX_TELEMETRY_LINE_BYTES:
+            raise ValueError("telemetry line exceeds its byte bound")
+        sys.stdout.write("TRADE_SAFETY_TRACTION " + line.decode("ascii") + "\n")
+        sys.stdout.flush()
+
 
 ASSESSMENT_ACCEPTED: Final = "assessment_accepted"
 ASSESSMENT_REJECTED: Final = "assessment_rejected"
@@ -314,6 +339,7 @@ class TelemetryEmitter:
         "_clock",
         "_delivery_failures",
         "_delivery_lock",
+        "_identity_key",
         "_service_version",
         "_sink",
         "_source_revision",
@@ -326,6 +352,7 @@ class TelemetryEmitter:
         source_revision: str,
         sink: TelemetrySink | None = None,
         clock: Callable[[], datetime] | None = None,
+        identity_key: bytes | None = None,
     ) -> None:
         if (
             not isinstance(service_version, str)
@@ -337,12 +364,69 @@ class TelemetryEmitter:
             or _SOURCE_REVISION_RE.fullmatch(source_revision) is None
         ):
             raise TelemetrySchemaError("source revision is invalid")
+        if identity_key is not None and (
+            not isinstance(identity_key, bytes) or len(identity_key) != 32
+        ):
+            raise TelemetrySchemaError("telemetry identity key must contain 32 bytes")
+        self._identity_key = identity_key
         self._service_version = service_version
         self._source_revision = source_revision
         self._sink = sink
         self._clock = clock or (lambda: datetime.now(UTC))
         self._delivery_failures = 0
         self._delivery_lock = threading.Lock()
+
+    @contextmanager
+    def request_context(self, headers):
+        """Use only an optional random installation UUID and coarse probe class."""
+        traffic = "unattributed"
+        installation = None
+        if self._identity_key is not None:
+            values = {}
+            for name, value in headers:
+                name = name.lower()
+                if name in {
+                    b"user-agent",
+                    b"x-liquilens-traffic-class",
+                    b"x-liquilens-client-id",
+                }:
+                    values.setdefault(name, []).append(value)
+            agents = values.get(b"user-agent", [])
+            agent = agents[0].lower()[:512] if len(agents) == 1 else b""
+            if values.get(b"x-liquilens-traffic-class") == [b"synthetic"]:
+                traffic = "synthetic"
+            elif any(
+                term in agent
+                for term in (
+                    b"mcpbeat",
+                    b"sentineloracle",
+                    b"agent-tools",
+                    b"healthcheck",
+                    b"uptime",
+                    b"synthetic",
+                    b"monitor",
+                    b"codex-takeover",
+                )
+            ):
+                traffic = "automation"
+            ids = values.get(b"x-liquilens-client-id", [])
+            if len(ids) == 1 and len(ids[0]) == 36:
+                try:
+                    value = ids[0].decode("ascii")
+                    parsed = uuid.UUID(value)
+                    if parsed.version == 4 and str(parsed) == value:
+                        installation = hmac.new(
+                            self._identity_key,
+                            b"trade-safety-installation-v1\0" + ids[0],
+                            hashlib.sha256,
+                        ).hexdigest()
+                except (ValueError, UnicodeError):
+                    pass
+        token = _REQUEST_CONTEXT.set((traffic, installation))
+        try:
+            yield
+        finally:
+            _REQUEST_CONTEXT.reset(token)
 
     @property
     def enabled(self) -> bool:
@@ -396,6 +480,15 @@ class TelemetryEmitter:
             "source_revision": self._source_revision,
             "transport": transport,
         }
+        if self._identity_key is not None:
+            traffic, installation = _REQUEST_CONTEXT.get()
+            record.update(
+                schema=TELEMETRY_CONTEXT_SCHEMA,
+                traffic_class=traffic,
+                installation_key=installation,
+                identity_epoch=hashlib.sha256(self._identity_key).hexdigest()[:16],
+                event_id=str(uuid.uuid4()),
+            )
         encoded = json.dumps(
             record,
             allow_nan=False,
@@ -420,19 +513,35 @@ def telemetry_from_env(
     service_version: str,
     source_revision: str,
 ) -> TelemetryEmitter:
-    """Build disabled telemetry or an explicitly configured local JSONL sink.
+    """Build disabled telemetry or one explicitly configured JSONL sink.
 
-    Absence of ``TRADE_SAFETY_TELEMETRY_PATH`` is the only disabled state.  A
-    present value, including an empty or relative path, is validated eagerly so
-    a broken opt-in cannot be mistaken for working collection.
+    Path and stdout sinks are mutually exclusive and validated eagerly so a
+    broken opt-in cannot be mistaken for working collection.
     """
 
     configured_path = os.environ.get(TELEMETRY_PATH_ENV)
-    sink = None if configured_path is None else AppendOnlyJsonlSink(configured_path)
+    stdout = os.environ.get(TELEMETRY_STDOUT_ENV)
+    if stdout not in {None, "1"}:
+        raise ValueError("telemetry stdout setting must be absent or 1")
+    if stdout is not None and configured_path is not None:
+        raise ValueError("configure exactly one telemetry sink")
+    sink = (
+        StdoutJsonlSink()
+        if stdout == "1"
+        else (None if configured_path is None else AppendOnlyJsonlSink(configured_path))
+    )
+    identity = os.environ.get(TELEMETRY_IDENTITY_ENV)
+    if identity is not None and (
+        sink is None or re.fullmatch(r"[0-9a-f]{64}", identity) is None
+    ):
+        raise ValueError(
+            "identity measurement requires an enabled sink and a 32-byte hex key"
+        )
     return TelemetryEmitter(
         service_version=service_version,
         source_revision=source_revision,
         sink=sink,
+        identity_key=None if identity is None else bytes.fromhex(identity),
     )
 
 
