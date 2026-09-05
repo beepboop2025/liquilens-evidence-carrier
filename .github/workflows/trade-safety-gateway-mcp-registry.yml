@@ -99,7 +99,7 @@ jobs:
 
           health = request("/healthz")
           assert health["status"] == "ok"
-          assert health["version"] == "0.2.1"
+          assert health["version"] == "0.2.2"
           assert health["source_revision"] == expected_revision
           assert health["issuer_endpoint"] == base_url
           assert health["state"] == "read_only_sandbox"
@@ -107,7 +107,7 @@ jobs:
           assert health["telemetry"]["state"] == "ready"
 
           capabilities = request("/v1/capabilities")
-          assert capabilities["version"] == "0.2.1"
+          assert capabilities["version"] == "0.2.2"
           assert capabilities["source_revision"] == expected_revision
           assert capabilities["issuer_endpoint"] == base_url
           assert capabilities["state"] == "read_only_sandbox"
@@ -146,7 +146,7 @@ jobs:
           assert initialized["result"]["serverInfo"] == {
               "name": "liquilens-trade-safety-gateway",
               "title": "LiquiLens Trade Safety Gateway",
-              "version": "0.2.1",
+              "version": "0.2.2",
           }
 
           listed = request(
@@ -199,7 +199,7 @@ jobs:
 
           index = json.loads(Path("gateway-index.json").read_text())
           assert index["annotations"]["org.opencontainers.image.revision"] == os.environ["GITHUB_SHA"]
-          assert index["annotations"]["org.opencontainers.image.version"] == "0.2.1"
+          assert index["annotations"]["org.opencontainers.image.version"] == "0.2.2"
           path = Path("integrations/trade-safety-gateway/server.json")
           document = json.loads(path.read_text())
           metadata = document["_meta"]["io.modelcontextprotocol.registry/publisher-provided"]
@@ -230,14 +230,14 @@ jobs:
           url = (
               "https://registry.modelcontextprotocol.io/v0.1/servers/"
               + urllib.parse.quote(name, safe="")
-              + "/versions/0.2.1"
+              + "/versions/0.2.2"
           )
           for attempt in range(12):
               try:
                   with urllib.request.urlopen(url, timeout=10) as response:
                       payload = json.load(response)["server"]
                   assert payload["name"] == name
-                  assert payload["version"] == "0.2.1"
+                  assert payload["version"] == "0.2.2"
                   assert payload["remotes"] == [
                       {
                           "type": "streamable-http",

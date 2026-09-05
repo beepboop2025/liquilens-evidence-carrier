@@ -1,6 +1,6 @@
 # Trade Safety Infrastructure and Adoption Plan
 
-Status: staged delivery contract; core published, gateway `0.2.1` source candidate
+Status: staged delivery contract; core published, gateway `0.2.2` source candidate
 
 Owner: Liquidity Lab
 
@@ -24,7 +24,7 @@ order and one operator-owned policy.
 
 ### Current state as of 2026-09-04
 
-Implemented in the gateway `0.2.1` source candidate:
+Implemented in the gateway `0.2.2` source candidate:
 
 - fixed Seiche, Undertow, and conditional LiquiLens native-contract adapters;
 - strict request, policy, source, rights, clock, proof, and receipt validation;
@@ -33,7 +33,7 @@ Implemented in the gateway `0.2.1` source candidate:
   Bazaar discovery, durable replay and reconciliation state; and
 - opt-in privacy-minimized MCP, assessment, and x402 funnel telemetry.
 
-Not yet claimed: a merged or published `0.2.1` artifact, a hosted paid gateway,
+Not yet claimed: a merged or published `0.2.2` artifact, a hosted paid gateway,
 an owner-authorized settlement canary, active design partners, unique agents or
 payers, broker/OMS enforcement, or a live-money route. Existing product-level
 x402 experiments are separate surfaces and do not prove this gateway is active.
@@ -436,9 +436,9 @@ not a large number of optional MCP installs.
 
 ## 13. Immediate implementation sequence
 
-1. Finish independent review of the gateway `0.2.1` x402 journal, policy floor,
+1. Finish independent review of the gateway `0.2.2` x402 journal, policy floor,
    telemetry, packaging and recovery behavior; merge through protected main.
-2. Publish the independently signed, attested `0.2.1` gateway artifact without
+2. Publish the independently signed, attested `0.2.2` gateway artifact without
    describing artifact availability as hosted activation.
 3. Deploy the free read-only sandbox with live mode hard-blocked and prove exact
    source/build identity, semantic freshness, rollback, edge limits and uptime.

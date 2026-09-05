@@ -681,7 +681,7 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         health = client.get("/healthz")
         assert health.status_code == 200
         assert health.json()["state"] == "read_only_sandbox"
-        assert health.json()["version"] == SERVICE_VERSION == "0.2.1"
+        assert health.json()["version"] == SERVICE_VERSION == "0.2.2"
         assert health.json()["source_revision"] == SERVICE_REVISION
         assert health.json()["telemetry"] == {
             "state": "disabled",

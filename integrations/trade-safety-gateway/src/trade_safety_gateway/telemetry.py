@@ -90,7 +90,14 @@ MCP_OUTCOMES: Final = frozenset({"success", "error"})
 # Reasons are deliberately coarser than wire errors.  Callers must translate
 # internal errors into one of these values before invoking the emitter.
 ASSESSMENT_REJECTION_REASONS: Final = frozenset(
-    {"policy_not_admitted", "invalid_request", "internal_error"}
+    {
+        "policy_not_admitted",
+        "invalid_request",
+        "internal_error",
+        "rate_limited",
+        "capacity_exhausted",
+        "request_deadline",
+    }
 )
 X402_VERIFY_FAILURE_REASONS: Final = frozenset(
     {

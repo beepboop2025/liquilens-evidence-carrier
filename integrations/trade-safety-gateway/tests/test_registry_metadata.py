@@ -20,7 +20,7 @@ def test_registry_metadata_is_remote_read_only_and_exact() -> None:
             "Read-only checks for proposed orders against evidence and policy; "
             "no trading or payment authority."
         ),
-        "version": "0.2.1",
+        "version": "0.2.2",
         "repository": {
             "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
             "source": "github",

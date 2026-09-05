@@ -42,6 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from .admission import RequestAdmission
 from .http_safety import cookie_free_jar
 from .policy_guard import PolicyAdmissionError, PolicyAdmissionGuard
 from .telemetry import (
@@ -76,7 +77,7 @@ from .x402_access import (
 from .x402_runtime import X402Runtime, x402_runtime_from_env
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.2.1"
+SERVICE_VERSION = "0.2.2"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -280,24 +281,26 @@ class SafetyEnvelopeMiddleware:
         *,
         telemetry: TelemetryEmitter,
         x402_enabled: bool,
+        admission: RequestAdmission,
     ) -> None:
         self.app = app
         self.telemetry = telemetry
         self.x402_enabled = x402_enabled
+        self.admission = admission
 
-    def _record_rejection(self, scope: Scope) -> None:
+    def _record_rejection(self, scope: Scope, reason: str = "invalid_request") -> None:
         path = scope.get("path")
         if path == "/v1/check":
             self.telemetry.emit(
                 ASSESSMENT_REJECTED,
                 transport="rest",
-                reason="invalid_request",
+                reason=reason,
             )
         elif path == "/v1/x402/check" and self.x402_enabled:
             self.telemetry.emit(
                 ASSESSMENT_REJECTED,
                 transport="x402",
-                reason="invalid_request",
+                reason=reason,
             )
         elif path == "/mcp":
             self.telemetry.emit(
@@ -309,7 +312,47 @@ class SafetyEnvelopeMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         with self.telemetry.request_context(scope.get("headers", [])):
-            await self._call(scope, receive, send)
+            if scope["type"] != "http" or scope.get("method", "").upper() != "POST":
+                await self._call(scope, receive, send)
+                return
+            reason = self.admission.acquire()
+            if reason is not None:
+                await self._reject_load(scope, receive, send, reason)
+                return
+            response_started = False
+
+            async def tracked_send(message: Message) -> None:
+                nonlocal response_started
+                if message["type"] == "http.response.start":
+                    response_started = True
+                await send(message)
+
+            try:
+                async with asyncio.timeout(
+                    self.admission.limits.request_timeout_seconds
+                ):
+                    await self._call(scope, receive, tracked_send)
+            except TimeoutError:
+                if response_started:
+                    # A response already on the wire cannot be replaced by JSON.
+                    raise
+                await self._reject_load(scope, receive, send, "request_deadline")
+            finally:
+                self.admission.release()
+
+    async def _reject_load(
+        self, scope: Scope, receive: Receive, send: Send, reason: str
+    ) -> None:
+        self._record_rejection(scope, reason)
+        payload: dict[str, Any] = {"state": reason, "retry_after_seconds": 1}
+        if scope.get("path") == "/mcp":
+            payload = _rpc_error(None, -32000, "Gateway busy; retry later", payload)
+        response = _bounded_response(
+            payload,
+            status_code=429 if reason == "rate_limited" else 503,
+            headers={"retry-after": "1"},
+        )
+        await response(scope, receive, send)
 
     async def _call(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -1394,6 +1437,7 @@ def capabilities(
     policy_guard: PolicyAdmissionGuard | None = None,
     x402_gate: X402AccessGate | None = None,
     telemetry: TelemetryEmitter | None = None,
+    admission: RequestAdmission | None = None,
 ) -> dict[str, Any]:
     """Return the static authority and integration contract, without probing."""
 
@@ -1502,6 +1546,7 @@ def capabilities(
             "response_bytes": MAX_RESPONSE_BYTES,
             "upstream_total_timeout_seconds": UPSTREAM_TOTAL_TIMEOUT_SECONDS,
             "upstream_connect_timeout_seconds": UPSTREAM_CONNECT_TIMEOUT_SECONDS,
+            "admission": (admission or RequestAdmission()).limits.public,
         },
         "mcp_protocol_versions": [
             MCP_PROTOCOL_VERSION,
@@ -1740,6 +1785,7 @@ def create_app(
     policy_guard: PolicyAdmissionGuard | None = None,
     telemetry: TelemetryEmitter | None = None,
     x402_runtime: X402Runtime | None = None,
+    admission: RequestAdmission | None = None,
 ) -> FastAPI:
     """Create an application; tests can inject a byte-exact fake transport."""
 
@@ -1755,6 +1801,7 @@ def create_app(
     active_x402_gate = (
         active_x402_runtime.gate if active_x402_runtime is not None else None
     )
+    active_admission = admission or RequestAdmission()
     gateway = TradeSafetyGateway(
         active_transport,
         clock=clock,
@@ -1786,11 +1833,13 @@ def create_app(
         SafetyEnvelopeMiddleware,
         telemetry=active_telemetry,
         x402_enabled=active_x402_gate is not None,
+        admission=active_admission,
     )
     application.state.gateway = gateway
     application.state.upstream = active_transport
     application.state.telemetry = active_telemetry
     application.state.x402_runtime = active_x402_runtime
+    application.state.admission = active_admission
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(
@@ -1856,6 +1905,7 @@ def create_app(
                 active_policy_guard,
                 active_x402_gate,
                 active_telemetry,
+                active_admission,
             )
         )
 
@@ -2622,6 +2672,7 @@ def create_app(
                 active_policy_guard,
                 active_x402_gate,
                 active_telemetry,
+                active_admission,
             )
             active_telemetry.emit(
                 MCP_ACTIVATION,

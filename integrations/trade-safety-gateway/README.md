@@ -19,6 +19,24 @@ tenant-authenticated, and the broker-preview reference is `not_applicable`.
 
 - `GET /healthz` reports process health without probing or masking source state.
 - `GET /v1/capabilities` describes static limits, sources, and authority.
+
+Anonymous POST requests share a budget within each gateway worker: 16 requests
+in flight, 20 new requests per second, a burst of 40, and a 20-second total
+deadline covering body upload and processing. Rate exhaustion returns HTTP 429;
+occupied capacity or an expired deadline returns HTTP 503. These responses carry
+`Retry-After: 1`, `Cache-Control: no-store`, and the usual read-only headers.
+MCP errors retain the JSON-RPC envelope. Retry with backoff and jitter; paid
+requests, when separately enabled, must also follow the settlement journal's
+reconciliation rules.
+
+Health and discovery GET requests remain available when the POST budget is full.
+No IP address or installation identity is stored by this control, and changing
+forwarding, installation, or monitoring headers cannot bypass it. The limits are
+per worker, not a fleet-wide quota or a substitute for edge network protection.
+Operators can lower or raise the bounded budget with
+`TRADE_SAFETY_MAX_IN_FLIGHT` (1–64), `TRADE_SAFETY_REQUESTS_PER_SECOND` (1–100), and
+`TRADE_SAFETY_REQUEST_BURST` (1–200); invalid values fail startup. The effective
+settings are exposed under `limits.admission` in the capability response.
 - `POST /v1/check` accepts exactly `{"request": {...}, "policy": {...}}`.
 - `POST /v1/x402/check` is registered only under a complete x402 configuration;
   it challenges and settles paid access to an otherwise identical assessment.
@@ -181,10 +199,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.2.1 .
+  -t liquilens-trade-safety-gateway:0.2.2 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.2.1
+  -p 8080:8080 liquilens-trade-safety-gateway:0.2.2
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the
@@ -206,10 +224,10 @@ boundary and must be operated by the adopter. The independent gateway-tag lane
 publishes OCI only; it builds a wheel as validation evidence but does not publish
 that wheel, an sdist, or a GitHub Release.
 
-Gateway `0.2.1` has an independent release identity so publishing it does not
+Gateway `0.2.2` has an independent release identity so publishing it does not
 move or reuse the immutable core `v0.19.0` tag. After the release commit has
 landed on `origin/main`, an allowlisted release owner may create and push the
-annotated, signed tag `trade-safety-gateway-v0.2.1`. The workflow rejects a
+annotated, signed tag `trade-safety-gateway-v0.2.2`. The workflow rejects a
 lightweight or unsigned tag, an unsigned target commit, a target outside
 `origin/main`, a gateway/tag version mismatch, or any core `VERSION` other than
 `0.19.0`. It also rejects pre-existing gateway version, source-commit, or signed

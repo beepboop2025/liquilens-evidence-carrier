@@ -1,6 +1,6 @@
 # Trade Safety x402 access
 
-Status: source implementation for gateway `0.2.1`; disabled by default
+Status: source implementation for gateway `0.2.2`; disabled by default
 
 Authority: paid access to a read-only sandbox assessment only
 
@@ -256,7 +256,7 @@ new quote; payment durability never extends market-evidence freshness.
 
 Before enabling a public paid route, record and independently verify:
 
-1. exact source SHA, gateway `0.2.1` artifact digest, issuer endpoint, external
+1. exact source SHA, gateway `0.2.2` artifact digest, issuer endpoint, external
    resource URL, x402 network, asset, atomic price and receiving address;
 2. facilitator compatibility with x402 v2 verify/settle response schemas,
    authentication method if any, timeout behavior, and settlement-pending
