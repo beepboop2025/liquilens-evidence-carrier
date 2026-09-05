@@ -5,12 +5,21 @@ from .adapter import (
     AlpacaPaperAccountUnavailable,
     AlpacaPaperAdapterError,
     AlpacaPaperAdapterOrderUnsupported,
+    AlpacaPaperBrokerResponseInvalid,
     AlpacaPaperConfigurationError,
+    AlpacaPaperReconciliation,
     AlpacaPaperReconciliationUnavailable,
     AlpacaPaperSubmission,
     AlpacaPaperSubmissionUncertain,
     AlpacaPaperTradeSafetyGateway,
     client_order_id_for_request_hash,
+)
+from .journal import (
+    AlpacaPaperSubmissionJournal,
+    AlpacaPaperSubmissionJournalError,
+    AlpacaPaperSubmissionRecord,
+    AlpacaPaperSubmissionState,
+    SQLiteAlpacaPaperSubmissionJournal,
 )
 
 __all__ = [
@@ -18,10 +27,17 @@ __all__ = [
     "AlpacaPaperAccountUnavailable",
     "AlpacaPaperAdapterError",
     "AlpacaPaperAdapterOrderUnsupported",
+    "AlpacaPaperBrokerResponseInvalid",
     "AlpacaPaperConfigurationError",
+    "AlpacaPaperReconciliation",
     "AlpacaPaperReconciliationUnavailable",
     "AlpacaPaperSubmission",
+    "AlpacaPaperSubmissionJournal",
+    "AlpacaPaperSubmissionJournalError",
+    "AlpacaPaperSubmissionRecord",
+    "AlpacaPaperSubmissionState",
     "AlpacaPaperSubmissionUncertain",
     "AlpacaPaperTradeSafetyGateway",
+    "SQLiteAlpacaPaperSubmissionJournal",
     "client_order_id_for_request_hash",
 ]

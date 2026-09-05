@@ -37,12 +37,19 @@ validation.
 ```python
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 
-from liquilens_alpaca_paper import AlpacaPaperTradeSafetyGateway
+from liquilens_alpaca_paper import (
+    AlpacaPaperTradeSafetyGateway,
+    SQLiteAlpacaPaperSubmissionJournal,
+)
 from liquilens_evidence import TradeSafetyExecutionBinding
 
-# Implement the small ReceiptConsumer protocol with a durable atomic store.
-my_durable_receipt_consumer = ...
+# Keep this file on a durable, backed-up local filesystem. The parent directory
+# must already exist; the journal secures its SQLite, WAL, and SHM files to 0600.
+submission_journal = SQLiteAlpacaPaperSubmissionJournal(
+    Path("/var/lib/operator/liquilens/alpaca-paper-submissions.sqlite3")
+)
 
 gateway = AlpacaPaperTradeSafetyGateway(
     binding=TradeSafetyExecutionBinding(
@@ -61,7 +68,7 @@ gateway = AlpacaPaperTradeSafetyGateway(
         issuer_endpoint="https://operator.example/trade-safety",
         hmac_key_id="operator-paper-key-v1",
     ),
-    receipt_consumer=my_durable_receipt_consumer,
+    submission_journal=submission_journal,
     hmac_key=os.environ["TRADE_SAFETY_HMAC_KEY"].encode(),
     api_key=os.environ["ALPACA_PAPER_API_KEY"],
     secret_key=os.environ["ALPACA_PAPER_SECRET_KEY"],
@@ -72,18 +79,63 @@ gateway = AlpacaPaperTradeSafetyGateway(
 submission = gateway.submit(proposed_request, trade_safety_receipt)
 ```
 
-The durable consumer above is an operator implementation of the package's
-`ReceiptConsumer` protocol. The bundled in-memory consumer is for one-process
-tests and demonstrations only.
+The journal is both the atomic one-time receipt consumer and the submission
+state machine. Its `receipt_id`, canonical request hash, submission id, and
+deterministic Alpaca `client_order_id` are permanently unique. It uses SQLite
+WAL mode with `synchronous=FULL`; the broker call cannot begin until the
+`submitting` transition commits. Keep one journal for the full lifetime of the
+operator service, monitor `submission_journal.counts()`, back up the database
+with a SQLite-aware snapshot procedure, and close it during an orderly
+shutdown.
+
+The legacy `receipt_consumer=` constructor lane remains compatible for local
+tests and demonstrations, but it does not provide restart-safe submission
+state. Do not use `InMemoryReceiptConsumer` for an operator service.
+
+## Durable state and crash recovery
+
+| Persisted state | What it proves | Allowed next action |
+| --- | --- | --- |
+| `claimed` | The receipt is consumed; no broker call began | Reconcile locally to `not_submitted` |
+| `submitting` | The one allowed broker attempt began; acceptance may be unknown | Broker lookup only |
+| `submitted` | A response with the exact client id and a broker order id was persisted | Broker lookup only |
+| `uncertain` | The broker call or post-call persistence failed | Broker lookup only |
+| `reconciled` | The final lookup/local resolution was persisted | Read the record; never submit again |
+
+On process startup, call `gateway.recovery_candidates()` and reconcile every
+returned request hash. A lingering `claimed` record is resolved locally because
+the journal proves the call never began. Every other candidate is looked up by
+its deterministic client order id:
+
+```python
+for candidate in gateway.recovery_candidates():
+    result = gateway.reconcile(candidate.request_hash)
+    record = result.submission
+    operator_log.info(
+        "alpaca paper submission reconciled",
+        extra={
+            "submission_id": record.submission_id,
+            "state": record.state,
+            "resolution": record.reconciliation_resolution,
+        },
+    )
+```
+
+If lookup is unavailable, `reconcile` raises
+`AlpacaPaperReconciliationUnavailable` and leaves the durable state unchanged
+for a later lookup. It never calls `submit_order`. Do not delete or recycle
+journal rows to regain capacity: they are the permanent replay boundary. Move
+to a new, explicitly migrated journal only under an operator-reviewed retention
+and identity-continuity procedure.
 
 ## Ambiguous submissions
 
-If the broker call raises after the receipt has been claimed, the adapter raises
-`AlpacaPaperSubmissionUncertain`. Never submit again. Its `client_order_id` is
-deterministically derived from the request hash (`llts-<sha256>`), so the
-operator can call `gateway.reconcile(request_hash)` without creating a second
-order. A production deployment must persist the claim and submission state and
-continue reconciliation across process restarts.
+If the broker call raises after the durable `submitting` transition, the adapter
+raises `AlpacaPaperSubmissionUncertain`. Never submit again. Its
+`client_order_id` is deterministically derived from the request hash
+(`llts-<sha256>`), so the operator can call `gateway.reconcile(request_hash)`
+without creating a second order. A failure while persisting the response also
+remains sticky as `submitting`; this is intentionally treated as uncertain.
 
 ## Boundary
 

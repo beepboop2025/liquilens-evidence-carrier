@@ -14,8 +14,9 @@ without a negotiated marketplace listing:
   broker credentials, execution route, custody, or trade-settlement surface;
   optional x402 v2 access-payment settlement remains a separate authority;
 - `alpaca-paper/` is a paper-only, exact-order broker reference adapter that
-  keeps the raw client outside the agent, checks the bound account, consumes an
-  authenticated receipt once, and provides request-hash reconciliation;
+  keeps the raw client outside the agent, checks the bound account, atomically
+  journals one authenticated receipt and broker attempt, and provides
+  restart-safe request-hash reconciliation without blind resubmission;
 - `openlineage/` validates the custom lineage facet;
 - `dbt/` rejects warehouse rows that strip clocks, rights, or redaction state;
   and

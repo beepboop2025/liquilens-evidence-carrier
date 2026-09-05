@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Protocol
@@ -27,7 +27,16 @@ from liquilens_evidence import (
     validate_trade_safety_request,
 )
 
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+from .journal import (
+    AlpacaPaperSubmissionJournal,
+    AlpacaPaperSubmissionJournalError,
+    AlpacaPaperSubmissionRecord,
+    AlpacaPaperSubmissionState,
+)
+from .journal import (
+    client_order_id_for_request_hash as _journal_client_order_id,
+)
+
 _SUPPORTED_ASSET_CLASSES = frozenset({"crypto", "equity", "etf"})
 _SUPPORTED_TIME_IN_FORCE = frozenset({"DAY", "GTC", "OPG", "CLS", "IOC", "FOK"})
 
@@ -42,6 +51,10 @@ class AlpacaPaperConfigurationError(AlpacaPaperAdapterError):
 
 class AlpacaPaperAdapterOrderUnsupported(AlpacaPaperAdapterError):
     """The exact request contains semantics this adapter cannot preserve."""
+
+
+class AlpacaPaperBrokerResponseInvalid(AlpacaPaperAdapterError):
+    """A broker response did not preserve the request-bound order identity."""
 
 
 class AlpacaPaperAccountUnavailable(AlpacaPaperAdapterError):
@@ -92,6 +105,14 @@ class AlpacaPaperSubmission:
     receipt_id: str
 
 
+@dataclass(frozen=True, slots=True)
+class AlpacaPaperReconciliation:
+    """A durable reconciliation result and optional fresh broker response."""
+
+    submission: AlpacaPaperSubmissionRecord
+    broker_order: Any | None
+
+
 class _AlpacaClient(Protocol):
     _base_url: BaseURL | str
     _sandbox: bool
@@ -109,9 +130,12 @@ _ClientFactory = Callable[..., _AlpacaClient]
 def client_order_id_for_request_hash(request_hash: str) -> str:
     """Return the stable Alpaca idempotency/reconciliation key for one request."""
 
-    if not isinstance(request_hash, str) or _SHA256_RE.fullmatch(request_hash) is None:
-        raise AlpacaPaperAdapterError("request_hash must be a lowercase SHA-256 digest")
-    return f"llts-{request_hash}"
+    try:
+        return _journal_client_order_id(request_hash)
+    except AlpacaPaperSubmissionJournalError as error:
+        raise AlpacaPaperAdapterError(
+            "request_hash must be a lowercase SHA-256 digest"
+        ) from error
 
 
 def _base_url_text(value: BaseURL | str | Any) -> str:
@@ -138,6 +162,32 @@ def _account_id(value: Any) -> str:
             "Alpaca paper account response did not contain an account id"
         )
     return str(raw)
+
+
+def _broker_order_identity(value: Any, *, client_order_id: str) -> str:
+    raw_id = (
+        value.get("id") if isinstance(value, Mapping) else getattr(value, "id", None)
+    )
+    raw_client_id = (
+        value.get("client_order_id")
+        if isinstance(value, Mapping)
+        else getattr(value, "client_order_id", None)
+    )
+    broker_order_id = "" if raw_id is None else str(raw_id)
+    returned_client_id = "" if raw_client_id is None else str(raw_client_id)
+    if (
+        not broker_order_id
+        or broker_order_id != broker_order_id.strip()
+        or len(broker_order_id.encode("utf-8")) > 256
+    ):
+        raise AlpacaPaperBrokerResponseInvalid(
+            "Alpaca paper response did not contain a bounded broker order id"
+        )
+    if returned_client_id != client_order_id:
+        raise AlpacaPaperBrokerResponseInvalid(
+            "Alpaca paper response client_order_id differs from the request binding"
+        )
+    return broker_order_id
 
 
 def _order_request(
@@ -220,7 +270,8 @@ class AlpacaPaperTradeSafetyGateway:
         self,
         *,
         binding: TradeSafetyExecutionBinding,
-        receipt_consumer: ReceiptConsumer,
+        receipt_consumer: ReceiptConsumer | None = None,
+        submission_journal: AlpacaPaperSubmissionJournal | None = None,
         hmac_key: bytes,
         api_key: str | None = None,
         secret_key: str | None = None,
@@ -241,13 +292,22 @@ class AlpacaPaperTradeSafetyGateway:
                 "could not initialize the Alpaca paper credential lane"
             ) from error
         _assert_paper_client(client)
+        if (receipt_consumer is None) == (submission_journal is None):
+            raise AlpacaPaperConfigurationError(
+                "provide exactly one receipt_consumer or submission_journal"
+            )
         self._binding = binding
         self._client = client
+        self._submission_journal = submission_journal
+        consumer = (
+            submission_journal if submission_journal is not None else receipt_consumer
+        )
+        assert consumer is not None
         self._guard: PaperTradeSafetyOrderGateway[AlpacaPaperSubmission] = (
             PaperTradeSafetyOrderGateway(
                 self._submit_authorized,
                 binding=binding,
-                receipt_consumer=receipt_consumer,
+                receipt_consumer=consumer,
                 hmac_key=hmac_key,
                 clock=clock,
             )
@@ -277,9 +337,35 @@ class AlpacaPaperTradeSafetyGateway:
             authorization.order,
             client_order_id=client_order_id,
         )
+        if self._submission_journal is not None:
+            self._submission_journal.begin_submission(
+                receipt_id=authorization.receipt_id,
+                request_hash=authorization.request_hash,
+                client_order_id=client_order_id,
+            )
         try:
             broker_order = self._client.submit_order(order_data=order_data)
+            broker_order_id = _broker_order_identity(
+                broker_order, client_order_id=client_order_id
+            )
+            if self._submission_journal is not None:
+                self._submission_journal.mark_submitted(
+                    receipt_id=authorization.receipt_id,
+                    request_hash=authorization.request_hash,
+                    client_order_id=client_order_id,
+                    broker_order_id=broker_order_id,
+                )
         except Exception as error:
+            if self._submission_journal is not None:
+                # ``submitting`` is itself a sticky uncertain state.  Never
+                # replace the original post-attempt error or resubmit.
+                with suppress(Exception):
+                    self._submission_journal.mark_uncertain(
+                        receipt_id=authorization.receipt_id,
+                        request_hash=authorization.request_hash,
+                        client_order_id=client_order_id,
+                        error_type=type(error).__name__,
+                    )
             raise AlpacaPaperSubmissionUncertain(
                 client_order_id=client_order_id,
                 request_hash=authorization.request_hash,
@@ -310,17 +396,62 @@ class AlpacaPaperTradeSafetyGateway:
         self._verify_account_binding()
         return self._guard.submit(proposed_request, receipt)
 
-    def reconcile(self, request_hash: str) -> Any:
-        """Read one prior paper order by its request-bound client order id."""
+    def reconcile(self, request_hash: str) -> Any | AlpacaPaperReconciliation:
+        """Read and durably reconcile one request identity without resubmitting."""
 
         client_order_id = client_order_id_for_request_hash(request_hash)
+        if self._submission_journal is not None:
+            record = self._submission_journal.get(request_hash)
+            if record is None:
+                raise AlpacaPaperReconciliationUnavailable(
+                    client_order_id=client_order_id
+                )
+            if record.state is AlpacaPaperSubmissionState.RECONCILED:
+                return AlpacaPaperReconciliation(
+                    submission=record,
+                    broker_order=None,
+                )
+            if record.state is AlpacaPaperSubmissionState.CLAIMED:
+                reconciled = self._submission_journal.mark_reconciled(
+                    request_hash=request_hash,
+                    resolution="not_submitted",
+                )
+                return AlpacaPaperReconciliation(
+                    submission=reconciled,
+                    broker_order=None,
+                )
         self._verify_account_binding()
         try:
-            return self._client.get_order_by_client_id(client_order_id)
+            broker_order = self._client.get_order_by_client_id(client_order_id)
+            broker_order_id = _broker_order_identity(
+                broker_order, client_order_id=client_order_id
+            )
+            if self._submission_journal is None:
+                return broker_order
+            reconciled = self._submission_journal.mark_reconciled(
+                request_hash=request_hash,
+                resolution="broker_order_found",
+                broker_order_id=broker_order_id,
+            )
+            return AlpacaPaperReconciliation(
+                submission=reconciled,
+                broker_order=broker_order,
+            )
         except Exception as error:
             raise AlpacaPaperReconciliationUnavailable(
                 client_order_id=client_order_id
             ) from error
+
+    def recovery_candidates(
+        self, *, limit: int = 100
+    ) -> tuple[AlpacaPaperSubmissionRecord, ...]:
+        """List durable entries needing operator reconciliation."""
+
+        if self._submission_journal is None:
+            raise AlpacaPaperConfigurationError(
+                "recovery candidates require a durable submission journal"
+            )
+        return self._submission_journal.recovery_candidates(limit=limit)
 
 
 __all__ = [
@@ -328,7 +459,9 @@ __all__ = [
     "AlpacaPaperAccountUnavailable",
     "AlpacaPaperAdapterError",
     "AlpacaPaperAdapterOrderUnsupported",
+    "AlpacaPaperBrokerResponseInvalid",
     "AlpacaPaperConfigurationError",
+    "AlpacaPaperReconciliation",
     "AlpacaPaperReconciliationUnavailable",
     "AlpacaPaperSubmission",
     "AlpacaPaperSubmissionUncertain",
