@@ -1,0 +1,48 @@
+name: Trading copilot paper operator
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/trading-copilot.yml"
+      - "integrations/trading-copilot/**"
+      - "integrations/alpaca-paper/**"
+      - "integrations/trade-safety-gateway/**"
+      - "src/liquilens_evidence/order_guard.py"
+      - "src/liquilens_evidence/trade_safety.py"
+  pull_request:
+    paths:
+      - ".github/workflows/trading-copilot.yml"
+      - "integrations/trading-copilot/**"
+      - "integrations/alpaca-paper/**"
+      - "integrations/trade-safety-gateway/**"
+      - "src/liquilens_evidence/order_guard.py"
+      - "src/liquilens_evidence/trade_safety.py"
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install locked paper operator environment
+        run: |
+          python -m pip install uv==0.12.5
+          uv sync --project integrations/trading-copilot --locked --extra test
+      - name: Verify native evidence through guarded paper submission
+        run: |
+          uv run --project integrations/trading-copilot --locked --extra test \
+            pytest integrations/trading-copilot/tests integrations/alpaca-paper/tests
+          uv run --project integrations/trading-copilot --locked --extra test \
+            ruff check integrations/trading-copilot/src integrations/trading-copilot/tests
+          uv run --project integrations/trading-copilot --locked --extra test \
+            ruff format --check integrations/trading-copilot/src integrations/trading-copilot/tests
+      - name: Build integration package
+        run: uv build --project integrations/trading-copilot

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "liquilens-trading-copilot"
+version = "0.1.0"
+description = "Operator-owned, receipt-gated paper trading with fleet evidence"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "liquilens-evidence==0.19.0",
+  "liquilens-alpaca-paper==0.1.0",
+  "liquilens-trade-safety-gateway==0.2.2",
+  "httpx>=0.28.1,<0.29",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=9.0.3,<10", "ruff>=0.15,<0.16", "build>=1.3,<2"]
+
+[project.scripts]
+liquilens-trading-copilot = "liquilens_trading_copilot.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+liquilens-evidence = {path = "../..", editable = true}
+liquilens-alpaca-paper = {path = "../alpaca-paper", editable = true}
+liquilens-trade-safety-gateway = {path = "../trade-safety-gateway", editable = true}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../../src", "../alpaca-paper/src", "../trade-safety-gateway/src"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]

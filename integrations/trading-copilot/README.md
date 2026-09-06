@@ -1,0 +1,239 @@
+# LiquiLens trading copilot
+
+An operator-owned, deterministic BTC/USD **paper** trading runner. It combines
+Seiche funding observations, LiquiLens corporate research and Undertow exit
+context with an exact-order HMAC receipt and the durable Alpaca paper adapter.
+Riptide supplies separately audited, display-only defensive research and event
+availability. Its native score does not become a BTC signal or order permission.
+There is no live-money mode, LLM decision maker or demonstrated profitable
+strategy. The public Trade Safety gateway remains unchanged and read-only.
+
+## Default private profile
+
+`init` selects `liquilens.paper-funding-exit.v1`, policy version `1.0.0`, and
+creates a disabled configuration. All three evidence products are required.
+This profile has its own source scope and cadence rules:
+
+| Source | Native input and use | Required freshness |
+| --- | --- | --- |
+| [Seiche money-market desk](https://api.seiche.info/api/money-markets) | `policy_corridor` SOFR, EFFR and IORB rates, plus SOFR−IORB and EFFR−IORB spreads. Validate source identities, observation dates, exact-date joins, no forward fill and basis-point arithmetic. | Each selected observation younger than 8 days; capture clocks checked when present. |
+| [LiquiLens corporate transmission](https://api.liquilens.in/api/public-signals/corporate-transmission) | Schema/method v2: current CP spread and weekly rollover. Preserve other channel/leg periods, unavailable channels and historical eligibility flags as background research. | Both CP legs younger than 8 days; stale, withheld or missing current legs block. |
+| [Undertow MCP](https://api.seiche.info/undertow/mcp) | `trade_safety_exit_context` for a distinct, exact $1,000 hypothetical BTC/USD SELL scenario associated with the original paper order. Preserve and revalidate its native request, hashes, clocks, rights and authority. | Native observation ceiling 300 seconds and native expiry. |
+
+The private funding pressure is `max(SOFR−IORB, abs(EFFR−IORB))`, in basis
+points: **CALM ≤5; EROSION >5–15; STRAIN >15–25; STRESS >25**. These are
+experimental operator bands, not Seiche's full-composite regime or calibrated
+return forecasts. Native display rounding permits at most 0.1005 bp arithmetic
+difference; classification uses the more conservative displayed/recomputed
+pressure. Original observation clocks and response hashes remain in the receipt.
+
+LiquiLens CP spread **above 50 bp** triggers a separate strategy HOLD after a
+passing evidence assessment. Its corporate state is not relabeled as Seiche's
+regime. Quarterly research legs retain their own dates and do not acquire the
+current CP freshness claim. The aggregate is not an institution or BTC rating;
+the observed board has four of six channels readable. The private eight-day
+CP rule does not change the native gateway's one-day institution policy.
+
+The original order must be **BTC/USD, BUY or SELL, $1,000 USD notional, market,
+IOC**, with `quantity`, venue and limit/stop prices unset. Undertow always
+assesses a separate SELL liquidation scenario, including for a BUY candidate.
+Its estimate is neither buy execution cost, a fill nor guaranteed future
+liquidity. Arbitrary sizes, quantity-based orders, other assets and live orders
+are outside this profile. Its exact policy is pinned; changing its policy fields
+requires a separately implemented/versioned profile.
+
+The existing `native_gateway_v1` path remains available through
+`init --profile native_gateway_v1` in a separate state directory. It preserves
+the full-composite freshness checks and native sell-only contract; optional
+institution context belongs to that path. A bare `diagnose` without a config
+also uses the native path. Pass the initialized config to diagnose this private
+profile.
+
+## Riptide defensive research
+
+The scoped runner also reads Riptide's fixed public `/risk` and `/events`
+endpoints. Risk research covers configured public Telegram previews: its
+`breach_stress` is a 0–100 keyword-density index, with native bands CALM below
+25, EROSION from 25 to below 45, STRAINED from 45 to below 70, and ACUTE from
+70. It is not a probability, market-risk score or price forecast. The private
+reader requires the original scan to be at most 24 hours old, with complete
+positive channel coverage and scanned posts; it rejects stale, partial or
+unavailable scans. The HTTP response generation time does not refresh the scan.
+
+Each report preserves observation time, coverage, native run ID and response
+hash. The public projection does not expose a verifiable private journal proof
+or the exact monitored-channel identities, so these are not claimed. Event
+availability and source-policy quarantine are reported independently. A
+quarantined empty event list cannot establish no event risk. SPY allocation
+weights and Riptide's separately labeled BTC toy strategy are not inputs.
+
+Riptide remains `financial_authority=none` and
+`influences_order_decision=false`. Its research is stored separately and linked
+to a candidate's request hash in the private audit. The authenticated trade
+permission receipt still has exactly three evidence products. Neither a high
+nor a low Riptide index changes position weights, clears an evidence refusal,
+or supplies permission to submit. Research is also accessible without an
+Alpaca account:
+
+```sh
+uv run --project integrations/trading-copilot --locked \
+  liquilens-trading-copilot research
+```
+
+## Strategy and submission controls
+
+| Setting | Default |
+| --- | --- |
+| Bars | Complete, consecutive hourly BTC/USD bars; minimum 30; newest close at most 7,200 seconds old |
+| Momentum | Mean of last 5 closes / mean of last 30 closes − 1; neutral when absolute value <0.003 |
+| Volatility target | 20% annualized; population standard deviation of hourly log returns, annualized using 365.25 days |
+| Position target | Equity × min(10%, target/observed volatility); EROSION halves it |
+| Rebalance tolerance | 1% of equity |
+| Candidate size | $1,000; minimum $1,000, with no rounding up of smaller cash/holding remainders |
+| Attempt limit | Two durable reservations per UTC day; one intent per account, strategy and completed bar |
+| Loss halt | Loss ≥2% against broker `last_equity`, its prior-close basis |
+| Outstanding orders | Zero allowed |
+| Receipt limits | Estimated hypothetical exit cost ≤25 bp; venue spread ≤15 bp; STRAIN/STRESS held |
+
+Positive momentum can buy toward the target; negative momentum can reduce
+existing BTC holdings. The runner never shorts or uses leverage. It does not
+sell solely because a positive-momentum target shrank. Missing inputs, invalid
+bars or zero/invalid volatility produce HOLD. Loss and evidence holds can leave
+a paper position open: this is not a stop-loss or automatic liquidation system.
+
+Before submission the runner fetches the credential-bound paper account,
+checks portfolio limits, obtains required evidence and persists the assessment.
+It then rereads the portfolio, recomputes the candidate using the receipt's
+funding regime, checks STOP and reserves a durable intent. The private HMAC
+receipt binds the original request, identity and policy; the scoped receipt and
+native liquidation association are reverified. The Alpaca adapter independently
+checks binding, authentication, expiry and replay state before its SDK call.
+Receipts last at most 30 seconds and cannot outlive their source/request bounds.
+
+## Private setup and commands
+
+From the repository root:
+
+```sh
+uv sync --project integrations/trading-copilot --locked --extra test
+uv run --project integrations/trading-copilot --locked \
+  liquilens-trading-copilot init --state-dir /absolute/private/operator-state
+```
+
+`init` creates mode-0600 `config.json` and `paper.env` inside a mode-0700 directory
+owned by the invoking user. It refuses to overwrite either file. Set the actual
+paper account ID in `config.json.account_id`. Privately fill these literal keys
+in `paper.env`; retain the generated HMAC value across restarts:
+
+```text
+ALPACA_PAPER_API_KEY=
+ALPACA_PAPER_SECRET_KEY=
+COPILOT_PAPER_HMAC_KEY=<generated by init>
+```
+
+Do not commit or paste credentials, or source this file as shell code. The parser
+accepts only these three keys, requires private file ownership/permissions and
+does not evaluate shell syntax. The broker endpoint is fixed to
+`https://paper-api.alpaca.markets`; generic/live credential names and a custom
+broker host are not accepted. The account must match `account_id`, be active in
+USD and have clear trading/block flags.
+
+```sh
+uv run --project integrations/trading-copilot --locked \
+  liquilens-trading-copilot diagnose \
+  --config /absolute/private/operator-state/config.json \
+  --env-file /absolute/private/operator-state/paper.env
+```
+
+Scoped `diagnose` makes four public GETs, to Seiche, LiquiLens and Riptide. It reports
+credential presence, not validity, and does not assess Undertow, read the broker
+or authorize an order. Even `pending_order_specific_checks` is not a submission
+pass. Once the required evidence and account setup are ready, set
+`config.json.enabled=true` to permit a bounded cycle:
+
+```sh
+uv run --project integrations/trading-copilot --locked \
+  liquilens-trading-copilot once \
+  --config /absolute/private/operator-state/config.json \
+  --env-file /absolute/private/operator-state/paper.env
+```
+
+Replace `once` with `reconcile` to perform uncertain-submission lookups and
+observe existing orders without submitting. Reconciliation is available while
+execution is disabled. Use `status --config ...` for the private audit state;
+its output may include the latest full audit record and should remain private.
+
+```sh
+uv run --project integrations/trading-copilot --locked \
+  liquilens-trading-copilot stop \
+  --config /absolute/private/operator-state/config.json
+```
+
+`stop` persistently creates `<state_dir>/STOP`. It is checked before submission
+and again after the adapter's blocking account lookup and before its authorized
+submission hook. It does not cancel an order already submitted/in flight or
+liquidate holdings. Resume requires explicitly removing that file and keeping
+`enabled=true`. A stop or error after intent reservation retains that intent;
+removing STOP alone does not resolve it. Unresolved reservations continue to
+block new exposure and require reconciliation or operator investigation. There
+is no automatic resume command. The stop hooks couple to the pinned adapter
+version and are covered by the integration pipeline tests.
+
+## Durable state and service layout
+
+Keep one state directory per managed account and use it for every runner
+instance. One advisory lock covers a cycle. `audit.sqlite3` stores evidence,
+intents and subsequent order observations; `alpaca-submissions.sqlite3` stores
+the adapter's durable submission/recovery journal. Back up both consistently,
+including any required SQLite WAL state. Do not erase reservations or journal
+rows to retry or regain a daily slot.
+
+A failed or uncertain attempt retains its reservation. Ambiguous submission is
+resolved by lookup, never blind resubmission; an unavailable lookup remains
+unresolved. Any known nonterminal or unresolved order blocks another submission,
+even if the broker's open-order list is temporarily empty. Accepted is distinct
+from filled. Later validated broker status,
+filled quantity and average price are recorded separately, without rewriting
+the original safety receipt. Filled quantities and terminal observations cannot
+regress. External/manual account activity can still race the final read; the
+broker retains its cash, holdings and order checks.
+
+The supplied `deploy/liquilens-paper-copilot.service` runs as the unprivileged
+`liquilens-copilot` user with this deployment layout:
+
+```text
+source: /opt/liquilens-trading-copilot/current
+binary: /opt/liquilens-trading-copilot/current/integrations/trading-copilot/.venv/bin/liquilens-trading-copilot
+state:  /var/lib/liquilens-trading-copilot
+```
+
+Prepare the locked environment from the complete reviewed checkout, including
+its sibling packages, and initialize state as the service user. The oneshot
+unit passes the private config/env-file paths. Its timer runs five minutes after
+boot and 15 minutes after the previous service finishes. The config's
+`cycle_interval_seconds=900` is descriptive for another scheduler; it does not
+change the unit. **The service/timer is not enabled pending prerequisites.**
+
+At the 2026-09-06 validation boundary, current scoped Seiche/CP observations were
+usable, but the exact Undertow response remained unavailable with
+`rights_manifest_not_approved`. Paper account ID and credentials were also
+missing. Keep execution disabled until these actual prerequisites are resolved;
+installing the runner or getting healthy endpoints does not clear them. No real
+paper account order, fill or profit has been established by the synthetic tests
+or the read-only scoped assessment.
+
+## Local verification
+
+```sh
+uv run --project integrations/trading-copilot --locked --extra test \
+  pytest integrations/trading-copilot/tests
+uv run --project integrations/trading-copilot --locked --extra test \
+  ruff check integrations/trading-copilot/src integrations/trading-copilot/tests
+uv build --project integrations/trading-copilot
+```
+
+Tests exercise native-shaped synthetic responses and a mocked Alpaca SDK,
+including the actual paper adapter. They do not demonstrate a real broker fill
+or strategy performance. This package uses source-tree sibling dependencies;
+building its wheel does not publish those dependencies to PyPI. Paper fills,
+when observed, remain simulations and do not establish equivalent live results.
