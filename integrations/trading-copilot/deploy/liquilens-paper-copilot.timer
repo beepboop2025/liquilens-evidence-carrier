@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the operator paper copilot every 15 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+AccuracySec=15s
+Unit=liquilens-paper-copilot.service
+
+[Install]
+WantedBy=timers.target

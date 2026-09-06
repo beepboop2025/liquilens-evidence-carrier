@@ -1,0 +1,24 @@
+[Unit]
+Description=LiquiLens guarded paper trading cycle
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=liquilens-copilot
+Group=liquilens-copilot
+WorkingDirectory=/opt/liquilens-trading-copilot/current
+ExecStart=/opt/liquilens-trading-copilot/current/integrations/trading-copilot/.venv/bin/liquilens-trading-copilot once --config /var/lib/liquilens-trading-copilot/config.json --env-file /var/lib/liquilens-trading-copilot/paper.env
+StateDirectory=liquilens-trading-copilot
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/liquilens-trading-copilot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+TimeoutStartSec=120
+# A timeout during submission remains uncertain in the durable broker journal.
+# The next cycle performs lookup; it never blindly retries the same order.
