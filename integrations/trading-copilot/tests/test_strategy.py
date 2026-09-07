@@ -89,7 +89,7 @@ class StrategyTests(TestCase):
             portfolio=portfolio,
             config=replace(CONFIG, rebalance_tolerance_fraction=0),
         )
-        self.assertEqual(decision.reasons, ("below_minimum_order_notional",))
+        self.assertEqual(decision.reasons, ("residual_below_minimum_order_notional",))
 
     def test_no_churn_inside_neutral_momentum_band(self) -> None:
         decision = self.decision(bars=sample_bars(trend=0, noise=0.00001))

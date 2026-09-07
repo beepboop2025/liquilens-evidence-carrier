@@ -191,6 +191,15 @@ def propose(
         "current_exposure_fraction": (
             portfolio.btc_notional_usd / portfolio.equity_usd
         ),
+        "exposure_limit_semantics": "entry_target_not_maintained",
+        "configured_exposure_ceiling_fraction": config.max_portfolio_exposure,
+        "above_configured_exposure_ceiling": int(
+            portfolio.btc_notional_usd
+            > portfolio.equity_usd * config.max_portfolio_exposure
+        ),
+        "residual_below_minimum_order": int(
+            0 < portfolio.btc_notional_usd < config.min_order_notional_usd
+        ),
     }
     if daily_loss_fraction >= config.max_daily_loss_fraction:
         return _hold("daily_loss_stop", risk_metrics)
@@ -269,9 +278,12 @@ def propose(
         target_exposure_fraction=target_fraction,
         target_notional_usd=target_notional,
         rebalance_delta_usd=delta,
+        exposure_above_target_usd=max(0.0, -delta),
     )
     tolerance = portfolio.equity_usd * config.rebalance_tolerance_fraction
-    if abs(delta) < tolerance or delta == 0:
+    # Accumulation tolerance must not prevent a valid, fixed-rung reduction.
+    # All clock, evidence-context, loss and pending-order checks still precede it.
+    if (momentum > 0 and abs(delta) < tolerance) or delta == 0:
         return _hold("within_rebalance_tolerance", metrics)
     # Positive momentum never forces a sale solely because a target moved.
     # Negative momentum never adds risk to an existing position.
@@ -286,7 +298,12 @@ def propose(
     # Truncate to cents, never round an order beyond cash, holding, or limits.
     amount = math.floor(amount * 100) / 100
     if amount < config.min_order_notional_usd:
-        return _hold("below_minimum_order_notional", metrics)
+        return _hold(
+            "residual_below_minimum_order_notional"
+            if action == "sell"
+            else "below_minimum_order_notional",
+            metrics,
+        )
     return Decision(
         action=action,
         notional_usd=amount,

@@ -88,6 +88,7 @@ class CopilotConfig:
     strategy_id: str = "btc-trend-volatility-v1"
     issuer_endpoint: str = "https://liquilens.in/operator/paper-copilot"
     max_daily_attempts: int = 2
+    reserved_daily_exit_attempts: int = 1
     cycle_interval_seconds: int = 900
     liquilens_institution_slug: str | None = None
     liquilens_required: bool = False
@@ -122,6 +123,11 @@ class CopilotConfig:
             or not 1 <= self.max_daily_attempts <= 10
         ):
             raise ConfigurationError("daily_attempt_limit_out_of_range")
+        if (
+            type(self.reserved_daily_exit_attempts) is not int
+            or not 0 <= self.reserved_daily_exit_attempts <= self.max_daily_attempts
+        ):
+            raise ConfigurationError("reserved_exit_attempts_out_of_range")
         if (
             type(self.cycle_interval_seconds) is not int
             or not 60 <= self.cycle_interval_seconds <= 86400
