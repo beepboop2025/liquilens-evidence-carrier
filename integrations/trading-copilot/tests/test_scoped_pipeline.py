@@ -555,7 +555,7 @@ def test_known_accepted_order_blocks_next_bar_despite_empty_open_orders_list(
 
 
 @pytest.mark.parametrize("status", ["filled", "canceled"])
-def test_terminal_order_observation_allows_next_bar_without_releasing_prior_intent(
+def test_terminal_order_observation_keeps_entry_spent_and_exit_capacity(
     tmp_path: Path,
     status: str,
 ) -> None:
@@ -569,13 +569,14 @@ def test_terminal_order_observation_allows_next_bar_without_releasing_prior_inte
             first_hash = trade_safety_request_hash(initial["request"])
             assert initial["status"] == "submitted"
             subsequent = await system.runner.cycle(bars("buy"), seiche_regime="CALM")
-            assert subsequent["status"] == "submitted", subsequent
+            assert subsequent["status"] == "blocked", subsequent
+            assert subsequent["reasons"] == ["intent_used_or_daily_attempt_limit"]
             assert subsequent["order_observations"][0]["status"] == status
             assert subsequent["order_observations"][0]["terminal"] is True
-            assert len(sdk.orders) == 2
-            assert system.store.status()["intent_count"] == 2
+            assert len(sdk.orders) == 1
+            assert system.store.status()["intent_count"] == 1
             assert system.store.status()["order_observation_count"] == 1
-            assert system.store.status()["pending_intent_count"] == 1
+            assert system.store.status()["pending_intent_count"] == 0
             assert system.store.status()["filled_order_count"] == int(
                 status == "filled"
             )
@@ -585,6 +586,18 @@ def test_terminal_order_observation_allows_next_bar_without_releasing_prior_inte
             assert first.state == AlpacaPaperSubmissionState.SUBMITTED
             assert first.submit_attempts == 1
             assert first.receipt_id == initial["receipt"]["receipt_id"]
+            assert subsequent["daily_budget"]["remaining_total"] == 1
+            assert subsequent["daily_budget"]["remaining_entries"] == 0
+            reduction = await system.runner.cycle(bars("sell"), seiche_regime="CALM")
+            if status == "filled":
+                assert reduction["status"] == "submitted", reduction
+                assert len(sdk.orders) == 2
+                assert system.store.status()["intent_count"] == 2
+                assert reduction["daily_budget"]["remaining_total"] == 0
+            else:
+                assert reduction["status"] == "hold", reduction
+                assert len(sdk.orders) == 1
+                assert system.store.status()["intent_count"] == 1
 
     asyncio.run(run())
 

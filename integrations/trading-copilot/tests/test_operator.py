@@ -98,7 +98,7 @@ def test_single_operator_lock_and_symlink_refusal(tmp_path: Path) -> None:
 
 def test_intent_dedup_and_daily_budget_survive_restart(tmp_path: Path) -> None:
     store = CycleStore(tmp_path / "state")
-    options = {"amount": 1000, "now": NOW, "max_daily_attempts": 2}
+    options = {"amount": 1000, "now": NOW, "max_daily_attempts": 2, "side": "sell"}
     assert store.reserve(intent_key="a", request_hash="1", **options)
     store.close()
     store = CycleStore(tmp_path / "state")

@@ -8,7 +8,7 @@ import os
 import sqlite3
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -63,6 +63,9 @@ class CycleStore:
           CREATE TABLE IF NOT EXISTS intents (
             intent_key TEXT PRIMARY KEY, day TEXT NOT NULL,
             request_hash TEXT NOT NULL UNIQUE, amount REAL NOT NULL);
+          CREATE TABLE IF NOT EXISTS intent_directions (
+            intent_key TEXT PRIMARY KEY,
+            side TEXT NOT NULL CHECK (side IN ('buy','sell','unknown')));
           CREATE TABLE IF NOT EXISTS order_observations (
             request_hash TEXT PRIMARY KEY, observed_at TEXT NOT NULL,
             status TEXT NOT NULL, terminal INTEGER NOT NULL CHECK (terminal IN (0,1)),
@@ -90,19 +93,29 @@ class CycleStore:
         amount: float,
         now: datetime,
         max_daily_attempts: int,
+        side: str = "unknown",
+        reserved_daily_exit_attempts: int = 1,
     ) -> bool:
+        day = self._budget_day(now, max_daily_attempts, reserved_daily_exit_attempts)
+        if side not in {"buy", "sell", "unknown"}:
+            raise StateError("invalid_intent_direction")
         self.db.execute("BEGIN IMMEDIATE")
         try:
-            count = self.db.execute(
-                "SELECT count(*) FROM intents WHERE day=?",
-                (now.date().isoformat(),),
-            ).fetchone()[0]
-            if count >= max_daily_attempts:
+            budget = self._daily_budget(
+                day, max_daily_attempts, reserved_daily_exit_attempts
+            )
+            if budget["remaining_total"] == 0 or (
+                side != "sell" and budget["remaining_entries"] == 0
+            ):
                 self.db.rollback()
                 return False
             self.db.execute(
                 "INSERT INTO intents VALUES (?,?,?,?)",
-                (intent_key, now.date().isoformat(), request_hash, amount),
+                (intent_key, day, request_hash, amount),
+            )
+            self.db.execute(
+                "INSERT INTO intent_directions(intent_key,side) VALUES (?,?)",
+                (intent_key, side),
             )
             self.db.commit()
             return True
@@ -112,6 +125,54 @@ class CycleStore:
         except BaseException:
             self.db.rollback()
             raise
+
+    @staticmethod
+    def _budget_day(now: datetime, maximum: int, reserved: int) -> str:
+        if (
+            not isinstance(now, datetime)
+            or now.tzinfo is None
+            or now.utcoffset() is None
+        ):
+            raise StateError("aware_reservation_clock_required")
+        if (
+            type(maximum) is not int
+            or maximum < 1
+            or type(reserved) is not int
+            or not 0 <= reserved <= maximum
+        ):
+            raise StateError("invalid_reservation_budget")
+        return now.astimezone(UTC).date().isoformat()
+
+    def _daily_budget(self, day: str, maximum: int, reserved: int) -> dict[str, Any]:
+        # Missing sidecar rows are old reservations, not free capacity. Charge
+        # every unknown direction against entry capacity; preserve old intents.
+        total, entries = self.db.execute(
+            """SELECT count(*), coalesce(sum(CASE
+                 WHEN coalesce(d.side,'unknown') != 'sell' THEN 1 ELSE 0 END),0)
+               FROM intents i LEFT JOIN intent_directions d USING(intent_key)
+               WHERE i.day=?""",
+            (day,),
+        ).fetchone()
+        remaining = max(0, maximum - total)
+        return {
+            "utc_day": day,
+            "maximum_total": maximum,
+            "reserved_exit_attempts": reserved,
+            "used_total": total,
+            "used_entries_or_unknown": entries,
+            "remaining_total": remaining,
+            "remaining_entries": min(remaining, max(0, maximum - reserved - entries)),
+        }
+
+    def daily_budget(
+        self,
+        *,
+        now: datetime,
+        max_daily_attempts: int,
+        reserved_daily_exit_attempts: int = 1,
+    ) -> dict[str, Any]:
+        day = self._budget_day(now, max_daily_attempts, reserved_daily_exit_attempts)
+        return self._daily_budget(day, max_daily_attempts, reserved_daily_exit_attempts)
 
     def pending_intents(self, *, limit: int = 100) -> tuple[dict[str, Any], ...]:
         """Known intents lacking a terminal broker observation, oldest first.

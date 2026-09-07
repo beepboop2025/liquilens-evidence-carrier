@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable
 from dataclasses import asdict
@@ -22,7 +23,7 @@ from .broker import OperatorPaperSubmissionStopped, OperatorPaperTradeSafetyGate
 from .config import SCOPED_PROFILE, CopilotConfig, PaperCredentials
 from .evidence import LiquiLensStrategyContext, OperatorEvidenceService, _json
 from .market import InputUnavailable, PaperAccountReader, bounded_json, fetch_bars
-from .state import CycleStore
+from .state import CycleStore, StateError
 from .strategy import Decision, MarketBar, propose
 
 
@@ -88,6 +89,107 @@ def _order_summary(order: Any) -> dict[str, Any]:
     return {
         key: str(getattr(order, key)) if getattr(order, key, None) is not None else None
         for key in ("id", "client_order_id", "status", "filled_qty", "filled_avg_price")
+    }
+
+
+_RECEIPT_CAPTURE_FIELDS = frozenset(
+    {
+        "schema",
+        "canonicalization",
+        "receipt_id",
+        "record_hash",
+        "evaluated_at",
+        "expires_at",
+        "request",
+        "request_hash",
+        "policy",
+        "policy_hash",
+        "evidence",
+        "broker_preview",
+        "decision",
+        "issuer",
+        "integrity",
+        "authority",
+    }
+)
+_SECRET_FIELDS = frozenset(
+    {
+        "headers",
+        "authorization",
+        "cookie",
+        "set_cookie",
+        "api_key",
+        "secret_key",
+        "hmac_key",
+        "access_token",
+        "refresh_token",
+        "password",
+    }
+)
+
+
+def _audit_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
+    """Copy only the verified receipt contract, never transport/auth objects."""
+    if not isinstance(receipt, dict) or set(receipt) != _RECEIPT_CAPTURE_FIELDS:
+        raise StateError("audit_receipt_contract_invalid")
+
+    def check(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if (
+                    not isinstance(key, str)
+                    or key.lower().replace("-", "_") in _SECRET_FIELDS
+                ):
+                    raise StateError("audit_receipt_credential_field_forbidden")
+                check(item)
+        elif isinstance(value, list):
+            for item in value:
+                check(item)
+
+    check(receipt)
+    return json.loads(_json(receipt, limit=524288))
+
+
+def _strategy_input_record(
+    config: CopilotConfig,
+    bars: list[MarketBar],
+    *,
+    now: datetime,
+    seiche_regime: str | None,
+) -> dict[str, Any]:
+    """Retain only public market fields and strategy parameters, privately."""
+    if (
+        not isinstance(bars, list)
+        or len(bars) > 10000
+        or any(
+            not isinstance(bar, MarketBar) or not isinstance(bar.at, datetime)
+            for bar in bars
+        )
+    ):
+        raise StateError("strategy_input_capture_invalid_or_oversized")
+    rows = [{"at": bar.at.isoformat(), "close": bar.close} for bar in bars]
+    canonical_bars = _json(rows, limit=262144)
+    regime = (
+        seiche_regime
+        if isinstance(seiche_regime, str)
+        and seiche_regime in {"CALM", "EROSION", "STRAIN", "STRESS"}
+        else None
+    )
+    return {
+        "schema": "liquilens.paper-strategy-inputs.v1",
+        "observed_at": now.isoformat(),
+        "knowledge_time_basis": "local_decision_observation_not_source_publication",
+        "historical_vintage_reconstructed": False,
+        "bar_clock_semantics": "complete_bar_close",
+        "bars": json.loads(canonical_bars),
+        "bars_sha256": hashlib.sha256(canonical_bars.encode()).hexdigest(),
+        "strategy_config": asdict(config.strategy),
+        "strategy_source_sha256": hashlib.sha256(
+            Path(__file__).with_name("strategy.py").read_bytes()
+        ).hexdigest(),
+        "input_regime": regime,
+        "input_regime_authority": "unverified_strategy_context_requires_receipt",
+        "execution_permission": False,
     }
 
 
@@ -201,14 +303,30 @@ class CopilotRunner:
                 portfolio=asdict(portfolio),
                 order_observations=observations,
             )
+        decision_at = self.clock()
         decision = propose(
             bars,
             portfolio,
             self.config.strategy,
-            now=self.clock(),
+            now=decision_at,
             seiche_regime=seiche_regime,
         )
-        common = {"decision": asdict(decision), "portfolio": asdict(portfolio)}
+        input_record = _strategy_input_record(
+            self.config, bars, now=decision_at, seiche_regime=seiche_regime
+        )
+        self.store.event("strategy_inputs", input_record, decision_at)
+        common = {
+            "decision": asdict(decision),
+            "portfolio": asdict(portfolio),
+            "strategy_inputs_sha256": hashlib.sha256(
+                _json(input_record, limit=524288).encode()
+            ).hexdigest(),
+            "daily_budget": self.store.daily_budget(
+                now=decision_at,
+                max_daily_attempts=self.config.max_daily_attempts,
+                reserved_daily_exit_attempts=self.config.reserved_daily_exit_attempts,
+            ),
+        }
         if research is not None:
             common["riptide_research"] = research
         if recovered:
@@ -229,7 +347,12 @@ class CopilotRunner:
                 self.clock(),
             )
         assessment = await self.evidence_service.assess(request)
-        receipt = assessment.receipt
+        receipt = _audit_receipt(assessment.receipt)
+        source_receipt = getattr(assessment, "source_receipt", None)
+        if source_receipt is not None:
+            self.store.event(
+                "source_receipt", _audit_receipt(source_receipt), self.clock()
+            )
         common.update(request=request, receipt=receipt)
         # Save evidence BEFORE requesting broker submission. A persistence
         # failure is a hard stop, not permission to run without an audit trail.
@@ -255,12 +378,26 @@ class CopilotRunner:
         assessed_regime = (
             receipt.get("evidence", {}).get("seiche", {}).get("facts", {}).get("regime")
         )
+        rechecked_at = self.clock()
         checked = propose(
             bars,
             fresh,
             self.config.strategy,
-            now=self.clock(),
+            now=rechecked_at,
             seiche_regime=assessed_regime,
+        )
+        self.store.event(
+            "submission_recheck",
+            {
+                "observed_at": rechecked_at.isoformat(),
+                "request_hash": trade_safety_request_hash(request),
+                "strategy_inputs_sha256": common["strategy_inputs_sha256"],
+                "portfolio": asdict(fresh),
+                "decision": asdict(checked),
+                "assessed_regime": assessed_regime,
+                "execution_permission": False,
+            },
+            rechecked_at,
         )
         if (checked.action, checked.notional_usd) != (
             decision.action,
@@ -290,10 +427,22 @@ class CopilotRunner:
             amount=decision.notional_usd or 0,
             now=self.clock(),
             max_daily_attempts=self.config.max_daily_attempts,
+            side=decision.action,
+            reserved_daily_exit_attempts=self.config.reserved_daily_exit_attempts,
         ):
+            common["daily_budget"] = self.store.daily_budget(
+                now=self.clock(),
+                max_daily_attempts=self.config.max_daily_attempts,
+                reserved_daily_exit_attempts=self.config.reserved_daily_exit_attempts,
+            )
             return self.record(
                 "blocked", reasons=["intent_used_or_daily_attempt_limit"], **common
             )
+        common["daily_budget"] = self.store.daily_budget(
+            now=self.clock(),
+            max_daily_attempts=self.config.max_daily_attempts,
+            reserved_daily_exit_attempts=self.config.reserved_daily_exit_attempts,
+        )
         try:
             # The existing adapter independently verifies the exact request,
             # HMAC, policy, expiry, account and replay state before its SDK call.

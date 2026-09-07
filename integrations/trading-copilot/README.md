@@ -88,9 +88,9 @@ uv run --project integrations/trading-copilot --locked \
 | Momentum | Mean of last 5 closes / mean of last 30 closes − 1; neutral when absolute value <0.003 |
 | Volatility target | 20% annualized; population standard deviation of hourly log returns, annualized using 365.25 days |
 | Position target | Equity × min(10%, target/observed volatility); EROSION halves it |
-| Rebalance tolerance | 1% of equity |
+| Entry rebalance tolerance | 1% of equity; negative-momentum reductions do not use this tolerance |
 | Candidate size | $1,000; minimum $1,000, with no rounding up of smaller cash/holding remainders |
-| Attempt limit | Two durable reservations per UTC day; one intent per account, strategy and completed bar |
+| Attempt limit | Two durable reservations per UTC day, with one reserved for reductions; at most one entry and at most two total attempts |
 | Loss halt | Loss ≥2% against broker `last_equity`, its prior-close basis |
 | Outstanding orders | Zero allowed |
 | Receipt limits | Estimated hypothetical exit cost ≤25 bp; venue spread ≤15 bp; STRAIN/STRESS held |
@@ -101,6 +101,23 @@ sell solely because a positive-momentum target shrank. Missing inputs, invalid
 bars or zero/invalid volatility produce HOLD. Loss and evidence holds can leave
 a paper position open: this is not a stop-loss or automatic liquidation system.
 
+The position target limits entries; it is not a continuously maintained exposure
+cap. Price appreciation can move a holding above the target or configured ceiling.
+Decision metrics report both conditions without forcing a sale. Negative momentum
+can propose a $1,000 reduction even when the holding is below the 1% rebalance
+tolerance. Holdings below $1,000 remain HOLD with
+`residual_below_minimum_order_notional`; the runner neither rounds up nor creates
+a smaller order outside the evidence profile. These policy changes were chosen
+to address reproduced behavior, without optimizing historical returns.
+
+`reserved_daily_exit_attempts` defaults to one, including when loading an older
+configuration without the field. With the default two total attempts, buy/sell,
+sell/buy and sell/sell are permitted sequences; buy/buy is blocked. A failed,
+cancelled or uncertain attempt still counts. Setting the total to one while
+retaining the default reserve makes the runner exit-only; an explicit zero reserve
+opts out of reserving exit capacity. Reservations remain limited to one intent per
+account, strategy and completed bar. Cycle records include the UTC daily budget.
+
 Before submission the runner fetches the credential-bound paper account,
 checks portfolio limits, obtains required evidence and persists the assessment.
 It then rereads the portfolio, recomputes the candidate using the receipt's
@@ -109,6 +126,17 @@ receipt binds the original request, identity and policy; the scoped receipt and
 native liquidation association are reverified. The Alpaca adapter independently
 checks binding, authentication, expiry and replay state before its SDK call.
 Receipts last at most 30 seconds and cannot outlive their source/request bounds.
+
+The private audit also retains bounded strategy bars, the strategy configuration
+and source-code hash, and the original source receipt when the evidence profile
+supplies one. The final account/strategy recheck is recorded before submission.
+Receipt capture accepts the explicit receipt contract and rejects credential or
+transport-header fields; it does not export the environment or HTTP client.
+Failure to persist any of these pre-submission records stops the cycle before
+the broker submission call. `observed_at` is the local decision-observation clock,
+not a reconstructed source publication clock. Original evidence clocks, request
+hashes, expiry and authority remain unchanged. These private records do not prove
+that a complete historical evidence chain existed for earlier market bars.
 
 ## Private setup and commands
 
@@ -187,6 +215,13 @@ intents and subsequent order observations; `alpaca-submissions.sqlite3` stores
 the adapter's durable submission/recovery journal. Back up both consistently,
 including any required SQLite WAL state. Do not erase reservations or journal
 rows to retry or regain a daily slot.
+
+The `intent_directions` sidecar records buy/sell direction without rewriting the
+original four-column `intents` table. Existing reservations without a direction
+conservatively consume entry capacity as well as total capacity. Backups must
+retain both tables together. The schema stays readable by the older runner, but
+that runner does not enforce the new reserved-exit policy; reverting code also
+reverts that policy. Do not mix runner versions for a managed account.
 
 A failed or uncertain attempt retains its reservation. Ambiguous submission is
 resolved by lookup, never blind resubmission; an unavailable lookup remains
