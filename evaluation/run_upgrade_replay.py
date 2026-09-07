@@ -67,7 +67,8 @@ def load_candidate_harness(path: Path):
     module.__package__ = "liquilens_trading_copilot"
     module._candidate_strategy_path = Path(strategy.__file__)
     sys.modules[module.__name__] = module
-    exec(compile(adapted, str(path), "exec"), module.__dict__)
+    # Only the exact SHA-pinned harness plus the two fixed substitutions runs.
+    exec(compile(adapted, str(path), "exec"), module.__dict__)  # noqa: S102
     if module.propose is not strategy.propose:
         raise ValueError("candidate_strategy_import_mismatch")
 
