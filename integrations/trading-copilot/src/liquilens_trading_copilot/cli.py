@@ -1,4 +1,4 @@
-"""Operator CLI: diagnose, initialize private state, run paper cycles, reconcile."""
+"""Offline demo, diagnostics, private paper cycles and reconciliation."""
 
 from __future__ import annotations
 
@@ -70,7 +70,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=["init", "diagnose", "research", "once", "reconcile", "status", "stop"],
+        choices=[
+            "demo",
+            "init",
+            "diagnose",
+            "research",
+            "once",
+            "reconcile",
+            "status",
+            "stop",
+        ],
+    )
+    from .demo import SCENARIOS
+
+    parser.add_argument("--scenario", choices=SCENARIOS, help="offline demo only")
+    parser.add_argument(
+        "--format", choices=["json", "markdown"], help="offline demo only"
     )
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--config", type=Path)
@@ -82,6 +97,19 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
+        if args.command == "demo":
+            if any((args.config, args.env_file, args.state_dir)):
+                parser.error("demo does not accept operator configuration or state")
+            from .demo import build_demo, format_demo_markdown
+
+            report = build_demo(args.scenario or "candidate")
+            if args.format == "markdown":
+                print(format_demo_markdown(report), end="")
+            else:
+                _emit(report)
+            return 0
+        if args.scenario is not None or args.format is not None:
+            parser.error("--scenario and --format apply only to demo")
         if args.command == "init":
             if args.state_dir is None:
                 parser.error("init requires --state-dir")
