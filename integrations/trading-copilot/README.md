@@ -8,6 +8,58 @@ availability. Its native score does not become a BTC signal or order permission.
 There is no live-money mode, LLM decision maker or demonstrated profitable
 strategy. The public Trade Safety gateway remains unchanged and read-only.
 
+## Try an offline decision first
+
+From a source checkout, Python 3.11 or later can run the demo without installing
+dependencies, creating an account or reading credentials:
+
+```sh
+PYTHONPATH=integrations/trading-copilot/src \
+  python3 -B -m liquilens_trading_copilot.demo --format markdown
+```
+
+With the locked copilot environment already prepared, the same feature is also
+available through its CLI:
+
+```sh
+uv run --project integrations/trading-copilot --locked --no-sync --offline \
+  liquilens-trading-copilot demo --format markdown
+uv run --project integrations/trading-copilot --locked --no-sync --offline \
+  liquilens-trading-copilot demo --scenario stale-bars > synthetic-decision.json
+```
+
+Both entry points use the existing `strategy.propose` function with unchanged
+defaults and explicitly invented bars, portfolio and funding regime. The fixed
+scenario clock is **2000-01-02**, not the current market clock. JSON is the default;
+Markdown includes the full JSON, input hash, decision metrics, reason explanations,
+countercase and remaining evidence gates. Shell redirection writes only the file
+you select. The demo itself performs no network or broker calls and does not read
+or write configuration, secrets, accounts or journals.
+
+| `--scenario` | What to inspect |
+| --- | --- |
+| `candidate` (default) | Synthetic positive momentum produces a $1,000 candidate; execution remains blocked. |
+| `reduction` | Negative momentum can reduce a synthetic holding without opening a short. |
+| `stale-bars` | Old complete bars cause HOLD; report generation cannot refresh them. |
+| `loss-halt` | The daily-loss halt freezes both sides and leaves the synthetic holding open. |
+| `funding-stress` | A synthetic STRESS input blocks new exposure. |
+| `small-residual` | A holding below the $1,000 order rung remains HOLD without rounding up. |
+
+These are educational decision examples, not historical evaluation, performance
+evidence or a production readiness check. Every report has a separate demo schema,
+`synthetic=true`, `order_authorized=false` and `receipt_issued=false`. Required
+Seiche, LiquiLens, Undertow and operator/broker gates remain **not evaluated**.
+No demo result can be submitted as a trading request or authorization receipt.
+The CLI rejects operator config, secret-file and state-directory arguments for
+`demo`. It does not enable the runner.
+
+For current public research, open [Market Brief](https://beepboop2025.github.io/market-brief/)
+separately, inspect its source clocks and gaps, then use its AI research handoff.
+Its public brief does not clear trading gates. For the distinct private paper
+workflow and source-checkout dependency installation, see
+[Private setup and commands](#private-setup-and-commands). The signed core Carrier
+wheel alone does not install this copilot integration.
+
 ## Default private profile
 
 `init` selects `liquilens.paper-funding-exit.v1`, policy version `1.0.0`, and

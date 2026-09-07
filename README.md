@@ -98,6 +98,12 @@ separately identified reference rather than silently upgraded.
 
 ## Install and verify
 
+Want to inspect an explained copilot decision first? The
+[offline copilot demo](integrations/trading-copilot/README.md#try-an-offline-decision-first)
+runs from this source checkout with Python alone. It uses clearly synthetic inputs,
+shows candidate and HOLD scenarios, and keeps execution blocked without network,
+credentials or broker setup. It is separate from the signed core package below.
+
 The [installation guide](docs/INSTALLATION.md) covers ordinary conda-forge
 `0.15.0`, the listed Dev Container Feature (Carrier `0.14.0`), and SchemaStore
 editor setup. Those channels have their own versions; use the signed `0.19.0`
