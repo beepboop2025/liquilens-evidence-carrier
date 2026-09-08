@@ -6,9 +6,9 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_VERSION = "0.19.0"
+SOURCE_VERSION = "0.20.0"
 SOURCE_MCPB_SHA256 = (
-    "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a"
+    "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f"
 )
 SOURCE_README_SHA256 = (
     "2d1b4dce5431451510d786f70a5a8e401180f4dd8e4820025e101444e5a97aa6"
@@ -161,7 +161,7 @@ def test_main_facing_docs_record_published_v0190_and_preserve_history():
         assert CANONICAL_SITE_REVISION in text
         assert CANONICAL_SITE_WORKFLOW in text
     for text in (readme, distribution, changelog, release_receipt):
-        assert SOURCE_MCPB_SHA256 in text
+        assert RELEASE_MCPB_SHA256 in text
 
     for stale_claim in (
         "source checkpoint prepares `v0.19.0`",
@@ -329,9 +329,9 @@ def test_published_v0180_embedded_readme_stays_reproducible():
 
 
 def test_published_v0190_embedded_readme_matches_registry_digest_input():
-    frozen = ROOT / "mcpb/release-readmes" / f"{SOURCE_VERSION}.md"
+    frozen = ROOT / "mcpb/release-readmes" / f"{RELEASE_VERSION}.md"
     assert hashlib.sha256(frozen.read_bytes()).hexdigest() == (
-        SOURCE_README_SHA256
+        RELEASE_README_SHA256
     )
     normalized = " ".join(frozen.read_text(encoding="utf-8").split())
     assert "bytes prepared for the v0.19.0 MCPB candidate" in normalized

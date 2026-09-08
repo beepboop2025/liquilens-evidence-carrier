@@ -7,6 +7,11 @@ authority.
 
 ## [Unreleased]
 
+- Prepare core `0.20.0` with two offline MCP resources for Seiche connected
+  research: the response schema and a product routing map. The four verification
+  tools and existing Trade Safety v1 schema bytes retain their meaning. This
+  source candidate does not change published `0.19.0` artifact identities.
+
 - Prepare independently versioned Trade Safety gateway `0.2.0` against the
   unchanged core `0.19.0` protocol: consume Seiche
   `seiche.risk-context.v1` and Undertow
