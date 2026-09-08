@@ -265,7 +265,7 @@ def main() -> int:
     )
     assert published_wheel in readme
     assert (
-        f"current signed and published core release is `v{PUBLISHED_VERSION}`"
+        f"historical core publication receipt describes `v{PUBLISHED_VERSION}`"
         in readme
     )
     assert "not yet tagged, published, or registered" not in normalized_readme
@@ -294,9 +294,16 @@ def main() -> int:
     assert "liquilens-evidence issue-trade-safety" in readme
     assert f"Published release `v{PUBLISHED_VERSION}` provides" in readme
     distribution = (ROOT / "DISTRIBUTION.md").read_text(encoding="utf-8")
-    assert f"current core implementation release is `v{PUBLISHED_VERSION}`" in (
+    assert f"historical core implementation release was `v{PUBLISHED_VERSION}`" in (
         distribution
     )
+    assert f"current signed core release is `v{SOURCE_VERSION}`" in readme
+    current_receipt = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
+        encoding="utf-8"
+    )
+    assert SOURCE_MCPB_SHA256 in current_receipt
+    assert "34276508204" in current_receipt
+    assert "bfe665431c0c2203e71d1a5e9c7ba57095320585" in current_receipt
     assert "not yet tagged, published, registered, or deployed" not in distribution
     assert CANONICAL_SITE_REVISION in distribution
     assert CANONICAL_SITE_WORKFLOW in distribution

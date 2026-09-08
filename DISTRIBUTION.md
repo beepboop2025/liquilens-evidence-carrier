@@ -1,11 +1,16 @@
 # LiquiLens Evidence Carrier distribution
 
+The current core implementation release is `v0.20.0`. Its signed tag, published
+wheel and MCPB checksums, exact-workflow attestations, and official Registry
+readback are recorded in [the 0.20.0 receipt](docs/RELEASE-0.20.0.md).
+The independently versioned channels below keep their own recorded pins.
+
 This matrix records public ways to run LiquiLens Evidence Carrier. A channel is
 called **live** only when an anonymous or otherwise public retrieval and a real
 runtime check have succeeded. An upstream pull request remains **under review**
 until its maintainer merges and deploys it.
 
-The current core implementation release is `v0.19.0`. Annotated tag object
+The historical core implementation release was `v0.19.0`. Annotated tag object
 `c3239bfc7c4d3c4b7fc5ce26e0f602962e7d4337` targets allowlisted SSH-signed
 release commit `8f5738c9e77cc95b9a68543d478b9521f5595d61`, tree
 `acca6fa7aab75ebc91bf044e153c6468cd6f9c0c`. The exact commit passed
