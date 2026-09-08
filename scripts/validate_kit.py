@@ -12,9 +12,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_VERSION = "0.19.0"
+SOURCE_VERSION = "0.20.0"
 SOURCE_MCPB_SHA256 = (
-    "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a"
+    "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f"
 )
 GATEWAY_VERSION = "0.2.2"
 PUBLISHED_VERSION = "0.19.0"
@@ -287,7 +287,7 @@ def main() -> int:
     ) in readme
     assert CANONICAL_SITE_REVISION in readme
     assert CANONICAL_SITE_WORKFLOW in readme
-    assert SOURCE_MCPB_SHA256 in readme
+    assert PUBLISHED_MCPB_SHA256 in readme
     assert "liquilens.fleet-brief.v1" in readme
     assert "liquilens-evidence issue-brief" in readme
     assert "liquilens.trade-safety-receipt.v1" in readme
@@ -300,7 +300,7 @@ def main() -> int:
     assert "not yet tagged, published, registered, or deployed" not in distribution
     assert CANONICAL_SITE_REVISION in distribution
     assert CANONICAL_SITE_WORKFLOW in distribution
-    assert SOURCE_MCPB_SHA256 in distribution
+    assert PUBLISHED_MCPB_SHA256 in distribution
     assert PUBLISHED_REVISION in distribution
     assert PUBLISHED_TAG_OBJECT in distribution
     assert PUBLISHED_PREFLIGHT in distribution
@@ -356,7 +356,7 @@ def main() -> int:
         release_record
     )
     assert "There is no v0.19.0 tag object" not in release_record
-    assert SOURCE_MCPB_SHA256 in release_record
+    assert PUBLISHED_MCPB_SHA256 in release_record
     historical_record = ROOT / f"docs/RELEASE-{HISTORICAL_VERSION}.md"
     assert _sha256(historical_record) == HISTORICAL_RELEASE_RECORD_SHA256
     historical_text = historical_record.read_text(encoding="utf-8")
@@ -374,9 +374,9 @@ def main() -> int:
     previous_readme = ROOT / "mcpb/release-readmes" / f"{PREVIOUS_VERSION}.md"
     assert _sha256(previous_readme) == PREVIOUS_README_SHA256
     changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [{SOURCE_VERSION}] - 2026-09-02" in changelog
+    assert f"## [{PUBLISHED_VERSION}] - 2026-09-02" in changelog
     assert "No `v0.19.0` tag, GitHub release" not in changelog
-    assert SOURCE_MCPB_SHA256 in changelog
+    assert PUBLISHED_MCPB_SHA256 in changelog
     assert f"## [{PUBLISHED_VERSION}] - 2026-09-02" in changelog
     assert PUBLISHED_REVISION in changelog
     assert PUBLISHED_TAG_OBJECT in changelog
