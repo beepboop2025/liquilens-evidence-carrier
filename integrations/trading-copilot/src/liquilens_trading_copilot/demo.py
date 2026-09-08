@@ -261,10 +261,30 @@ def format_demo_markdown(report: dict[str, Any]) -> str:
 def main() -> int:
     """A standard-library-only entry point for an uninstalled source checkout."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scenario", choices=SCENARIOS, default="candidate")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--scenario", choices=SCENARIOS)
+    selection.add_argument(
+        "--all", action="store_true", help="export all scenarios as a JSON pack"
+    )
+    parser.add_argument(
+        "--source-ref",
+        help="--all only: verify sources against a full local Git commit SHA",
+    )
     parser.add_argument("--format", choices=["json", "markdown"], default="json")
     args = parser.parse_args()
-    report = build_demo(args.scenario)
+    if args.all:
+        if args.format != "json":
+            parser.error("--all exports JSON only")
+        from .demo_pack import build_demo_pack, serialize_demo_pack
+
+        try:
+            print(serialize_demo_pack(build_demo_pack(args.source_ref)), end="")
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
+        return 0
+    if args.source_ref is not None:
+        parser.error("--source-ref requires --all")
+    report = build_demo(args.scenario or "candidate")
     if args.format == "markdown":
         print(format_demo_markdown(report), end="")
     else:
