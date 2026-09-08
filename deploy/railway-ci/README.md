@@ -10,8 +10,11 @@ they do not assert GitHub execution or OIDC identity.
 
 Configure `deploy/railway-ci/Dockerfile`, restart policy `NEVER`, one replica,
 no public domain, no application/deployment credentials and no wait for Actions.
-Every successful run emits `RAILWAY_CI_PASS` with the source SHA and deployment
-ID. A Railway deployment status alone is not evidence that its tests passed.
+The complete gate runs during image construction, so failed checks fail the
+Railway build and PR deployment check. The image retains an exact-source pass
+receipt; startup verifies it against the runtime source SHA and emits
+`RAILWAY_CI_PASS` with source and deployment IDs. Detailed job results remain in
+the build logs. A Railway deployment status alone is not test evidence.
 
 Setup actions are explicitly mapped to image dependencies. Unknown actions,
 conditions, matrix axes or privilege-bearing job structures fail before any

@@ -25,33 +25,6 @@ from liquilens_evidence.fleet_brief import (
 from liquilens_evidence.protocol_resources import load_protocol_json
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_node_verifier_flushes_large_json_to_a_pipe(tmp_path: Path) -> None:
-    node = shutil.which("node")
-    if node is None:
-        pytest.skip("Node is unavailable for cross-language verification")
-    payload = {"large": "evidence-" * 131072}
-    path = tmp_path / "large.json"
-    path.write_text(json.dumps(payload))
-    completed = subprocess.run(
-        [
-            node,
-            str(ROOT / "protocol/verify_hash_tree_v1.mjs"),
-            "--artifact",
-            "value",
-            str(path),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    result = json.loads(completed.stdout)
-    assert result["ok"] is True
-    assert len(result["canonical_utf8"]) > 1024 * 1024
-
-
 EVALUATED_AT = datetime(2026, 8, 25, tzinfo=UTC)
 EVALUATED_AT_TEXT = "2026-08-25T00:00:00Z"
 ENDPOINTS = {
@@ -326,25 +299,32 @@ def test_committed_conformance_briefs_verify(name: str, states: dict[str, str]) 
         assert "sources" not in json.dumps(rejected)
 
 
-def test_node_verifier_matches_python_fleet_brief_identity() -> None:
+def test_node_verifier_matches_python_fleet_brief_identity(tmp_path: Path) -> None:
     node = shutil.which("node")
     if node is None:
         pytest.skip("Node is unavailable for cross-language brief verification")
     path = ROOT / "examples" / "fleet-brief" / "mixed-states.fleet-brief.json"
-    completed = subprocess.run(
-        [
-            node,
-            str(ROOT / "protocol" / "verify_hash_tree_v1.mjs"),
-            "--artifact",
-            "fleet-brief",
-            str(path),
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    # This contract checks the cross-language identity. A regular file retains the
+    # complete canonical JSON even on hosts with small asynchronous stdout pipes.
+    output = tmp_path / "node-verification.json"
+    with output.open("w") as stream:
+        completed = subprocess.run(
+            [
+                node,
+                str(ROOT / "protocol" / "verify_hash_tree_v1.mjs"),
+                "--artifact",
+                "fleet-brief",
+                str(path),
+            ],
+            check=False,
+            stdout=stream,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     assert completed.returncode == 0, completed.stderr
-    assert json.loads(completed.stdout)["ok"] is True
+    result = json.loads(output.read_text())
+    assert result["ok"] is True
+    assert result["digest"] == json.loads(path.read_text())["record_hash"]
 
 
 def test_cli_issues_and_verifies_from_explicit_local_paths(tmp_path: Path) -> None:

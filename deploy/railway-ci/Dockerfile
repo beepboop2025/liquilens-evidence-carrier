@@ -14,5 +14,8 @@ ENV UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_PREFERENCE=only-managed \
 RUN uv python install 3.11 3.12 3.13 3.14
 COPY . /source
 WORKDIR /source
+ARG RAILWAY_GIT_COMMIT_SHA
+ARG RAILWAY_DEPLOYMENT_ID
+RUN timeout --signal=TERM --kill-after=30 2700 python deploy/railway-ci/run.py
 ENTRYPOINT ["/usr/bin/tini", "-s", "--"]
-CMD ["timeout", "--signal=TERM", "--kill-after=30", "2700", "python", "deploy/railway-ci/run.py"]
+CMD ["python", "deploy/railway-ci/run.py", "--verify-build"]
