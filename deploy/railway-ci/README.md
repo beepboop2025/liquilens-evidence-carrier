@@ -27,5 +27,12 @@ deployment remain separate. This job does not mint their required OIDC identity
 or claim their native-executor proof. Owner pull requests use a focused Railway environment copied from a base
 containing only CI services and no credentials or volumes. The seven portable
 GitHub workflows retain a fallback for pull requests from other authors. Browser
-verification also remains a prerequisite of the existing Pages publisher.
+verification runs here before the exact-source native CI result can pass.
 Manual validation uses a Railway redeployment of the desired source.
+
+The Pages issuer workflow follows the successful Railway status event for current
+main, or an explicit main dispatch. It checks the authenticated Railway bot, exact
+CI context/service/environment and latest result for that commit, then rechecks
+before deployment. A changed main, pending/failed result, malformed target or PR
+environment cannot reuse an earlier main pass. Pages still uses its original
+GitHub origin and OIDC deployment; it does not repeat the portable browser tests.

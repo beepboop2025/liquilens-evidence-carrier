@@ -31,6 +31,11 @@ EXTERNAL_PR_CONDITION = (
     "github.event_name == 'pull_request' && "
     "github.event.pull_request.user.login != 'beepboop2025'"
 )
+EXTERNAL_FORK_PR_CONDITION = (
+    "github.event_name == 'pull_request' && "
+    "(github.event.pull_request.user.login != 'beepboop2025' || "
+    "github.event.pull_request.head.repo.full_name != github.repository)"
+)
 PUBLIC_INSTALL_CONDITION = (
     "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 )
@@ -49,7 +54,10 @@ def check_job(job):
     }
     if set(job) - allowed or job["runs-on"] != "ubuntu-24.04":
         raise ValueError("Unsupported portable job structure")
-    if job.get("if", EXTERNAL_PR_CONDITION) != EXTERNAL_PR_CONDITION:
+    if job.get("if", EXTERNAL_PR_CONDITION) not in {
+        EXTERNAL_PR_CONDITION,
+        EXTERNAL_FORK_PR_CONDITION,
+    }:
         raise ValueError("Unsupported job condition")
     defaults = job.get("defaults", {})
     if set(defaults) - {"run"} or set(defaults.get("run", {})) - {"working-directory"}:
