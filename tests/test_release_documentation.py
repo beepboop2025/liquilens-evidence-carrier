@@ -137,11 +137,11 @@ def test_main_facing_docs_record_published_v0190_and_preserve_history():
         assert RELEASE_CONTAINER_ATTESTATION in text
         assert RELEASE_GATEWAY_CONTAINER_ATTESTATION in text
 
-    assert f"current signed and published core release is `v{RELEASE_VERSION}`" in (
+    assert f"historical core publication receipt describes `v{RELEASE_VERSION}`" in (
         readme
     )
     assert "signed, published, attested, and active/latest" in normalized_release
-    assert f"current core implementation release is `v{RELEASE_VERSION}`" in (
+    assert f"historical core implementation release was `v{RELEASE_VERSION}`" in (
         distribution
     )
     assert f"## [{RELEASE_VERSION}] - 2026-09-02" in changelog
