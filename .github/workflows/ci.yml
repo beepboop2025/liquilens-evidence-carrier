@@ -10,6 +10,8 @@ permissions:
 
 jobs:
   test:
+    # Owner changes run in the isolated Railway PR and main services.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'beepboop2025'
     strategy:
       fail-fast: false
       matrix:
@@ -30,6 +32,8 @@ jobs:
         run: uv run --locked --extra dev pytest -q
 
   static-and-package:
+    # Owner changes run in the isolated Railway PR and main services.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'beepboop2025'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -119,6 +123,8 @@ jobs:
           uv build --project integrations/trade-safety-gateway
 
   action-smoke:
+    # Owner changes run in the isolated Railway PR and main services.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'beepboop2025'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
