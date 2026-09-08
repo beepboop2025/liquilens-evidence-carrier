@@ -21,6 +21,9 @@ See [`docs/RELEASE-0.20.0.md`](docs/RELEASE-0.20.0.md) for its publication recei
 Independent consumer channels retain the versions recorded by their own receipts.
 
 The following historical core publication receipt describes `v0.19.0`.
+Published release `v0.19.0` provides the preserved
+[historical wheel](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens_evidence-0.19.0-py3-none-any.whl)
+and [Registry record](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.19.0).
 Annotated tag
 object `c3239bfc7c4d3c4b7fc5ce26e0f602962e7d4337` targets the allowlisted
 SSH-signed release commit `8f5738c9e77cc95b9a68543d478b9521f5595d61`, tree
@@ -114,22 +117,22 @@ credentials or broker setup. It is separate from the signed core package below.
 
 The [installation guide](docs/INSTALLATION.md) covers ordinary conda-forge
 `0.15.0`, the listed Dev Container Feature (Carrier `0.14.0`), and SchemaStore
-editor setup. Those channels have their own versions; use the signed `0.19.0`
-wheel below for the current core release and Trade Safety verification.
+editor setup. Those channels have their own versions; use the signed `0.20.0`
+wheel below for the current core release, connected-research resources and Trade Safety verification.
 
 ```bash
 # Source checkout (main may contain post-release documentation)
 uv sync --locked
 uv run liquilens-evidence --help
 
-# Signed v0.19.0 wheel; checksum verified against the release manifest
-python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens_evidence-0.19.0-py3-none-any.whl#sha256=1adccb72376f50456fd16a979e372f802ae73ba35b766633bc3d8bd4ab5abcc8'
+# Signed v0.20.0 wheel; checksum verified against the release manifest
+python -m pip install 'https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.20.0/liquilens_evidence-0.20.0-py3-none-any.whl#sha256=d864af722153f66a5cad5855ce00fb70809a4a078d7d972a75ce714ebbdf57cc'
 liquilens-evidence issue examples/descriptor.json > carrier.json
 liquilens-evidence verify carrier.json --as-of 2026-08-24T12:00:00Z
 liquilens-evidence convert carrier.json --format fdc3
 ```
 
-Published release `v0.19.0` provides a wheel and checksum manifest. The Python
+Published release `v0.20.0` provides a wheel and checksum manifest. The Python
 runtime has no third-party dependencies. A Node.js verifier is also
 included for cross-language `liquilens-hash-tree-v1` identity checks:
 
@@ -274,7 +277,7 @@ revision, `2025-11-25`, for existing clients.
 }
 ```
 
-The published `v0.19.0` release exposes four read-only tools:
+The published `v0.20.0` release exposes four read-only tools and eleven offline resources:
 
 - `verify_carrier` verifies the content identity, clocks, rights, and export
   disposition of one explicit JSON path below the configured root.
@@ -287,11 +290,11 @@ The published `v0.19.0` release exposes four read-only tools:
   inside the tenant boundary.
 
 It never fetches network data, expands restricted rights, recommends, rates
-credit, or executes a financial action. The published `v0.19.0` GitHub release
+credit, or executes a financial action. The published `v0.20.0` GitHub release
 carries the checksum-pinned
-[`liquilens-evidence-carrier-mcp-0.19.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens-evidence-carrier-mcp-0.19.0.mcpb)
+[`liquilens-evidence-carrier-mcp-0.20.0.mcpb`](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.20.0/liquilens-evidence-carrier-mcp-0.20.0.mcpb)
 bundle for compatible desktop clients. Registry identity:
-[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.19.0).
+[`io.github.beepboop2025/liquilens-evidence-carrier`](https://registry.modelcontextprotocol.io/v0.1/servers/io.github.beepboop2025%2Fliquilens-evidence-carrier/versions/0.20.0).
 
 <!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
