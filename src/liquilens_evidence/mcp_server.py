@@ -263,6 +263,16 @@ _RESOURCE_FILES: dict[str, tuple[str, str, str]] = {
         "conformance/trade-safety-v1/corpus.json",
         "Raw-byte pass, non-pass, tamper, lexical, expiry and replay vectors.",
     ),
+    "liquilens-evidence://research/network-routing": (
+        "Connected product research routing",
+        "research-network-routing-v1.json",
+        "Read-only source discovery across Palimpsest, Seiche, LiquiLens, Undertow and NarcoScope; no network access or execution authority.",
+    ),
+    "liquilens-evidence://research/network-schema": (
+        "Connected research response schema",
+        "seiche-research-network-v1.schema.json",
+        "Schema for metadata discovery with separately completed funding context; not a signed evidence carrier.",
+    ),
 }
 
 

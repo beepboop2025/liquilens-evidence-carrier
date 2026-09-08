@@ -176,7 +176,7 @@ def test_modern_discover_list_call_and_resources(tmp_path: Path) -> None:
     assert brief_verified["structuredContent"]["authority"]["can_execute"] is False
 
     resources = _result(server.handle(_modern_request(6, "resources/list")))
-    assert len(resources["resources"]) == 9
+    assert len(resources["resources"]) == 11
     uri = resources["resources"][0]["uri"]
     read = _result(server.handle(_modern_request(7, "resources/read", {"uri": uri})))
     assert json.loads(read["contents"][0]["text"])["$schema"].startswith(

@@ -62,6 +62,18 @@
       "path": "../integrations/openlineage/liquilens-evidence-facet.schema.json",
       "canonical_url": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json",
       "sha256": "e4c6035452d75be280a7b717f85da87319a078dbf5563e62ac3a3cb83486e9a5"
+    },
+    {
+      "name": "Seiche connected research schema",
+      "path": "seiche-research-network-v1.schema.json",
+      "canonical_url": "https://seiche.info/protocol/research-network-v1.schema.json",
+      "sha256": "33b364eb1ada3b486b2c9e9fb6b29db14fc5b3f586853144006daf376da608b8"
+    },
+    {
+      "name": "Connected research routing reference",
+      "path": "research-network-routing-v1.json",
+      "canonical_url": "https://liquilens.in/protocol/research-network-routing-v1.json",
+      "sha256": "2ac4ba1ba2c99fe200648595b9a757dfb8bd0819a8a47b0646d7c9c5850b158d"
     }
   ],
   "conformance": [

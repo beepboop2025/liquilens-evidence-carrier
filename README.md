@@ -355,3 +355,16 @@ Code, schemas, documentation, and integration assets in this repository are
 licensed under [Apache‑2.0](LICENSE). Provider data carried inside an evidence
 object retains its own rights and license; this repository's license does not
 grant rights to third-party data or product trademarks.
+
+## Connected research
+
+The Seiche `research_network` tool and `/api/v2/research-network` endpoint
+connect Palimpsest's complete source catalog with separately completed funding
+context and explicit research steps into LiquiLens, Undertow and NarcoScope.
+Use `topic`, `offset` and `limit`; follow `next_offset` for remaining datasets.
+The human desk is <https://seiche.info/#RESEARCH>. Telegram readers can use
+`/research china`, `/research regions` or `/research liquidity`.
+
+Catalog rows are references, not permission to redistribute source values or
+change a score. Source clocks, rights and missingness remain attached. The
+retrieved catalog hash is a byte identity, not a producer attestation.
