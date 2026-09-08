@@ -23,10 +23,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: browser-pages-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   verify-browser:
     name: browser-verifier
@@ -53,6 +49,9 @@ jobs:
        (github.event_name == 'status' && github.event.state == 'success' &&
         github.event.context == 'railway-automation - carrier-pr-ci' &&
         github.event.sha == github.sha))
+    concurrency:
+      group: browser-pages-main
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     permissions:
       contents: read
