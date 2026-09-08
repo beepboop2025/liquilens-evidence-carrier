@@ -16,6 +16,8 @@ permissions:
 
 jobs:
   router:
+    # Owner changes run in the isolated Railway PR and main services.
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'beepboop2025'
     name: router (Python ${{ matrix.python-version }})
     strategy:
       fail-fast: false

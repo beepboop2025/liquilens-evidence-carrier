@@ -24,5 +24,8 @@ broker credentials or submit paper/live orders.
 Native Nix platform checks, Docker sandbox/multi-architecture checks, protected
 release preflight, package/container publishing, GitHub attestations and Pages
 deployment remain separate. This job does not mint their required OIDC identity
-or claim their native-executor proof. PR validation needs an isolated PR-source
-trigger before the existing PR workflows can be retired.
+or claim their native-executor proof. Owner pull requests use a focused Railway environment copied from a base
+containing only CI services and no credentials or volumes. The seven portable
+GitHub workflows retain a fallback for pull requests from other authors. Browser
+verification also remains a prerequisite of the existing Pages publisher.
+Manual validation uses a Railway redeployment of the desired source.

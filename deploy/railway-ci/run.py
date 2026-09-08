@@ -27,6 +27,10 @@ SETUP_ACTIONS = {
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     "actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903",
 }
+EXTERNAL_PR_CONDITION = (
+    "github.event_name == 'pull_request' && "
+    "github.event.pull_request.user.login != 'beepboop2025'"
+)
 PUBLIC_INSTALL_CONDITION = (
     "github.event_name == 'push' && github.ref == 'refs/heads/main'"
 )
@@ -34,9 +38,19 @@ PUBLIC_INSTALL_CONDITION = (
 
 def check_job(job):
     """Reject unsupported execution or privilege features before running any job."""
-    allowed = {"name", "runs-on", "steps", "strategy", "defaults", "timeout-minutes"}
+    allowed = {
+        "name",
+        "runs-on",
+        "steps",
+        "strategy",
+        "defaults",
+        "timeout-minutes",
+        "if",
+    }
     if set(job) - allowed or job["runs-on"] != "ubuntu-24.04":
         raise ValueError("Unsupported portable job structure")
+    if job.get("if", EXTERNAL_PR_CONDITION) != EXTERNAL_PR_CONDITION:
+        raise ValueError("Unsupported job condition")
     defaults = job.get("defaults", {})
     if set(defaults) - {"run"} or set(defaults.get("run", {})) - {"working-directory"}:
         raise ValueError("Unsupported job defaults")
