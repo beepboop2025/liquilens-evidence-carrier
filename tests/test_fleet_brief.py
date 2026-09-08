@@ -25,6 +25,33 @@ from liquilens_evidence.fleet_brief import (
 from liquilens_evidence.protocol_resources import load_protocol_json
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_node_verifier_flushes_large_json_to_a_pipe(tmp_path: Path) -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node is unavailable for cross-language verification")
+    payload = {"large": "evidence-" * 131072}
+    path = tmp_path / "large.json"
+    path.write_text(json.dumps(payload))
+    completed = subprocess.run(
+        [
+            node,
+            str(ROOT / "protocol/verify_hash_tree_v1.mjs"),
+            "--artifact",
+            "value",
+            str(path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    result = json.loads(completed.stdout)
+    assert result["ok"] is True
+    assert len(result["canonical_utf8"]) > 1024 * 1024
+
+
 EVALUATED_AT = datetime(2026, 8, 25, tzinfo=UTC)
 EVALUATED_AT_TEXT = "2026-08-25T00:00:00Z"
 ENDPOINTS = {

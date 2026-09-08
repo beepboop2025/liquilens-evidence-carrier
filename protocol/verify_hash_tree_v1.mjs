@@ -332,7 +332,7 @@ function main() {
     result = verifyVector(args[0]);
   }
   process.stdout.write(`${JSON.stringify(result)}\n`);
-  process.exit(result.ok ? 0 : 1);
+  process.exitCode = result.ok ? 0 : 1;
 }
 
 function isMainModule() {
