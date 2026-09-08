@@ -1,0 +1,5 @@
+**
+!deploy/
+!deploy/railway-ci/
+!deploy/railway-ci/nix-linux/
+!deploy/railway-ci/nix-linux/run.sh
