@@ -13,6 +13,11 @@ The carrier is infrastructure for inspection and reproducibility. It is not an
 order, recommendation, credit rating, market-data entitlement, or endorsement
 by Bloomberg, LSEG, FactSet, FINOS, or any other platform.
 
+Source now prepares `v0.20.0`, adding offline connected-research routing and
+response-schema resources. It is an unpublished candidate; the publication
+receipts below still describe `v0.19.0`. See
+[`docs/RELEASE-0.20.0.md`](docs/RELEASE-0.20.0.md) for the candidate boundary.
+
 The current signed and published core release is `v0.19.0`. Annotated tag
 object `c3239bfc7c4d3c4b7fc5ce26e0f602962e7d4337` targets the allowlisted
 SSH-signed release commit `8f5738c9e77cc95b9a68543d478b9521f5595d61`, tree
@@ -355,3 +360,16 @@ Code, schemas, documentation, and integration assets in this repository are
 licensed under [Apache‑2.0](LICENSE). Provider data carried inside an evidence
 object retains its own rights and license; this repository's license does not
 grant rights to third-party data or product trademarks.
+
+## Connected research
+
+The Seiche `research_network` tool and `/api/v2/research-network` endpoint
+connect Palimpsest's complete source catalog with separately completed funding
+context and explicit research steps into LiquiLens, Undertow and NarcoScope.
+Use `topic`, `offset` and `limit`; follow `next_offset` for remaining datasets.
+The human desk is <https://seiche.info/#RESEARCH>. Telegram readers can use
+`/research china`, `/research regions` or `/research liquidity`.
+
+Catalog rows are references, not permission to redistribute source values or
+change a score. Source clocks, rights and missingness remain attached. The
+retrieved catalog hash is a byte identity, not a producer attestation.

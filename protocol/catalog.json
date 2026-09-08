@@ -1,6 +1,6 @@
 {
   "schema": "liquilens.evidence-carrier-catalog.v1",
-  "release": "0.19.0",
+  "release": "0.20.0",
   "license": "Apache-2.0",
   "artifacts": [
     {
@@ -62,6 +62,12 @@
       "path": "../integrations/openlineage/liquilens-evidence-facet.schema.json",
       "canonical_url": "https://liquilens.in/protocol/openlineage/liquilens-evidence-facet.schema.json",
       "sha256": "e4c6035452d75be280a7b717f85da87319a078dbf5563e62ac3a3cb83486e9a5"
+    },
+    {
+      "name": "Seiche connected research schema",
+      "path": "seiche-research-network-v1.schema.json",
+      "canonical_url": "https://seiche.info/protocol/research-network-v1.schema.json",
+      "sha256": "33b364eb1ada3b486b2c9e9fb6b29db14fc5b3f586853144006daf376da608b8"
     }
   ],
   "conformance": [

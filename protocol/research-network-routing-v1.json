@@ -1,0 +1,27 @@
+{
+  "schema": "liquilens.research-network-routing.v1",
+  "purpose": "Discover original evidence before preparing a verified fleet brief.",
+  "canonical_api": "https://api.seiche.info/api/v2/research-network",
+  "canonical_site": "https://seiche.info/#RESEARCH",
+  "mcp": {
+    "endpoint": "https://api.seiche.info/mcp",
+    "tool": "research_network",
+    "arguments": {"topic": "all", "offset": 0, "limit": 12}
+  },
+  "native_palimpsest": {
+    "endpoint": "https://api.seiche.info/palimpsest/mcp",
+    "tool": "research_catalog",
+    "arguments": {"offset": 0, "limit": 12}
+  },
+  "response_schema": "seiche-research-network-v1.schema.json",
+  "pagination": "Follow next_offset with the same topic and limit until it is null. A partial page is not complete coverage.",
+  "evidence_boundary": [
+    "Read each source's original values, rights, units, observation time and limitations before making a claim.",
+    "The returned SHA-256 identifies retrieved catalog bytes; it does not authenticate a producer or a source observation.",
+    "A source link or shared topic is not corroboration, causality, institution exposure or a trading signal.",
+    "Do not pass this discovery response to verify_evidence_carrier or verify_fleet_brief as if it were a signed carrier.",
+    "Keep Palimpsest, Seiche, LiquiLens, Undertow and NarcoScope in their own evidence lanes."
+  ],
+  "network_access_from_this_resource": false,
+  "execution_authority": false
+}

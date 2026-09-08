@@ -26,9 +26,9 @@ def _working_tree_text(path: str) -> str:
 
 
 def test_current_candidate_metadata_passes_preflight_validation():
-    metadata = validate_candidate_metadata(_working_tree_text, "0.19.0")
+    metadata = validate_candidate_metadata(_working_tree_text, "0.20.0")
     assert metadata["mcpb_sha256"] == (
-        "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a"
+        "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f"
     )
 
 
@@ -39,7 +39,7 @@ def test_version_mismatch_fails_before_tag_creation():
         return _working_tree_text(path)
 
     with pytest.raises(PreflightError, match="VERSION"):
-        validate_candidate_metadata(mismatched, "0.19.0")
+        validate_candidate_metadata(mismatched, "0.20.0")
 
 
 def test_placeholder_mcpb_digest_fails_before_tag_creation():
@@ -47,13 +47,13 @@ def test_placeholder_mcpb_digest_fails_before_tag_creation():
         text = _working_tree_text(path)
         if path == "server.json":
             return text.replace(
-                "11db11aefafcc6c4ba558877d1f9892fc708150b3afbaa28a741e74435b9a91a",
+                "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f",
                 "0" * 64,
             )
         return text
 
     with pytest.raises(PreflightError, match="placeholder"):
-        validate_candidate_metadata(placeholder, "0.19.0")
+        validate_candidate_metadata(placeholder, "0.20.0")
 
 
 def test_protocol_catalog_keeps_schema_artifacts_separate_from_conformance():
@@ -70,7 +70,7 @@ def test_protocol_catalog_keeps_schema_artifacts_separate_from_conformance():
         return __import__("json").dumps(changed)
 
     with pytest.raises(PreflightError, match="schema-only"):
-        validate_candidate_metadata(misplaced, "0.19.0")
+        validate_candidate_metadata(misplaced, "0.20.0")
 
 
 def test_manual_preflight_workflow_has_no_tag_write_authority():

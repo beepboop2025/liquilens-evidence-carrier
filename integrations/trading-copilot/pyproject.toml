@@ -10,7 +10,7 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11,<3.15"
 dependencies = [
-  "liquilens-evidence==0.19.0",
+  "liquilens-evidence==0.20.0",
   "liquilens-alpaca-paper==0.1.0",
   "liquilens-trade-safety-gateway==0.2.2",
   "httpx>=0.28.1,<0.29",

@@ -20,7 +20,7 @@ FROM python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f14
 
 ARG SOURCE_REVISION="source-checkout"
 ARG CREATED="1970-01-01T00:00:00Z"
-ARG CORE_VERSION="0.19.0"
+ARG CORE_VERSION="0.20.0"
 ARG ISSUER_ENDPOINT="https://liquilens.in/trade-safety-gateway"
 
 LABEL org.opencontainers.image.title="LiquiLens Trade Safety Gateway" \
