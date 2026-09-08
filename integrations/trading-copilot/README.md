@@ -60,6 +60,56 @@ workflow and source-checkout dependency installation, see
 [Private setup and commands](#private-setup-and-commands). The signed core Carrier
 wheel alone does not install this copilot integration.
 
+### Export all six examples for a public browser
+
+The standalone entry point can export every existing scenario in one bounded,
+deterministic JSON file. It still imports no operator, evidence-service or broker
+module. The browser displays these Python-generated reports and does not
+implement its own trading strategy.
+
+After committing the reviewed generator changes, run from the source checkout:
+
+```sh
+copilot_source_ref="$(git rev-parse HEAD)"
+PYTHONPATH=integrations/trading-copilot/src python3 -B \
+  -m liquilens_trading_copilot.demo --all --source-ref "$copilot_source_ref" \
+  > /tmp/copilot-demo-pack.json
+python3 -c 'import hashlib,pathlib; print(hashlib.sha256(pathlib.Path("/tmp/copilot-demo-pack.json").read_bytes()).hexdigest())'
+```
+
+`python3 -m liquilens_trading_copilot.demo_pack --source-ref <full-commit-SHA>`
+is the equivalent dedicated export entry point with the same `PYTHONPATH`.
+`--all` cannot be combined with `--scenario` or Markdown output. Existing
+single-scenario commands and the installed operator CLI remain unchanged.
+
+The `liquilens.copilot-demo-pack.v1` envelope contains six complete existing
+`liquilens.copilot-offline-demo.v1` reports, their fixed order, unchanged
+`StrategyConfig` defaults and explicit false execution flags. Its provenance
+includes the actual strategy-file SHA-256, hashes of all synthetic inputs and
+generator sources, and a fixed-origin GitHub source link pinned to the supplied
+40-character commit. Git blob comparisons must match the actual `strategy.py`,
+`demo.py` and `demo_pack.py` bytes. Local Git runs without inherited credentials,
+custom configuration, replacement objects or permission to fetch missing blobs.
+This verifies local source identity, not a remote publication or signature.
+
+Omitting `--source-ref` produces a local preview with `source_verified=false`
+and null source reference/link; it must not be published as a verified pack.
+Files modified after the supplied commit cause verification to fail. The source
+commit does not depend on the generated artifact: commit code first and keep
+the generated pack outside the Carrier repository.
+
+Input and generator hashes use the canonicalization and field scope documented
+inside `provenance`. Python and JavaScript can serialize numeric JSON differently,
+so a public loader must independently pin and verify the SHA-256 of the complete
+file bytes, not recompute those hashes by serializing parsed data in JavaScript.
+Require the exact schema, six unique scenario IDs, verified pinned source and
+false authorization/receipt/submission flags at both envelope and report levels.
+Render an allowlisted view as text and fail closed on malformed or partial packs.
+
+The pack has no current-time stamp and is capped at 256 KiB. Its year-2000 clocks
+belong to invented examples. Source, receipt and broker policies remain
+unevaluated; the exported strategy defaults do not become order permission.
+
 ## Default private profile
 
 `init` selects `liquilens.paper-funding-exit.v1`, policy version `1.0.0`, and
