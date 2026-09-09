@@ -20,6 +20,10 @@ release source; the official MCP Registry advertises the new bundle.
 See [`docs/RELEASE-0.20.0.md`](docs/RELEASE-0.20.0.md) for its publication receipt.
 Independent consumer channels retain the versions recorded by their own receipts.
 
+Source candidate `v0.20.1` corrects the Palimpsest routing resource to use its
+working catalog API while the additional MCP tool awaits approval. Its
+publication verification is pending; see the [candidate record](docs/RELEASE-0.20.1.md).
+
 The following historical core publication receipt describes `v0.19.0`.
 Published release `v0.19.0` provides the preserved
 [historical wheel](https://github.com/beepboop2025/liquilens-evidence-carrier/releases/download/v0.19.0/liquilens_evidence-0.19.0-py3-none-any.whl)

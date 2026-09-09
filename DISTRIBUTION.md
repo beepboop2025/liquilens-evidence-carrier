@@ -3,6 +3,8 @@
 The current core implementation release is `v0.20.0`. Its signed tag, published
 wheel and MCPB checksums, exact-workflow attestations, and official Registry
 readback are recorded in [the 0.20.0 receipt](docs/RELEASE-0.20.0.md).
+Source candidate `v0.20.1` prepares the API-only Palimpsest handoff; its
+publication verification is pending.
 The independently versioned channels below keep their own recorded pins.
 
 This matrix records public ways to run LiquiLens Evidence Carrier. A channel is

@@ -6,9 +6,9 @@ import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE_VERSION = "0.20.0"
+SOURCE_VERSION = "0.20.1"
 SOURCE_MCPB_SHA256 = (
-    "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f"
+    "09b25571f61f4ba2bd5e1c367a580355a6e08eccf0d1c34bdde0bbd460be0ed6"
 )
 GATEWAY_VERSION = "0.2.2"
 CANONICAL_SITE_REVISION = "3ec660175c81c5b282715ee400eea2f771dc2610"

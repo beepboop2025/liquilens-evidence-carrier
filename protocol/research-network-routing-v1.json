@@ -6,12 +6,18 @@
   "mcp": {
     "endpoint": "https://api.seiche.info/mcp",
     "tool": "research_network",
-    "arguments": {"topic": "all", "offset": 0, "limit": 12}
+    "arguments": {
+      "topic": "all",
+      "offset": 0,
+      "limit": 12
+    }
   },
   "native_palimpsest": {
-    "endpoint": "https://api.seiche.info/palimpsest/mcp",
-    "tool": "research_catalog",
-    "arguments": {"offset": 0, "limit": 12}
+    "api": "https://www.palimpsest.info/readings/research-catalog-latest.json",
+    "endpoint": null,
+    "tool": null,
+    "arguments": {},
+    "mcp_tool_state": "owner-approval-required"
   },
   "response_schema": "seiche-research-network-v1.schema.json",
   "pagination": "Follow next_offset with the same topic and limit until it is null. A partial page is not complete coverage.",
