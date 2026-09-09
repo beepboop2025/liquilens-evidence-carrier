@@ -13,16 +13,13 @@ The carrier is infrastructure for inspection and reproducibility. It is not an
 order, recommendation, credit rating, market-data entitlement, or endorsement
 by Bloomberg, LSEG, FactSet, FINOS, or any other platform.
 
-The current signed core release is `v0.20.0`, adding offline connected-research
-routing and response-schema resources. The downloaded wheel and MCP bundle
-passed checksum and GitHub attestation verification against the exact signed
-release source; the official MCP Registry advertises the new bundle.
-See [`docs/RELEASE-0.20.0.md`](docs/RELEASE-0.20.0.md) for its publication receipt.
-Independent consumer channels retain the versions recorded by their own receipts.
-
-Source candidate `v0.20.1` corrects the Palimpsest routing resource to use its
-working catalog API while the additional MCP tool awaits approval. Its
-publication verification is pending; see the [candidate record](docs/RELEASE-0.20.1.md).
+The current signed core release is `v0.20.1`. Its offline routing resource uses
+Palimpsest's published catalog API while the additional MCP tool awaits approval.
+All 22 artifact checksums passed; the downloaded wheel and MCP bundle have
+verified provenance for the exact signed source, and the official MCP Registry
+advertises the new bundle. See [`docs/RELEASE-0.20.1.md`](docs/RELEASE-0.20.1.md)
+for the publication receipt. The [0.20.0 receipt](docs/RELEASE-0.20.0.md) remains
+available. Independent consumer channels retain their own recorded versions.
 
 The following historical core publication receipt describes `v0.19.0`.
 Published release `v0.19.0` provides the preserved

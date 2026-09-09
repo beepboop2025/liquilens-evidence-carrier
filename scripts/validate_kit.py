@@ -16,9 +16,9 @@ SOURCE_VERSION = "0.20.1"
 SOURCE_MCPB_SHA256 = (
     "09b25571f61f4ba2bd5e1c367a580355a6e08eccf0d1c34bdde0bbd460be0ed6"
 )
-CURRENT_RELEASE_VERSION = "0.20.0"
+CURRENT_RELEASE_VERSION = "0.20.1"
 CURRENT_RELEASE_MCPB_SHA256 = (
-    "1c740167183cba7ad39862ee749f497930f43cfd27b1362d703c81e71d5b2d6f"
+    "09b25571f61f4ba2bd5e1c367a580355a6e08eccf0d1c34bdde0bbd460be0ed6"
 )
 GATEWAY_VERSION = "0.2.2"
 PUBLISHED_VERSION = "0.19.0"
@@ -306,14 +306,15 @@ def main() -> int:
         encoding="utf-8"
     )
     assert CURRENT_RELEASE_MCPB_SHA256 in current_receipt
-    assert f"Source candidate `v{SOURCE_VERSION}`" in readme
-    candidate_record = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
-        encoding="utf-8"
-    )
-    assert SOURCE_MCPB_SHA256 in candidate_record
-    assert "Prepared candidate; publication verification pending." in candidate_record
-    assert "34276508204" in current_receipt
-    assert "bfe665431c0c2203e71d1a5e9c7ba57095320585" in current_receipt
+    if SOURCE_VERSION != CURRENT_RELEASE_VERSION:
+        assert f"Source candidate `v{SOURCE_VERSION}`" in readme
+        candidate_record = (ROOT / f"docs/RELEASE-{SOURCE_VERSION}.md").read_text(
+            encoding="utf-8"
+        )
+        assert SOURCE_MCPB_SHA256 in candidate_record
+        assert "Prepared candidate; publication verification pending." in candidate_record
+    assert "34298762148" in current_receipt
+    assert "6f9077bf0879a76db7b9bf98fb37839f7755dd9f" in current_receipt
     assert "not yet tagged, published, registered, or deployed" not in distribution
     assert CANONICAL_SITE_REVISION in distribution
     assert CANONICAL_SITE_WORKFLOW in distribution
