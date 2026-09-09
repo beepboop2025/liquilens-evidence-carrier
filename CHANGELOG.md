@@ -5,18 +5,21 @@ public merely because it appears in this file: the signed GitHub release,
 checksums, attestations, and distribution receipts remain the publication
 authority.
 
+## [0.20.1] - 2026-09-09
+
+- Publish the corrected API-only Palimpsest routing handoff. The additional MCP
+  tool remains pending owner approval.
+- Verify all 22 downloaded artifact checksums, the wheel/MCPB provenance, and the
+  official Registry active/latest record. See the exact publication receipt.
+- Preserve the prior signed releases and independently versioned channels.
+
+## [0.20.0] - 2026-09-08
+
+- Publish two offline MCP resources for Seiche connected research: the response
+  schema and product routing map. The verification tools and existing Trade
+  Safety v1 schema bytes retain their meaning; see the preserved 0.20.0 receipt.
+
 ## [Unreleased]
-
-- Prepare core `0.20.1` so the offline routing resource points to Palimpsest's
-  working catalog API. The additional MCP tool remains explicitly pending
-  approval, with no callable tool advertised in that handoff.
-- Keep source-candidate checks separate from the existing `0.20.0` publication
-  receipt; the previous signed artifacts retain their original identities.
-
-- Prepare core `0.20.0` with two offline MCP resources for Seiche connected
-  research: the response schema and a product routing map. The four verification
-  tools and existing Trade Safety v1 schema bytes retain their meaning. This
-  source candidate does not change published `0.19.0` artifact identities.
 
 - Prepare independently versioned Trade Safety gateway `0.2.0` against the
   unchanged core `0.19.0` protocol: consume Seiche
