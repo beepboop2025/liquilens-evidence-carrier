@@ -304,7 +304,7 @@ provides-extras = ["test"]
 
 [[package]]
 name = "liquilens-evidence"
-version = "0.20.0"
+version = "0.20.1"
 source = { editable = "../../" }
 
 [package.metadata]

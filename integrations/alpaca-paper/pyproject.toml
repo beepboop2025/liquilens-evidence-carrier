@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
     "alpaca-py==0.44.0",
-    "liquilens-evidence==0.20.0",
+    "liquilens-evidence==0.20.1",
 ]
 
 [project.optional-dependencies]

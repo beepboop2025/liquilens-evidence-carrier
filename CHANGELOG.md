@@ -7,6 +7,12 @@ authority.
 
 ## [Unreleased]
 
+- Prepare core `0.20.1` so the offline routing resource points to Palimpsest's
+  working catalog API. The additional MCP tool remains explicitly pending
+  approval, with no callable tool advertised in that handoff.
+- Keep source-candidate checks separate from the existing `0.20.0` publication
+  receipt; the previous signed artifacts retain their original identities.
+
 - Prepare core `0.20.0` with two offline MCP resources for Seiche connected
   research: the response schema and a product routing map. The four verification
   tools and existing Trade Safety v1 schema bytes retain their meaning. This
