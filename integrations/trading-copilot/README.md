@@ -8,6 +8,10 @@ availability. Its native score does not become a BTC signal or order permission.
 There is no live-money mode, LLM decision maker or demonstrated profitable
 strategy. The public Trade Safety gateway remains unchanged and read-only.
 
+External agents can use the separate [private agent host](AGENT-HOST.md) to submit
+their own bounded proposals through the same evidence and account controls. It
+includes authenticated REST endpoints and an explicit, non-retrying client.
+
 ## Try an offline decision first
 
 From a source checkout, Python 3.11 or later can run the demo without installing
