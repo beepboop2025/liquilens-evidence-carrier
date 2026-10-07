@@ -14,6 +14,7 @@ from .adapter import (
     AlpacaPaperTradeSafetyGateway,
     client_order_id_for_request_hash,
 )
+from .agent_tools import AlpacaPaperAgentTools, PaperAgentToolProtocolError
 from .journal import (
     AlpacaPaperSubmissionJournal,
     AlpacaPaperSubmissionJournalError,
@@ -27,6 +28,7 @@ __all__ = [
     "AlpacaPaperAccountUnavailable",
     "AlpacaPaperAdapterError",
     "AlpacaPaperAdapterOrderUnsupported",
+    "AlpacaPaperAgentTools",
     "AlpacaPaperBrokerResponseInvalid",
     "AlpacaPaperConfigurationError",
     "AlpacaPaperReconciliation",
@@ -38,6 +40,7 @@ __all__ = [
     "AlpacaPaperSubmissionState",
     "AlpacaPaperSubmissionUncertain",
     "AlpacaPaperTradeSafetyGateway",
+    "PaperAgentToolProtocolError",
     "SQLiteAlpacaPaperSubmissionJournal",
     "client_order_id_for_request_hash",
 ]
