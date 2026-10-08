@@ -84,9 +84,16 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--allowed-host", action="append", default=[])
     parser.add_argument("--undertow-token-file", type=Path)
+    parser.add_argument(
+        "--require-disabled",
+        action="store_true",
+        help="serve: refuse startup unless the loaded paper configuration is disabled",
+    )
     args = parser.parse_args()
     if args.undertow_token_file is not None and args.command != "serve":
         parser.error("--undertow-token-file applies only to serve")
+    if args.require_disabled and args.command != "serve":
+        parser.error("--require-disabled applies only to serve")
     state_dir = args.state_dir.expanduser().resolve()
     try:
         if args.command == "init":
@@ -104,6 +111,8 @@ def main() -> int:
         config = load_config(state_dir / "config.json")
         if Path(config.state_dir) != state_dir:
             raise ValueError("configured_state_directory_mismatch")
+        if args.require_disabled and config.enabled is not False:
+            raise ValueError("disabled_host_configuration_required")
         credentials = PaperCredentials.from_environment(
             load_secret_file(state_dir / "paper.env")
         )

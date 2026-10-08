@@ -29,6 +29,11 @@ sizes are unsupported by this profile.
 
 ## Install and initialize
 
+For an existing bound paper installation, use [HOST-ATTACH.md](HOST-ATTACH.md)
+to preserve its account, credentials and audit history. The attached service
+requires disabled mode at startup; do not initialize another state directory
+for that account.
+
 From this reviewed source checkout, with Python 3.11–3.14 and uv:
 
 ```sh

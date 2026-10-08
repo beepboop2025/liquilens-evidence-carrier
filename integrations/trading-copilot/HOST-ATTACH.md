@@ -110,6 +110,20 @@ Local readiness must pass with `ready_for_order=false` and `enabled=false`.
 Compare the original four files with the preparation manifest before startup.
 The configured agent identity and HMAC key remain unchanged.
 
+The attached unit passes `serve --require-disabled`. Startup checks the loaded
+configuration before reading credentials, creating the application or opening
+journals. An enabled configuration is refused with a sanitized diagnostic.
+The service retains that immutable disabled configuration for its lifetime;
+changing the file afterward cannot enable the running host. This also prevents
+a source-credential renewal restart from loading an enabled runtime when a
+configuration edit races the renewal coordinator's preflight check.
+
+Future execution activation requires a deliberate reviewed unit change removing
+`--require-disabled`, in addition to configuration enablement and all existing
+source/account gates. Retire automatic disabled-host credential reload before
+that unit change; an active execution host needs a separately reviewed reload
+interlock. Never remove the startup guard as part of routine token renewal.
+
 Render `deploy/liquilens-agent-host-attached.service` with `@RELEASE_DIR@` set to
 the exact qualified release path, then install the rendered bytes as
 `liquilens-agent-host.service`. Review the resulting `ExecStart`, owner and only
