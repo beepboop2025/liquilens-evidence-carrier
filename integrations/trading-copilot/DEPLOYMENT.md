@@ -68,9 +68,10 @@ export CARRIER_UV="$CARRIER_RECEIPTS/bootstrap/bin/uv"
 chmod -R go+rX,go-w "$CARRIER_RELEASE"
 ```
 
-The isolated bootstrap pins uv 0.10.0 and the SHA-256 of its Linux glibc x86_64
-wheel from PyPI; it never installs into the host's system Python or depends on an
-ambient `uv` command. The bootstrap directory belongs to root and stays outside
+The isolated bootstrap pins uv 0.12.5, matching CI, and the SHA-256 of its Linux
+glibc x86_64 wheel from [PyPI metadata](https://pypi.org/pypi/uv/0.12.5/json).
+It never installs into the host's system Python or depends on an ambient `uv`
+command. The bootstrap directory belongs to root and stays outside
 the service's source/state directories. If the host lacks `venv`/pip or has a
 different architecture, stop and prepare an equivalent reviewed tool artifact;
 do not run a remote installer or change global packages as part of this upgrade.
