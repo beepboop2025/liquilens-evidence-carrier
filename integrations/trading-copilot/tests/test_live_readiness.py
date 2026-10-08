@@ -111,3 +111,22 @@ def test_doctor_cli_uses_nonzero_readiness_exit_without_contacting_broker(
     )
     assert live_cli.main() == 2
     assert json.loads(capsys.readouterr().out)["live_ready"] is False
+
+
+def test_requirement_categories_preserve_legacy_unverified_gates(tmp_path):
+    live_cli.initialize(tmp_path.resolve())
+    report = live_readiness(tmp_path.resolve())
+    assert set(report["engineering_requirements"]) == {
+        "qualified_live_issuer_unverified",
+        "alpaca_limit_order_broker_preview_unavailable",
+    }
+    assert set(report["qualification_requirements"]) == {
+        "executable_quote_entitlement_unverified",
+        "account_qualification_unverified",
+        "account_activation_unverified",
+    }
+    assert set(report["external_requirements"]) == (
+        set(report["engineering_requirements"])
+        | set(report["qualification_requirements"])
+    )
+    assert report["live_ready"] is False and report["network_accessed"] is False

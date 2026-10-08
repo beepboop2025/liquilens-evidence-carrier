@@ -11,6 +11,7 @@ from liquilens_evidence import TradeSafetyExecutionBinding
 
 from .agent_host import private_json
 from .config import strict_json
+from .live_account import check_account
 from .live_connector import (
     AlpacaLiveTransport,
     LiveAccountConnector,
@@ -97,6 +98,7 @@ def main() -> int:
             "init",
             "capabilities",
             "doctor",
+            "check-account",
             "orders",
             "export",
             "preview",
@@ -154,10 +156,15 @@ def main() -> int:
                 "order_submitted": False,
                 "managed_live_service": False,
                 "broker_preview_adapter_available": False,
+                "qualified_live_issuer_available": False,
+                "managed_live_endpoint": None,
+                "read_only_account_check_available": True,
                 "live_ready": False,
             }
         elif args.operation == "doctor":
             result = live_readiness(args.state_dir)
+        elif args.operation == "check-account":
+            result = check_account(args.state_dir)
         elif args.operation == "status":
             result = local_status(args.state_dir, args.request_hash)
         elif args.operation in {"orders", "export"}:
@@ -229,6 +236,7 @@ def main() -> int:
         if result.get("error")
         or result.get("state") == "uncertain"
         or (args.operation == "doctor" and not result["live_ready"])
+        or (args.operation == "check-account" and not result["account_qualified"])
         else 0
     )
 
