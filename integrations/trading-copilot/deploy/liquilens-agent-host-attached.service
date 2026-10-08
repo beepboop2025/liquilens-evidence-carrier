@@ -1,0 +1,29 @@
+[Unit]
+Description=Private LiquiLens paper agent host (attached existing paper state)
+After=network-online.target
+Wants=network-online.target
+Conflicts=liquilens-paper-copilot.service liquilens-paper-copilot.timer
+ConditionPathExists=/var/lib/liquilens-trading-copilot/config.json
+ConditionPathExists=/var/lib/liquilens-trading-copilot/agent-auth.json
+
+[Service]
+Type=simple
+User=liquilens-copilot
+Group=liquilens-copilot
+WorkingDirectory=@RELEASE_DIR@
+ExecStart=@RELEASE_DIR@/integrations/trading-copilot/.venv/bin/liquilens-agent-host serve --state-dir /var/lib/liquilens-trading-copilot --port 8766
+Restart=no
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/liquilens-trading-copilot
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+TimeoutStopSec=120
+
+# Render @RELEASE_DIR@ to the exact qualified release, then install as
+# liquilens-agent-host.service. This file intentionally has no [Install] section.
+# No StateDirectory directive: startup must never create another account state.
