@@ -44,9 +44,21 @@ operations. A healthy observer cannot enable or repair a trading engine.
 
 Start the observer once, inspect its report, then enable the observer timer.
 Record the first successful scheduled recurrence separately from the manual
-run. The timer schedules a new observation five minutes after the prior run
+run. The timer schedules a new observation fifteen minutes after the prior run
 finishes, with up to fifteen seconds of jitter; it never sends notifications.
-This is owned verification traffic, not customer usage.
+This is owned verification traffic, not customer usage. The steady-state schedule
+uses about 96 MCP calls per day, plus startup/manual checks. Undertow's anonymous
+endpoint currently returns a 200-call daily limit shared with other usage from
+the same client. Verify the current quota before increasing cadence; do not
+rotate identities or retry repeatedly to bypass it. A quota refusal remains an
+unavailable source until the provider's allowance resets or changes.
+
+A completed capture can still contain refused sources. `source_clock_in_future`
+means an upstream response clock exceeded the observer's trusted evaluation
+clock; verify both clocks without granting a tolerance that the execution
+profile does not allow. `source_quota_exhausted` identifies a validated MCP quota
+error. Neither reason admits source facts or qualifies trading. Monitoring
+snapshots do not replace fresh evidence collection for an actual order.
 
 `latest.json` and up to 288 history records contain source clocks, source hashes,
 denial reasons and the exact implementation identity. They are private mode 0600.
