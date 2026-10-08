@@ -338,6 +338,49 @@ def test_pinned_transport_rejects_redirect_and_secret_error_body():
         broker.call("GET", "https://bad.example")
 
 
+@pytest.mark.parametrize(
+    "method,path",
+    [
+        ("DELETE", "/v2/positions"),
+        ("DELETE", "/v2/orders"),
+        ("POST", "/v2/account"),
+        ("POST", "/v2/orders:by_client_order_id"),
+        ("PATCH", "/v2/orders"),
+        ("DELETE", "/v2/orders/" + "-" * 36),
+    ],
+)
+def test_transport_rejects_bulk_or_unsupported_verbs_before_io(method, path):
+    calls = []
+    broker = AlpacaLiveTransport(
+        api_key="test",
+        secret_key="secret",
+        transport=httpx.MockTransport(lambda request: calls.append(request)),
+    )
+    with pytest.raises(LiveExecutionBlocked, match="unsupported_broker_route"):
+        broker.call(method, path)
+    assert calls == []
+    broker.close()
+
+
+@pytest.mark.parametrize("side,price", [("buy", "40001"), ("sell", "39999")])
+def test_fill_price_cannot_contradict_limit_or_release_pending_lane(
+    tmp_path, side, price
+):
+    request, receipt, binding = bundle(change=lambda r: r["order"].update(side=side))
+    broker = Broker()
+    client = lane(tmp_path, binding, broker)
+    before = client.submit(request, receipt)
+    broker.order.update(status="filled", filled_qty="0.025", filled_avg_price=price)
+    with pytest.raises(LiveExecutionBlocked, match="identity_or_state"):
+        client.inspect(before["request_hash"], reconcile=True)
+    assert client.inspect(before["request_hash"]) == before
+    request2, receipt2, _ = bundle(change=lambda r: r.update(request_id="new-id"))
+    with pytest.raises(LiveExecutionBlocked, match="unresolved_order"):
+        client.submit(request2, receipt2)
+    assert broker.posts == 1
+    client.broker.close()
+
+
 @pytest.mark.parametrize("cash,gross_limit", [("500", 10000), ("10000", 8500)])
 def test_buy_cannot_exceed_cash_or_total_exposure(tmp_path, cash, gross_limit):
     request, receipt, binding = bundle(change=lambda r: r["order"].update(side="buy"))

@@ -29,6 +29,14 @@ cannot satisfy the receipt's broker-preview requirement. Where a customer's
 broker/source combination cannot supply those inputs, live submission remains
 blocked. Do not relax those checks to turn the demo into live trading.
 
+The current Alpaca integration has **no compatible broker-preview adapter**.
+Alpaca's [Broker API estimation endpoint](https://docs.alpaca.markets/us/reference/get-v1-trading-accounts-account_id-orders-estimation)
+returns indicative estimates for notional market orders; its documented contract
+excludes crypto and non-market orders. It cannot qualify the quantity-sized limit
+orders supported here, and it belongs to the Broker API rather than this
+customer-key Trading API connector. A CLI dry run or our local account preflight
+does not replace that missing broker contract.
+
 ## Initialize and inspect without contacting a broker
 
 From a reviewed complete checkout:
@@ -39,7 +47,19 @@ uv run --project integrations/trading-copilot --locked liquilens-live init \
   --state-dir /absolute/private/live-state
 uv run --project integrations/trading-copilot --locked liquilens-live capabilities \
   --state-dir /absolute/private/live-state
+uv run --project integrations/trading-copilot --locked liquilens-live doctor \
+  --state-dir /absolute/private/live-state
 ```
+
+`doctor` reads existing local files without creating state or contacting an
+account. It reports binding, limits, private credential/key presence, STOP,
+configured activation and unresolved journal entries. It never prints credentials,
+account identifiers, receipts or complete orders. Its `live_ready` remains false
+and its exit code is 2 while the independent issuer, quote entitlement, compatible
+broker preview and account qualification are unverified. Even valid-looking keys
+and a configured activation acknowledgment do not establish those facts. The
+stable `alpaca_limit_order_broker_preview_unavailable` requirement identifies the
+current provider incompatibility above.
 
 Initialization writes owner-only `live-config.json` and `live-secrets.json`, never
 overwriting existing files. Supply your account and complete trusted issuer
@@ -70,16 +90,41 @@ Persist the request hash before calling it. Read `state`, `observation` and
 
 ```sh
 liquilens-live status --state-dir /absolute/private/live-state --request-hash <saved-hash>
+liquilens-live orders --state-dir /absolute/private/live-state --unresolved-only --limit 50
+liquilens-live export --state-dir /absolute/private/live-state --limit 100
 liquilens-live reconcile --state-dir /absolute/private/live-state --request-hash <saved-hash>
 liquilens-live cancel --state-dir /absolute/private/live-state --request-hash <saved-hash>
 ```
 
-`status` reads local history. `reconcile` reads the same client order ID at the
+`status`, `orders` and `export` read an existing local journal without requiring
+broker credentials, a receipt key or activation. They remain useful if credentials
+have been revoked or removed. `orders` lists saved hashes needed for crash
+recovery; `--unresolved-only` selects pending and uncertain attempts. `export`
+writes a sanitized metadata page to stdout, including bounded observations and
+hashes rather than complete orders, account bindings, requests or receipts.
+Each page is limited to 1–100 records. If `truncated=true`, pass `next_after` as
+`--after-hash` with the same filter to retrieve the following page. Retain exported
+metadata privately; it is a last-observed account record, never proof of a fresh
+broker state or authorization to retry.
+
+Local reads use a shared existing operator lock and read-only SQLite. They do not
+create a missing database or repair a hot journal. A concurrent writer produces
+`local_journal_busy`; leftover recovery files produce
+`local_journal_recovery_required`. Stop the writer and perform reviewed database
+recovery before reading again; do not remove recovery files to bypass the check.
+
+`reconcile` reads the same client order ID at the
 broker and validates order identity and monotonic fills. A `cancel` acknowledgment
 means cancellation was requested; reconcile again to observe the terminal state.
 Cancellation and reconciliation remain possible under STOP. Neither submits a
 replacement order. A timeout, malformed response, 404 or a crash after reservation
 keeps the outcome unresolved and blocks fresh submissions.
+
+Observed limit fills must respect the submitted side and limit price. A
+contradictory fill is rejected without clearing the existing pending/uncertain
+record. The transport allows only exact operation/route pairs, including
+single-order cancellation by UUID; bulk order cancellation and position
+liquidation routes are excluded.
 
 Create `STOP` in the live state directory to block new submissions. It cannot
 recall an in-flight order. The connector rechecks activation, STOP and receipt

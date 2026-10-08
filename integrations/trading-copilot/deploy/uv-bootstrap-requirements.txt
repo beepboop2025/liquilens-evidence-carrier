@@ -1,0 +1,3 @@
+# Linux glibc x86_64 wheel, matching the locally qualified uv version.
+# Source metadata: https://pypi.org/pypi/uv/0.10.0/json
+uv==0.10.0 --hash=sha256:82b46db718763bf742e986ebbc7a30ca33648957a0dcad34382970b992f5e900

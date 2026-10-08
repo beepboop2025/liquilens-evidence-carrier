@@ -17,6 +17,8 @@ from .live_connector import (
     LiveExecutionBlocked,
     LiveLimits,
 )
+from .live_diagnostics import live_readiness
+from .live_journal import local_orders, local_status
 from .state import prepare_state
 
 
@@ -94,6 +96,9 @@ def main() -> int:
         choices=(
             "init",
             "capabilities",
+            "doctor",
+            "orders",
+            "export",
             "preview",
             "submit",
             "status",
@@ -105,6 +110,9 @@ def main() -> int:
     parser.add_argument("--request", type=Path)
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--request-hash")
+    parser.add_argument("--limit", type=int, default=50)
+    parser.add_argument("--unresolved-only", action="store_true")
+    parser.add_argument("--after-hash")
     args = parser.parse_args()
     if args.operation in {"preview", "submit"}:
         if not args.request or not args.receipt or args.request_hash:
@@ -116,6 +124,10 @@ def main() -> int:
         != (args.operation in {"status", "reconcile", "cancel"})
     ):
         parser.error("status/reconcile/cancel require only request-hash")
+    if args.operation not in {"orders", "export"} and (
+        args.limit != 50 or args.unresolved_only or args.after_hash
+    ):
+        parser.error("journal filters are supported by orders/export only")
     broker = None
     try:
         # The trusted operator may select an SSD alias or a relative CLI path.
@@ -141,7 +153,22 @@ def main() -> int:
                 "broker_connected": False,
                 "order_submitted": False,
                 "managed_live_service": False,
+                "broker_preview_adapter_available": False,
+                "live_ready": False,
             }
+        elif args.operation == "doctor":
+            result = live_readiness(args.state_dir)
+        elif args.operation == "status":
+            result = local_status(args.state_dir, args.request_hash)
+        elif args.operation in {"orders", "export"}:
+            result = local_orders(
+                args.state_dir,
+                limit=args.limit,
+                unresolved_only=args.unresolved_only,
+                after=args.after_hash,
+            )
+            if args.operation == "export":
+                result["export_scope"] = "bounded_sanitized_metadata_page"
         else:
             prepare_state(args.state_dir)
             config = private_json(args.state_dir / "live-config.json")
@@ -197,7 +224,13 @@ def main() -> int:
         if broker:
             broker.close()
     print(json.dumps(result, allow_nan=False))
-    return 2 if result.get("error") or result.get("state") == "uncertain" else 0
+    return (
+        2
+        if result.get("error")
+        or result.get("state") == "uncertain"
+        or (args.operation == "doctor" and not result["live_ready"])
+        else 0
+    )
 
 
 if __name__ == "__main__":

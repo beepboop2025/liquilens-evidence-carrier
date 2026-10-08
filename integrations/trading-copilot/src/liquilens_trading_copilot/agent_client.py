@@ -24,7 +24,7 @@ _OPERATIONS = {
 
 
 def read_agent_token(path: Path) -> str:
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         info = os.fstat(fd)
         if (
