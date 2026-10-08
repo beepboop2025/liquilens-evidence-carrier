@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -124,16 +125,19 @@ class AlpacaLiveTransport:
         self, method: str, path: str, *, payload: Any = None, params: Any = None
     ) -> Any:
         # Only fixed routes selected by this connector reach the credential lane.
-        if path not in {
-            "/v2/account",
-            "/v2/positions",
-            "/v2/orders",
-            "/v2/orders:by_client_order_id",
+        if (method, path) not in {
+            ("GET", "/v2/account"),
+            ("GET", "/v2/positions"),
+            ("GET", "/v2/orders"),
+            ("GET", "/v2/orders:by_client_order_id"),
+            ("POST", "/v2/orders"),
         } and not (
             method == "DELETE"
-            and path.startswith("/v2/orders/")
-            and len(path) == len("/v2/orders/") + 36
-            and all(c in "0123456789abcdef-" for c in path[len("/v2/orders/") :])
+            and re.fullmatch(
+                r"/v2/orders/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                r"[0-9a-f]{4}-[0-9a-f]{12}",
+                path,
+            )
         ):
             raise LiveExecutionBlocked("unsupported_broker_route")
         try:
@@ -383,6 +387,11 @@ class LiveAccountConnector:
                 else None
             )
             if filled > 0 and (price is None or price <= 0):
+                raise ValueError
+            if filled > 0 and (
+                (order["side"] == "buy" and price > number(order["limit_price"]))
+                or (order["side"] == "sell" and price < number(order["limit_price"]))
+            ):
                 raise ValueError
             if raw["status"] == "filled" and filled != number(order["quantity"]):
                 raise ValueError

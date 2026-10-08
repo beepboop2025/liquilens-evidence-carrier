@@ -79,7 +79,7 @@ def initialize(state_dir: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("init", "serve"))
+    parser.add_argument("command", choices=("init", "doctor", "serve"))
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--allowed-host", action="append", default=[])
@@ -89,6 +89,12 @@ def main() -> int:
         if args.command == "init":
             print(json.dumps(initialize(state_dir)))
             return 0
+        if args.command == "doctor":
+            from .agent_diagnostics import diagnose_agent_host
+
+            result = diagnose_agent_host(state_dir)
+            print(json.dumps(result))
+            return 0 if result["local_configuration_ready"] else 2
         if not 1024 <= args.port <= 65535:
             raise ValueError("invalid_private_host_port")
         private_json(state_dir / "config.json")

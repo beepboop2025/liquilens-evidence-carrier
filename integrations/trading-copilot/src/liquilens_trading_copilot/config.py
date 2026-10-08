@@ -227,7 +227,7 @@ def load_secret_file(path: Path) -> dict[str, str]:
     """Read literal KEY=value settings, never shell code or generic env files."""
     import stat
 
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         info = os.fstat(fd)
         if (

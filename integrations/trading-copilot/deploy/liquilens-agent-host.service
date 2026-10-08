@@ -1,0 +1,29 @@
+[Unit]
+Description=Private LiquiLens paper agent host (manual activation only)
+After=network-online.target
+Wants=network-online.target
+Conflicts=liquilens-paper-copilot.service liquilens-paper-copilot.timer
+ConditionPathExists=/var/lib/liquilens-agent-host/config.json
+ConditionPathExists=/var/lib/liquilens-agent-host/agent-auth.json
+
+[Service]
+Type=simple
+User=liquilens-copilot
+Group=liquilens-copilot
+WorkingDirectory=/opt/liquilens-trading-copilot/current
+ExecStart=/opt/liquilens-trading-copilot/current/integrations/trading-copilot/.venv/bin/liquilens-agent-host serve --state-dir /var/lib/liquilens-agent-host --port 8766
+Restart=no
+StateDirectory=liquilens-agent-host
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/liquilens-agent-host
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+TimeoutStopSec=120
+
+# No [Install] section: installing this template does not enable or start it.
+# Configure a distinct private state directory; never copy/reuse account state.

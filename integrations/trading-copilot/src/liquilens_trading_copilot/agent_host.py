@@ -47,7 +47,7 @@ _ROUTES = {
 
 def private_json(path: Path) -> dict[str, Any]:
     """Read a bounded owner-only file without following a leaf symlink."""
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     try:
         info = os.fstat(fd)
         if (

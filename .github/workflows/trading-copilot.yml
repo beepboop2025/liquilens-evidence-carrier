@@ -41,7 +41,8 @@ jobs:
       - name: Verify native evidence through guarded paper submission
         run: |
           uv run --project integrations/trading-copilot --locked --extra test \
-            pytest integrations/trading-copilot/tests integrations/alpaca-paper/tests
+            pytest integrations/trading-copilot/tests integrations/alpaca-paper/tests \
+              integrations/trading-copilot/deploy/test_disabled_rollout.py
           uv run --project integrations/trading-copilot --locked --extra test \
             ruff check integrations/trading-copilot/src integrations/trading-copilot/tests
           uv run --project integrations/trading-copilot --locked --extra test \

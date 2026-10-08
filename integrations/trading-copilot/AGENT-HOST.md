@@ -55,7 +55,24 @@ The host ignores ambient broker environment variables. The client receives only
 its designated agent token. Token rotation/revocation requires changing the auth
 file and restarting the host; it does not cancel already submitted orders.
 
-Keep `enabled=false` for initial source assessment. Run the host explicitly:
+Keep `enabled=false` for initial source assessment.
+
+First inspect local setup without contacting sources or the broker:
+
+```sh
+uv run --project integrations/trading-copilot --locked liquilens-agent-host doctor \
+  --state-dir /absolute/private/agent-state
+```
+
+The report identifies missing account identity, credentials, receipt key, token
+scopes, file permissions, profile and account limits without printing their
+private values. It reads only local files and does not initialize, chmod or
+change them. Exit code 2 means local setup has blockers; exit code 0 means those
+local checks passed. `ready_for_order` remains false: current source eligibility,
+broker-account qualification and deployment/recovery are separate requirements.
+Execution enablement and STOP are reported independently from setup completeness.
+
+After provisioning the local setup, run the host explicitly:
 
 ```sh
 uv run --project integrations/trading-copilot --locked liquilens-agent-host serve \
