@@ -11,12 +11,21 @@ from .agent_host import private_json
 from .live_connector import LiveExecutionBlocked, LiveLimits
 from .live_journal import local_orders, private_directory
 
+# Legacy aggregate retained for output compatibility; not all gaps are external.
 EXTERNAL_REQUIREMENTS = (
     "qualified_live_issuer_unverified",
     "executable_quote_entitlement_unverified",
     "alpaca_limit_order_broker_preview_unavailable",
     "account_qualification_unverified",
     "account_activation_unverified",
+)
+
+ENGINEERING_REQUIREMENTS = (
+    "qualified_live_issuer_unverified",
+    "alpaca_limit_order_broker_preview_unavailable",
+)
+QUALIFICATION_REQUIREMENTS = tuple(
+    reason for reason in EXTERNAL_REQUIREMENTS if reason not in ENGINEERING_REQUIREMENTS
 )
 
 
@@ -127,6 +136,8 @@ def live_readiness(state_dir: Path) -> dict[str, Any]:
         "unresolved_count": unresolved,
         "local_reason_codes": reasons,
         "external_requirements": list(EXTERNAL_REQUIREMENTS),
+        "engineering_requirements": list(ENGINEERING_REQUIREMENTS),
+        "qualification_requirements": list(QUALIFICATION_REQUIREMENTS),
         "limitations": [
             "Credential presence does not verify an account, entitlement or mandate.",
             "Alpaca Broker API estimation is indicative and excludes limit orders "

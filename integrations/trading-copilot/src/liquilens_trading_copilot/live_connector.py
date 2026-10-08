@@ -97,6 +97,70 @@ class LiveLimits:
             raise LiveExecutionBlocked("invalid_live_limits")
 
 
+def validate_account_identity(account: Any, account_id: str) -> None:
+    """Bind a broker response to the configured USD account, without disclosure."""
+    if (
+        not isinstance(account, dict)
+        or account.get("id") != account_id
+        or account.get("currency") != "USD"
+    ):
+        raise LiveExecutionBlocked("live_account_not_eligible")
+
+
+def validate_account_controls(
+    account: Any, account_id: str, limits: LiveLimits
+) -> Decimal:
+    """Shared account status, cash and daily-loss controls; no broker calls."""
+    validate_account_identity(account, account_id)
+    if account.get("status") != "ACTIVE" or any(
+        account.get(key) is not False
+        for key in ("trading_blocked", "account_blocked", "trade_suspended_by_user")
+    ):
+        raise LiveExecutionBlocked("live_account_not_eligible")
+    cash, equity, prior = (
+        number(account.get(key)) for key in ("cash", "equity", "last_equity")
+    )
+    if (
+        cash < 0
+        or equity <= 0
+        or prior <= 0
+        or prior - equity >= number(limits.max_daily_loss_usd)
+    ):
+        raise LiveExecutionBlocked("account_loss_or_cash_limit")
+    return cash
+
+
+def validate_account_positions(positions: Any) -> tuple[Decimal, dict[str, Decimal]]:
+    """Validate long-only positions and aggregate exposure without returning rows."""
+    if not isinstance(positions, list):
+        raise LiveExecutionBlocked("invalid_account_positions")
+    gross = Decimal(0)
+    quantities: dict[str, Decimal] = {}
+    for position in positions:
+        if (
+            not isinstance(position, dict)
+            or not isinstance(position.get("symbol"), str)
+            or not position["symbol"]
+            or len(position["symbol"]) > 24
+            or any(c.isspace() for c in position["symbol"])
+        ):
+            raise LiveExecutionBlocked("invalid_account_positions")
+        symbol = position["symbol"].replace("/", "")
+        if not symbol:
+            raise LiveExecutionBlocked("invalid_account_positions")
+        if symbol in quantities:
+            raise LiveExecutionBlocked("duplicate_account_position")
+        quantity, value = (
+            number(position.get("qty")),
+            number(position.get("market_value")),
+        )
+        if quantity < 0 or value < 0:
+            raise LiveExecutionBlocked("short_or_margin_position_unsupported")
+        gross += value
+        quantities[symbol] = quantity
+    return gross, quantities
+
+
 class AlpacaLiveTransport:
     """Pinned live origin; no redirect, proxy, SDK retry or broker URL input."""
 
@@ -290,62 +354,20 @@ class LiveAccountConnector:
 
     def _account(self, request: dict | None = None) -> None:
         account = self.broker.call("GET", "/v2/account")
-        if (
-            not isinstance(account, dict)
-            or account.get("id") != self.binding.account_id
-            or account.get("currency") != "USD"
-        ):
-            raise LiveExecutionBlocked("live_account_not_eligible")
+        validate_account_identity(account, self.binding.account_id)
         if request is None:
             return
-        if account.get("status") != "ACTIVE" or any(
-            account.get(key) is not False
-            for key in (
-                "trading_blocked",
-                "account_blocked",
-                "trade_suspended_by_user",
-            )
-        ):
-            raise LiveExecutionBlocked("live_account_not_eligible")
-        cash, equity, prior = (
-            number(account.get(key)) for key in ("cash", "equity", "last_equity")
-        )
-        if (
-            cash < 0
-            or equity <= 0
-            or prior <= 0
-            or prior - equity >= number(self.limits.max_daily_loss_usd)
-        ):
-            raise LiveExecutionBlocked("account_loss_or_cash_limit")
+        cash = validate_account_controls(account, self.binding.account_id, self.limits)
         orders = self.broker.call(
             "GET", "/v2/orders", params={"status": "open", "limit": 1}
         )
         if orders != []:
             raise LiveExecutionBlocked("open_orders_pending")
-        positions = self.broker.call("GET", "/v2/positions")
-        if not isinstance(positions, list):
-            raise LiveExecutionBlocked("invalid_account_positions")
-        gross, held = Decimal(0), Decimal(0)
+        gross, quantities = validate_account_positions(
+            self.broker.call("GET", "/v2/positions")
+        )
         symbol = request["order"]["instrument"]["symbol"].replace("/", "")
-        seen = set()
-        for position in positions:
-            if not isinstance(position, dict) or not isinstance(
-                position.get("symbol"), str
-            ):
-                raise LiveExecutionBlocked("invalid_account_positions")
-            position_symbol = position["symbol"].replace("/", "")
-            if position_symbol in seen:
-                raise LiveExecutionBlocked("duplicate_account_position")
-            seen.add(position_symbol)
-            quantity, value = (
-                number(position.get("qty")),
-                number(position.get("market_value")),
-            )
-            if quantity < 0 or value < 0:
-                raise LiveExecutionBlocked("short_or_margin_position_unsupported")
-            gross += value
-            if position_symbol == symbol:
-                held = quantity
+        held = quantities.get(symbol, Decimal(0))
         order = request["order"]
         amount = number(order["notional"]["amount"])
         if order["side"] == "buy" and (
