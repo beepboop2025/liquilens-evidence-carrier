@@ -10,6 +10,7 @@ import asyncio
 import hashlib
 import json
 import os
+import re
 import stat
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -22,6 +23,7 @@ from trade_safety_gateway.app import (
     RawUpstreamResponse,
     _mcp_call,
     _mcp_structured,
+    _strict_json_object,
     _undertow_section,
 )
 from trade_safety_gateway.http_safety import cookie_free_jar
@@ -150,12 +152,61 @@ def _reported_clocks(product: str, raw: bytes, now: datetime) -> dict[str, str]:
     return result
 
 
+def _undertow_tool_error(raw: bytes) -> str | None:
+    """Recognize a bounded MCP error response without admitting source evidence.
+
+    Hosted quota errors contain no structuredContent or request digest. Their
+    exact JSON-RPC identity and error shape can explain unavailability, but can
+    never establish rights, source facts or a passing scenario binding.
+    """
+    envelope = _strict_json_object(raw, "Undertow diagnostic response")
+    if (
+        set(envelope) != {"jsonrpc", "id", "result"}
+        or envelope["jsonrpc"] != "2.0"
+        or envelope["id"] != "trade-safety-undertow-v1"
+    ):
+        return None
+    result = envelope["result"]
+    if (
+        not isinstance(result, dict)
+        or set(result) != {"content", "isError"}
+        or result["isError"] is not True
+    ):
+        return None
+    content = result["content"]
+    if not isinstance(content, list) or not 1 <= len(content) <= 4:
+        return None
+    for item in content:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"type", "text"}
+            or item["type"] != "text"
+            or not isinstance(item["text"], str)
+            or not 0 < len(item["text"]) <= 2048
+        ):
+            return None
+    if len(content) == 1:
+        quota = re.match(
+            r"^ERROR: daily MCP quota reached \(([0-9]{1,6})/([0-9]{1,6}) "
+            r"tool calls today, resets at UTC midnight\)\.(?:\s|$)",
+            content[0]["text"],
+        )
+        if quota is not None and int(quota[1]) >= int(quota[2]) > 0:
+            return "source_quota_exhausted"
+    # Raw upstream prose and any links or claimed rights stay out of the report.
+    return "source_unavailable"
+
+
 def _unavailable_undertow_reason(raw: bytes, expected: dict[str, Any]) -> str | None:
     """Validate only the unavailable envelope; admit none of its market facts.
 
     This digest is an integrity check, not authentication or a rights grant.
-    Only one recognized rights-denial code is retained from upstream prose.
+    A rights denial requires the full native envelope; tool errors explain only
+    source unavailability and cannot establish any rights state.
     """
+    tool_error = _undertow_tool_error(raw)
+    if tool_error is not None:
+        return tool_error
     payload = _mcp_structured(raw, "trade-safety-undertow-v1")
     if (
         set(payload) != _UNDERTOW_ROOT_KEYS
@@ -183,6 +234,8 @@ def _failure(
     # Never copy arbitrary exception text or upstream response prose into reports.
     code = str(error)
     if isinstance(error, FundingScopeError):
+        if code.endswith(": future observation"):
+            return "invalid", "source_clock_in_future"
         if code.endswith(": stale observation"):
             return "stale", "source_observation_stale"
         # Some pure-parser errors group unavailable/stale/withheld causes.
@@ -324,7 +377,12 @@ def _row(
                     else "unavailable"
                 )
                 row["reason_codes"] = [reason]
-                row["next_action"] = _ACTIONS[row["state"]]
+                row["next_action"] = (
+                    "Wait for the UTC quota reset or an approved higher allowance; "
+                    "schedule checks within the source allowance."
+                    if reason == "source_quota_exhausted"
+                    else _ACTIONS[row["state"]]
+                )
                 return row
             section = _undertow_section(raw=raw, expected_request=expected, **kwargs)
             row["native_expires_at"] = section["facts"]["clocks"]["expires_at"]
@@ -372,7 +430,10 @@ def _row(
         row["state"], reason = _failure(error, product, raw, now)
         row["reason_codes"] = [reason]
     row["next_action"] = (
-        (
+        "Reconcile producer and observer UTC clocks; keep the source unadmitted "
+        "until the original clock ordering is valid."
+        if "source_clock_in_future" in row["reason_codes"]
+        else (
             "Keep the source-policy hold; "
             "a valid observation does not clear the risk limit."
         )
