@@ -1,0 +1,35 @@
+[Unit]
+Description=Reconcile an interrupted disabled-paper-host backup
+After=local-fs.target liquilens-agent-host.service
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=@RELEASE_DIR@
+ExecStart=/usr/bin/python3 -B @RELEASE_DIR@/integrations/trading-copilot/deploy/backup_agent_host.py recover
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+ReadWritePaths=/var/lib/liquilens-paper-backup
+ReadWritePaths=/etc/liquilens-source-access/.renew.lock /etc/undertow-mcp/.service-identities.lock
+TimeoutStartSec=5min
+MemoryMax=256M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target
+
+# Ordering alone does not pull in or enable the host. Do not use Before=host:
+# recovery may synchronously start a previously active host, which would then
+# wait for this unit and deadlock. An inactive prior owner stays inactive.
