@@ -72,6 +72,7 @@ def main() -> int:
         "command",
         choices=[
             "demo",
+            "observe",
             "init",
             "diagnose",
             "research",
@@ -85,7 +86,12 @@ def main() -> int:
 
     parser.add_argument("--scenario", choices=SCENARIOS, help="offline demo only")
     parser.add_argument(
-        "--format", choices=["json", "markdown"], help="offline demo only"
+        "--format", choices=["json", "markdown"], help="demo or read-only observe"
+    )
+    parser.add_argument(
+        "--check-account",
+        action="store_true",
+        help="observe: explicitly check paper account using private files",
     )
     parser.add_argument("--state-dir", type=Path)
     parser.add_argument("--config", type=Path)
@@ -97,6 +103,32 @@ def main() -> int:
     )
     args = parser.parse_args()
     try:
+        if args.command == "observe":
+            if args.scenario is not None or args.state_dir is not None:
+                parser.error("observe does not accept --scenario or --state-dir")
+            if args.check_account:
+                if args.config is None or args.env_file is None:
+                    parser.error(
+                        "observe --check-account requires --config and --env-file"
+                    )
+            elif args.config is not None or args.env_file is not None:
+                parser.error("observe account files require --check-account")
+            from .observatory import collect_observatory, format_observatory_markdown
+
+            report = asyncio.run(
+                collect_observatory(
+                    check_account=args.check_account,
+                    config_path=args.config,
+                    env_path=args.env_file,
+                )
+            )
+            if args.format == "markdown":
+                print(format_observatory_markdown(report), end="")
+            else:
+                _emit(report)
+            return 0
+        if args.check_account:
+            parser.error("--check-account applies only to observe")
         if args.command == "demo":
             if any((args.config, args.env_file, args.state_dir)):
                 parser.error("demo does not accept operator configuration or state")
@@ -109,7 +141,9 @@ def main() -> int:
                 _emit(report)
             return 0
         if args.scenario is not None or args.format is not None:
-            parser.error("--scenario and --format apply only to demo")
+            parser.error(
+                "--scenario applies to demo; --format applies to demo or observe"
+            )
         if args.command == "init":
             if args.state_dir is None:
                 parser.error("init requires --state-dir")

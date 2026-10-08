@@ -12,6 +12,63 @@ External agents can use the separate [private agent host](AGENT-HOST.md) to subm
 their own bounded proposals through the same evidence and account controls. It
 includes authenticated REST endpoints and an explicit, non-retrying client.
 
+## Inspect the three live sources without submitting an order
+
+The execution observatory independently reads Seiche funding context, LiquiLens
+commercial-paper research and Undertow exit context. Each row explains the
+product's contribution, original observation clocks, retrieval clock, age ceiling,
+source hash, current admission result and next action. A missing or restricted
+source stays visible without hiding the other products.
+
+```sh
+uv run --project integrations/trading-copilot --locked --no-sync --offline \
+  liquilens-trading-copilot observe --format markdown
+```
+
+This command contacts the three fixed public source endpoints. It does not read
+operator configuration, environment credentials, broker accounts or state files.
+It uses a **hypothetical paper BTC/USD sell scenario of $1,000** and a distinct
+`liquilens.execution-observatory.v1` diagnostic hash. It creates no executable
+request or receipt, never opens a journal, and never enables or submits trading.
+JSON is the default; Markdown includes the identical complete JSON report.
+
+`source_checks_passed` means only that the three source contracts were admitted.
+`source_policy_checks_passed` separately checks funding-regime and exit-cost
+limits. All of `ready_for_order`, `receipt_issued`, `order_authorized`,
+`order_submitted` and `state_modified` remain false, including when every source
+check passes. The report lists the order, strategy, portfolio, operator, receipt
+and durable submission controls it did not evaluate. A reported observation clock
+on a rejected row remains an unadmitted producer claim; it does not become usable
+evidence. Native expiry is kept distinct from the local diagnostic expiry, which
+is also capped by the configured source-age deadline. All source rows are checked
+again at one final report clock after any optional account reads; expiry during
+collection removes current admission without changing the original retrieval
+clock.
+
+LiquiLens' eight-day ceiling is unchanged. A weekly CP publication interval can
+leave the date-only rollover observation temporarily ineligible before the next
+release. Recollecting a page cannot make that observation newer. Undertow's
+`rights_manifest_not_approved` is retained only after the unavailable envelope's
+schema, integrity, scenario binding and no-authority boundary are checked.
+
+An operator may explicitly add a **read-only paper account** check:
+
+```sh
+liquilens-trading-copilot observe --check-account \
+  --config /var/lib/liquilens-trading-copilot/config.json \
+  --env-file /var/lib/liquilens-trading-copilot/paper.env
+```
+
+The optional check uses only fixed-origin GETs for account, positions and open
+orders. It verifies account binding and ACTIVE/USD/block flags, and reports only
+counts and flags: no account identifiers, balances or secret values. Files must
+be explicitly provided; missing credentials affect only the account row. No
+account calls occur by default. The observer never uses receipt-signing authority
+or writes operator state. Shell redirection writes only a file you select.
+
+For a separate credential-inaccessible service with private atomic history and
+scheduled source checks, follow [observer deployment and recovery](OBSERVATORY-DEPLOYMENT.md).
+
 ## Try an offline decision first
 
 From a source checkout, Python 3.11 or later can run the demo without installing

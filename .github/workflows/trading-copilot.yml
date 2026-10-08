@@ -42,10 +42,15 @@ jobs:
         run: |
           uv run --project integrations/trading-copilot --locked --extra test \
             pytest integrations/trading-copilot/tests integrations/alpaca-paper/tests \
-              integrations/trading-copilot/deploy/test_disabled_rollout.py
+              integrations/trading-copilot/deploy/test_disabled_rollout.py \
+              integrations/trading-copilot/deploy/test_capture_observatory.py
           uv run --project integrations/trading-copilot --locked --extra test \
-            ruff check integrations/trading-copilot/src integrations/trading-copilot/tests
+            ruff check integrations/trading-copilot/src integrations/trading-copilot/tests \
+              integrations/trading-copilot/deploy/capture_observatory.py \
+              integrations/trading-copilot/deploy/test_capture_observatory.py
           uv run --project integrations/trading-copilot --locked --extra test \
-            ruff format --check integrations/trading-copilot/src integrations/trading-copilot/tests
+            ruff format --check integrations/trading-copilot/src integrations/trading-copilot/tests \
+              integrations/trading-copilot/deploy/capture_observatory.py \
+              integrations/trading-copilot/deploy/test_capture_observatory.py
       - name: Build integration package
         run: uv build --project integrations/trading-copilot
