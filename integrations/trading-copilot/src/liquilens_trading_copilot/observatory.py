@@ -633,6 +633,7 @@ async def collect_observatory(
     config_path: Path | None = None,
     env_path: Path | None = None,
     account_transport: httpx.AsyncBaseTransport | None = None,
+    undertow_token_file: Path | None = None,
 ) -> dict[str, Any]:
     """Collect independent diagnostics; never create a receipt or touch state."""
     if not check_account and any(
@@ -653,7 +654,13 @@ async def collect_observatory(
     )
     expected = {key: value for key, value in scenario.items() if key != "hypothetical"}
     expected["request_hash"] = scenario_hash
-    upstream = transport if transport is not None else ScopedUpstreamTransport()
+    if transport is not None and undertow_token_file is not None:
+        raise ValueError("observer_source_transport_conflict")
+    upstream = (
+        transport
+        if transport is not None
+        else ScopedUpstreamTransport(undertow_token_file=undertow_token_file)
+    )
 
     async def capture(method: str, url: str, **kwargs: Any) -> tuple[Any, datetime]:
         try:

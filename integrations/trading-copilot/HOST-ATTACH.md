@@ -118,6 +118,15 @@ Do not use the new-account template pointing to `/var/lib/liquilens-agent-host`.
 The attached template has no `StateDirectory` or `[Install]` directive and binds
 only loopback. Record unit bytes and source identity before starting it manually.
 
+The attached template also requires a separately registered Undertow source
+identity, `liquilens-paper-host`, stored root-only at
+`/etc/liquilens-source-access/paper-host.token`. Provision it using Undertow's
+reviewed service-identity helper. systemd supplies a private read-only copy via
+`LoadCredential`; its path is passed with `--undertow-token-file`. This credential
+only accesses the public exit-context tool. It grants neither venue-data rights
+nor broker authority. Its meter is separate from the source observer, and both
+identities retain the normal daily caps. Record expiry and the rotation procedure.
+
 Host startup holds the same process lock for its lifetime and initializes
 `agent_host_identity`, `agent_assessments` and the adapter submission journal in
 the existing state. This expected database migration is separate from attach;

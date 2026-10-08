@@ -97,6 +97,9 @@ def main() -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--env-file", type=Path)
     parser.add_argument(
+        "--undertow-token-file", type=Path, help="observe: private source access token"
+    )
+    parser.add_argument(
         "--profile",
         choices=["native_gateway_v1", SCOPED_PROFILE],
         default=SCOPED_PROFILE,
@@ -120,6 +123,7 @@ def main() -> int:
                     check_account=args.check_account,
                     config_path=args.config,
                     env_path=args.env_file,
+                    undertow_token_file=args.undertow_token_file,
                 )
             )
             if args.format == "markdown":
@@ -129,6 +133,8 @@ def main() -> int:
             return 0
         if args.check_account:
             parser.error("--check-account applies only to observe")
+        if args.undertow_token_file is not None:
+            parser.error("--undertow-token-file applies only to observe")
         if args.command == "demo":
             if any((args.config, args.env_file, args.state_dir)):
                 parser.error("demo does not accept operator configuration or state")

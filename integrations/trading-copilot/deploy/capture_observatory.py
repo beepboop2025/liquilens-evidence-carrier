@@ -183,7 +183,7 @@ def run_bounded(command: list[str], env: dict[str, str], timeout: float = 45):
             process.wait()
 
 
-def observe() -> tuple[dict | None, str | None]:
+def observe(undertow_token_file: Path | None = None) -> tuple[dict | None, str | None]:
     # No inherited credentials/proxies, config path, account flag or shell.
     command = [
         sys.executable,
@@ -194,6 +194,8 @@ def observe() -> tuple[dict | None, str | None]:
         "--format",
         "json",
     ]
+    if undertow_token_file is not None:
+        command.extend(["--undertow-token-file", str(undertow_token_file)])
     env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"}
     try:
         code, raw = run_bounded(command, env)
@@ -238,7 +240,13 @@ def recover_temporary(directory: Path) -> None:
     sync_directory(directory)
 
 
-def capture(state: Path, source_sha: str, keep: int = 288) -> dict:
+def capture(
+    state: Path,
+    source_sha: str,
+    keep: int = 288,
+    *,
+    undertow_token_file: Path | None = None,
+) -> dict:
     require(re.fullmatch(r"[0-9a-f]{40}", source_sha) is not None, "source_sha_invalid")
     require(type(keep) is int and 1 <= keep <= 2048, "retention_invalid")
     state = state.resolve(strict=True)
@@ -274,7 +282,9 @@ def capture(state: Path, source_sha: str, keep: int = 288) -> dict:
         # Prune before publishing a new history file: corruption cannot grow
         # the history on each failed attempt. Unknown data requires review.
         prune(history, keep - 1)
-        report, error = observe()
+        report, error = (
+            observe() if undertow_token_file is None else observe(undertow_token_file)
+        )
         completed = datetime.now(UTC)
         record.update(
             completed_at=completed.isoformat(),
@@ -303,9 +313,15 @@ def main() -> int:
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--source-sha", required=True)
     parser.add_argument("--keep", type=int, default=288)
+    parser.add_argument("--undertow-token-file", type=Path)
     args = parser.parse_args()
     try:
-        record = capture(args.state_dir, args.source_sha, args.keep)
+        record = capture(
+            args.state_dir,
+            args.source_sha,
+            args.keep,
+            undertow_token_file=args.undertow_token_file,
+        )
         print(
             json.dumps(
                 {
