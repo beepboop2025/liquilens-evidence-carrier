@@ -17,6 +17,8 @@ without a negotiated marketplace listing:
   keeps the raw client outside the agent, checks the bound account, atomically
   journals one authenticated receipt and broker attempt, and provides
   restart-safe request-hash reconciliation without blind resubmission;
+  its [private agent tools](alpaca-paper/AGENT-TOOLS.md) expose the same boundary
+  to an authenticated host without introducing a strategy or live-order mode;
 - `openlineage/` validates the custom lineage facet;
 - `dbt/` rejects warehouse rows that strip clocks, rights, or redaction state;
   and
