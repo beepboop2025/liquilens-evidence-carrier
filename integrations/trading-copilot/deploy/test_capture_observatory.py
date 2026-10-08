@@ -136,6 +136,31 @@ class CaptureTests(unittest.TestCase):
             self.assertIsNone(value)
             self.assertNotIn("secret", error)
 
+    def test_only_bound_systemd_directory_path_reaches_source_child(self):
+        path = Path("/run/credentials/observer.service/undertow.token")
+        completed = (0, json.dumps(report()).encode())
+        for directory in (
+            str(path.parent),
+            "/tmp/credentials",
+            "/run/credentials/other.service",
+        ):
+            with (
+                patch.dict(
+                    os.environ,
+                    {
+                        "CREDENTIALS_DIRECTORY": directory,
+                        "ALPACA_PAPER_SECRET_KEY": "never-forward",
+                    },
+                ),
+                patch.object(capture, "run_bounded", return_value=completed) as run,
+            ):
+                capture.observe(path)
+            env = run.call_args.args[1]
+            self.assertEqual(
+                "CREDENTIALS_DIRECTORY" in env, directory == str(path.parent)
+            )
+            self.assertNotIn("ALPACA_PAPER_SECRET_KEY", env)
+
     def test_source_credential_path_passed_without_inherited_broker_secrets(self):
         path = Path("/run/credentials/observer/undertow.token")
         with (

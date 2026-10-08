@@ -3,9 +3,11 @@
 import asyncio
 import json
 import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
@@ -17,7 +19,10 @@ from liquilens_trading_copilot.scoped import (
     UNDERTOW_URL,
     ScopedUpstreamTransport,
 )
-from liquilens_trading_copilot.source_access import read_source_token
+from liquilens_trading_copilot.source_access import (
+    _systemd_credential,
+    read_source_token,
+)
 
 TOKEN = "test_source_identity.only_test_material_123456789"
 BODY = {"method": "tools/call", "params": {"name": "trade_safety_exit_context"}}
@@ -50,7 +55,7 @@ class SourceAccessTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(ValueError, "^source_credential_unavailable$"):
                 read_source_token(self.path)
         self.path.write_text(TOKEN)
-        for mode in (0o644, 0o640, 0o660, 0o700):
+        for mode in (0o440, 0o644, 0o640, 0o660, 0o700):
             self.path.chmod(mode)
             with self.assertRaises(ValueError):
                 read_source_token(self.path)
@@ -76,6 +81,51 @@ class SourceAccessTests(unittest.IsolatedAsyncioTestCase):
             read_source_token(fifo)
         with self.assertRaises(ValueError):
             read_source_token(Path("source.token"))
+
+    def test_systemd_acl_copy_requires_exact_root_readonly_credential_context(self):
+        path = Path("/run/credentials/example.service/undertow.token")
+        info = SimpleNamespace(st_uid=0, st_gid=0, st_mode=stat.S_IFREG | 0o440)
+        parent = SimpleNamespace(st_uid=0, st_gid=0, st_mode=stat.S_IFDIR | 0o550)
+        with (
+            patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": str(path.parent)}),
+            patch.object(Path, "lstat", return_value=parent),
+            patch(
+                "os.fstatvfs", return_value=SimpleNamespace(f_flag=os.ST_RDONLY)
+            ) as vfs,
+        ):
+            self.assertTrue(_systemd_credential(path, info, 123))
+            vfs.return_value.f_flag = 0
+            self.assertFalse(_systemd_credential(path, info, 123))
+            vfs.return_value.f_flag = os.ST_RDONLY
+            for change in (
+                {"st_uid": 1},
+                {"st_gid": 1},
+                {"st_mode": stat.S_IFDIR | 0o750},
+            ):
+                with patch.multiple(parent, **change):
+                    self.assertFalse(_systemd_credential(path, info, 123))
+            with patch.dict(os.environ, {"CREDENTIALS_DIRECTORY": "/tmp/fake"}):
+                self.assertFalse(_systemd_credential(path, info, 123))
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertFalse(_systemd_credential(path, info, 123))
+            for change in (
+                {"st_uid": 1},
+                {"st_gid": 1},
+                {"st_mode": stat.S_IFREG | 0o640},
+            ):
+                with patch.multiple(info, **change):
+                    self.assertFalse(_systemd_credential(path, info, 123))
+            with patch.dict(
+                os.environ,
+                {"CREDENTIALS_DIRECTORY": "/tmp/credentials/example.service"},
+            ):
+                self.assertFalse(
+                    _systemd_credential(
+                        Path("/tmp/credentials/example.service/undertow.token"),
+                        info,
+                        123,
+                    )
+                )
 
     async def test_auth_only_on_fixed_undertow_route_and_no_redirect_following(self):
         seen = []

@@ -197,6 +197,16 @@ def observe(undertow_token_file: Path | None = None) -> tuple[dict | None, str |
     if undertow_token_file is not None:
         command.extend(["--undertow-token-file", str(undertow_token_file)])
     env = {"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8", "PYTHONDONTWRITEBYTECODE": "1"}
+    credential_directory = os.environ.get("CREDENTIALS_DIRECTORY")
+    if (
+        undertow_token_file is not None
+        and credential_directory is not None
+        and undertow_token_file.parent == Path(credential_directory)
+        and undertow_token_file.parent.parent == Path("/run/credentials")
+    ):
+        # This is a directory path, never an inherited credential value.
+        # The reader independently verifies root ownership and read-only mount.
+        env["CREDENTIALS_DIRECTORY"] = credential_directory
     try:
         code, raw = run_bounded(command, env)
         require(code in (0, 2), "observer_process_failed")
