@@ -741,7 +741,10 @@ def test_restarted_host_cannot_change_execution_identity(tmp_path: Path) -> None
     asyncio.run(run())
 
 
-def test_reference_client_through_real_loopback_http(tmp_path: Path) -> None:
+@pytest.mark.parametrize("use_mcp", [False, True])
+def test_reference_client_through_real_loopback_http(
+    tmp_path: Path, use_mcp: bool
+) -> None:
     async def run():
         async with rig(tmp_path, scoped=True) as env:
             listener = socket.socket()
@@ -759,14 +762,53 @@ def test_reference_client_through_real_loopback_http(tmp_path: Path) -> None:
             )
             serving = asyncio.create_task(server.serve(sockets=[listener]))
             client = AgentHostClient(f"http://127.0.0.1:{port}", token=TOKEN)
+            from liquilens_trading_copilot.agent_mcp import PaperAgentMCP
+
+            bridge = PaperAgentMCP(client, allow_submit=True)
+            bridge.handle(
+                {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {"name": "http-integration", "version": "1"},
+                    },
+                }
+            )
+            names = {
+                "capabilities": "paper_capabilities",
+                "assess": "assess_paper_order",
+                "submit": "submit_paper_order",
+                "reconcile": "reconcile_paper_order",
+            }
+
+            def call(operation, payload=None):
+                if not use_mcp:
+                    return client.call(operation, payload)
+                result = bridge.handle(
+                    {
+                        "jsonrpc": "2.0",
+                        "id": 2,
+                        "method": "tools/call",
+                        "params": {
+                            "name": names[operation],
+                            "arguments": payload or {},
+                        },
+                    }
+                )
+                assert not result["result"]["isError"]
+                return result["result"]["structuredContent"]
+
             try:
                 async with asyncio.timeout(5):
                     while not server.started:
                         await asyncio.sleep(0.01)
-                capabilities = await asyncio.to_thread(client.call, "capabilities")
+                capabilities = await asyncio.to_thread(call, "capabilities")
                 assert capabilities["result"]["live_execution_supported"] is False
                 item = await asyncio.to_thread(
-                    client.call,
+                    call,
                     "assess",
                     {
                         "intent_id": "http-client-1",
@@ -775,11 +817,11 @@ def test_reference_client_through_real_loopback_http(tmp_path: Path) -> None:
                     },
                 )
                 args = {"assessment_id": item["result"]["assessment_id"]}
-                submitted = await asyncio.to_thread(client.call, "submit", args)
+                submitted = await asyncio.to_thread(call, "submit", args)
                 assert submitted["result"]["status"] == "submitted"
-                repeated = await asyncio.to_thread(client.call, "submit", args)
+                repeated = await asyncio.to_thread(call, "submit", args)
                 assert repeated["result"]["duplicate_intent"] is True
-                observed = await asyncio.to_thread(client.call, "reconcile", args)
+                observed = await asyncio.to_thread(call, "reconcile", args)
                 assert observed["result"]["order_observation"]["terminal"] is False
                 assert len(env.sdk.orders) == 1
             finally:

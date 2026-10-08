@@ -108,6 +108,39 @@ All requests need `Authorization: Bearer <agent-token>`; POSTs require
 broker endpoints and enable flags are rejected. A token grants access only to
 this host's fixed binding. Configure separate installations for distinct tenants.
 
+## Connect an MCP-compatible agent
+
+The private stdio bridge exposes capabilities, assessment and saved-order status
+with the read token. Add this entry to your existing client's `mcpServers` map,
+replacing the absolute checkout and token paths locally:
+
+```json
+{
+  "liquilens-paper": {
+    "command": "uv",
+    "args": ["run", "--project", "/absolute/reviewed-checkout/integrations/trading-copilot",
+             "--locked", "liquilens-agent-mcp", "--token-file",
+             "/absolute/private/agent-state/agent-read.token"]
+  }
+}
+```
+
+The host must already be running. To expose submission and reconciliation, the
+operator must explicitly add `--allow-submit` and use the execution token file.
+This changes only the bridge catalog; host activation, scope checks, source
+policy, account controls and replay protection still apply. Broker and HMAC keys
+remain in the host. An MCP client capable of arbitrary filesystem access still
+needs OS isolation from the host's secret directory. Do not put secrets into the
+configuration, a public server listing, prompts or tool arguments.
+
+The bridge supports MCP 2025-11-25 initialization and 2026-07-28 per-request
+negotiation, private zero-TTL discovery, strict JSON input, bounded messages and
+execution error results. Notifications cannot invoke orders. The connector never
+turns an uncertain outcome into an automatic retry.
+
+For a separately gated customer-owned live connector, see
+[LIVE-CONNECTOR.md](LIVE-CONNECTOR.md). Paper host tokens never authorize it.
+
 ## Interpret outcomes and recover
 
 HTTP success is not financial success. Inspect `tool_error`, `status`,
