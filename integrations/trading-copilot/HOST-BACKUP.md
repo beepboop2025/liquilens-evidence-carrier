@@ -79,8 +79,9 @@ Render `@RELEASE_DIR@` in the backup and recovery service templates to the exact
 qualified absolute checkout. Review and run `systemd-analyze verify` on all three
 rendered units before installing them under `/etc/systemd/system` and reloading
 systemd. The backup unit reads protected files and needs local systemd control;
-its sandbox permits writes only to private backup work, the account directory
-for SQLite/lock handling, and the two existing source lock files.
+its sandbox permits writes only to private backup work, the existing account
+process lock, and the two existing source lock files. The original journals and
+their directory remain read-only inside the backup service.
 
 Run one explicit backup before enabling recurrence:
 

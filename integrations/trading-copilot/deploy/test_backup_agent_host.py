@@ -640,6 +640,23 @@ def test_failed_readiness_preserves_quiescing_intent(fixture, monkeypatch):
     assert host.read_intent()["phase"] == "quiescing"
 
 
+def test_backup_unit_cannot_write_original_journals_or_sidecars():
+    unit = Path(__file__).with_name("liquilens-paper-backup.service").read_text()
+    writes = {
+        path
+        for line in unit.splitlines()
+        if line.startswith("ReadWritePaths=")
+        for path in line.split("=", 1)[1].split()
+    }
+    assert "ProtectSystem=strict" in unit.splitlines()
+    assert writes == {
+        backup.WORK,
+        backup.STATE + "/operator.lock",
+        backup.TOKENS + "/.renew.lock",
+        str(Path(backup.REGISTRY).parent / ".service-identities.lock"),
+    }
+
+
 @pytest.mark.parametrize(
     "changed",
     [None, {"agent_id": "wrong-agent"}, {"execution_enabled": True}, {"mode": "live"}],
