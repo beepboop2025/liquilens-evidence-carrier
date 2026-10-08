@@ -1,0 +1,12 @@
+[Unit]
+Description=Refresh three-product source readiness every five minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=5min
+RandomizedDelaySec=15s
+AccuracySec=5s
+Unit=liquilens-execution-observer.service
+
+[Install]
+WantedBy=timers.target
