@@ -612,3 +612,30 @@ def test_cli_never_prints_secret_bearing_external_errors(fixture, monkeypatch, c
     output = capsys.readouterr().out
     assert "provider-secret-value" not in output
     assert json.loads(output)["reason"] == "ValueError"
+
+
+def test_capture_size_bound_resumes_host_before_exhausting_workspace(
+    fixture, monkeypatch
+):
+    host, system, snapshot = fixture
+    monkeypatch.setattr(backup, "MAX_CAPTURE_BYTES", 1024)
+    with pytest.raises(backup.BackupRefused, match="snapshot_limits_exceeded"):
+        host.snapshot(snapshot, RUN_ID)
+    assert system.state == "active"
+    assert sum(p.stat().st_size for p in snapshot.rglob("*") if p.is_file()) <= 1024
+
+
+def test_workspace_reserve_covers_all_temporary_copies_before_capture(
+    fixture, monkeypatch
+):
+    from types import SimpleNamespace
+
+    host, system, _snapshot = fixture
+    monkeypatch.setattr(
+        backup.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(free=6 * backup.MAX_TOTAL),
+    )
+    with pytest.raises(backup.BackupRefused, match="backup_space_insufficient"):
+        backup.backup(host)
+    assert not system.calls and system.state == "active"

@@ -53,6 +53,7 @@ SCHEMA = "liquilens.disabled-paper-backup.v1"
 ROOT_UID = 0
 MAX_FILE = 128 * 1024 * 1024
 MAX_TOTAL = 512 * 1024 * 1024
+MAX_CAPTURE_BYTES = MAX_TOTAL - 16 * 1024 * 1024
 ENV_KEYS = ("TYPE", "ACCESS_KEY_ID", "SECRET_ACCESS_KEY", "ENDPOINT", "REGION")
 
 
@@ -437,6 +438,12 @@ class HostBackup:
         }
 
         def put(label, raw, metadata):
+            require(
+                len(manifest["files"]) < 9999
+                and sum(row["bytes"] for row in manifest["files"].values()) + len(raw)
+                <= MAX_CAPTURE_BYTES,
+                "snapshot_limits_exceeded",
+            )
             target = snapshot / label
             target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             with target.open("xb") as output:
@@ -624,6 +631,13 @@ class HostBackup:
                 "original_path": release_path,
             }
         manifest["offline_validation"] = validate_account(snapshot, captured_at)
+        require(
+            sum(row["bytes"] for row in manifest["files"].values())
+            + len(json.dumps(manifest).encode())
+            + 1
+            <= MAX_TOTAL,
+            "snapshot_limits_exceeded",
+        )
         durable_json(snapshot / "MANIFEST.json", manifest)
         return manifest
 
@@ -836,7 +850,7 @@ def backup(host: HostBackup) -> dict:
     host.recover()
     private_dir(host.work)
     require(
-        shutil.disk_usage(host.work).free >= 4 * MAX_TOTAL, "backup_space_insufficient"
+        shutil.disk_usage(host.work).free >= 7 * MAX_TOTAL, "backup_space_insufficient"
     )
     env = storage_environment()
     bucket = os.environ.get("PAPER_BACKUP_BUCKET", "")
