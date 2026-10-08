@@ -59,7 +59,10 @@ and its exit code is 2 while the independent issuer, quote entitlement, compatib
 broker preview and account qualification are unverified. Even valid-looking keys
 and a configured activation acknowledgment do not establish those facts. The
 stable `alpaca_limit_order_broker_preview_unavailable` requirement identifies the
-current provider incompatibility above.
+current provider incompatibility above. The legacy `external_requirements` array
+remains an aggregate for compatibility. Additive `engineering_requirements`
+identifies missing issuer/preview implementations; `qualification_requirements`
+identifies unverified entitlement, account and activation gates. None is waived.
 
 Initialization writes owner-only `live-config.json` and `live-secrets.json`, never
 overwriting existing files. Supply your account and complete trusted issuer
@@ -75,6 +78,48 @@ configuration. This task did not set either value or provision any credentials.
 Use separate accounts/credentials/state for paper and live. Do not share the
 account with another order service or manual trading: the local lock cannot
 coordinate another machine or protect against external account mutations.
+
+## Read the configured account without activation
+
+With an existing private state directory, configured `binding.account_id`, valid
+operator limits and separately provisioned customer credentials, run:
+
+```sh
+uv run --project integrations/trading-copilot --locked liquilens-live check-account \
+  --state-dir /absolute/private/live-state
+```
+
+This command works with `live_enabled=false` and with STOP present. It requires
+only the configured account ID from the binding and the `api_key`/`secret_key`
+fields from the existing owner-only secrets file. It does not require an issuer,
+receipt key, signed receipt or activation acknowledgment. Do not populate those
+fields with placeholders to perform an account check.
+
+The transport pins `https://api.alpaca.markets` and allows only
+[`GET /v2/account`](https://docs.alpaca.markets/us/reference/getaccount-1),
+[`GET /v2/orders?status=open&limit=1`](https://docs.alpaca.markets/us/reference/getallorders-1)
+and [`GET /v2/positions`](https://docs.alpaca.markets/us/reference/getallopenpositions).
+It sends no order, cancellation, transfer, request body, redirect or retry. Account
+ID/USD binding, ACTIVE status, all three trading-block flags, finite cash/equity,
+daily loss, absence of open orders, unique long-only positions and gross exposure
+must pass the shared connector controls. This read does not assess a proposed
+order's size, available quantity or receipt.
+
+The redacted JSON reports checks, position count, configured activation, STOP and
+stable failure reasons. It prints no account ID, symbols, balances, credentials or
+upstream response/error text. Exit 0 means this momentary account check passed;
+exit 2 means it did not complete or failed a control. `account_qualified=true`
+never changes `live_ready=false`, the null managed endpoint or the unavailable
+issuer/preview flags. `doctor` remains an offline check and does not consume or
+persist this observation.
+
+No state directory, lock, journal or receipt is created, repaired or updated, and
+no activation occurs. Existing journals are not inspected by this operation;
+use the local recovery commands separately. Other account users can change the
+broker snapshot between these GET requests. A passing check cannot authorize a
+later order, establish broker-preview support, or certify live trading readiness.
+This implementation is tested with synthetic HTTP doubles, not a provisioned live
+account; it does not change the published paper-host source pin.
 
 ## Explicit operations
 
