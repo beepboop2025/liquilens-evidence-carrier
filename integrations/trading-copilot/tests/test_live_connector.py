@@ -387,3 +387,36 @@ def test_live_cli_initializes_private_disabled_state_and_refuses_overwrite(tmp_p
         assert (directory / filename).stat().st_mode & 0o777 == 0o600
     with pytest.raises(FileExistsError):
         initialize(directory)
+
+
+def test_live_cli_resolves_operator_storage_alias_without_broker_access(
+    tmp_path, monkeypatch, capsys
+):
+    from liquilens_trading_copilot import live_cli
+    from liquilens_trading_copilot.state import StateError
+
+    physical = tmp_path.resolve() / "physical"
+    physical.mkdir()
+    alias = tmp_path / "ssd-alias"
+    alias.symlink_to(physical, target_is_directory=True)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv", ["liquilens-live", "init", "--state-dir", "ssd-alias/live"]
+    )
+
+    def no_broker(**_kwargs):
+        pytest.fail("initialization must not create a broker transport")
+
+    monkeypatch.setattr(live_cli, "AlpacaLiveTransport", no_broker)
+    assert live_cli.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["initialized"] is True and result["live_enabled"] is False
+    directory = physical / "live"
+    assert directory.stat().st_mode & 0o777 == 0o700
+    for filename in ("live-config.json", "live-secrets.json"):
+        assert (directory / filename).stat().st_mode & 0o777 == 0o600
+    original = (directory / "live-config.json").read_bytes()
+    assert live_cli.main() == 2
+    assert (directory / "live-config.json").read_bytes() == original
+    with pytest.raises(StateError, match="without_symlinks"):
+        live_cli.initialize(alias / "direct-api")

@@ -118,6 +118,10 @@ def main() -> int:
         parser.error("status/reconcile/cancel require only request-hash")
     broker = None
     try:
+        # The trusted operator may select an SSD alias or a relative CLI path.
+        # Use its physical target consistently, as the paper host CLI does.
+        # Lower-level state operations still reject symlinks within that lane.
+        args.state_dir = args.state_dir.expanduser().resolve()
         if args.operation == "init":
             result = initialize(args.state_dir)
         elif args.operation == "capabilities":
