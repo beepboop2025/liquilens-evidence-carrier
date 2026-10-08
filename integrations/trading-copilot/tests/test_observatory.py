@@ -408,7 +408,12 @@ def test_cli_observe_does_not_fall_through_to_state(monkeypatch, capsys):
     expected, _ = run_report()
 
     async def fake_collect(**kwargs):
-        assert kwargs == {"check_account": False, "config_path": None, "env_path": None}
+        assert kwargs == {
+            "check_account": False,
+            "config_path": None,
+            "env_path": None,
+            "undertow_token_file": None,
+        }
         return expected
 
     def forbidden(*args, **kwargs):

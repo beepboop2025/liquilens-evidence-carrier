@@ -265,10 +265,19 @@ def create_agent_app(
 
 @asynccontextmanager
 async def configured_service(
-    config: CopilotConfig, credentials: PaperCredentials
+    config: CopilotConfig,
+    credentials: PaperCredentials,
+    *,
+    undertow_token_file: Path | None = None,
 ) -> AsyncIterator[PaperAgentService]:
     """Keep the process lock, databases and fixed-origin clients for the lifespan."""
     config.validate()
+    if undertow_token_file is not None:
+        if config.evidence_profile != SCOPED_PROFILE:
+            raise ValueError("source_credential_requires_scoped_profile")
+        from .source_access import read_source_token
+
+        read_source_token(undertow_token_file)
     binding = agent_binding(config)
     with operator_lock(Path(config.state_dir)):
         store = CycleStore(Path(config.state_dir))
@@ -287,7 +296,9 @@ async def configured_service(
                         ScopedUpstreamTransport,
                     )
 
-                    transport = ScopedUpstreamTransport()
+                    transport = ScopedUpstreamTransport(
+                        undertow_token_file=undertow_token_file
+                    )
                     evidence = ScopedPaperEvidenceService(
                         transport,
                         binding=binding,

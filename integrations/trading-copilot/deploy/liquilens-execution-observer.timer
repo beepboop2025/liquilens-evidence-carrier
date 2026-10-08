@@ -1,9 +1,9 @@
 [Unit]
-Description=Refresh three-product source readiness every fifteen minutes
+Description=Refresh three-product source readiness every thirty minutes
 
 [Timer]
 OnBootSec=90s
-OnUnitInactiveSec=15min
+OnUnitInactiveSec=30min
 RandomizedDelaySec=15s
 AccuracySec=5s
 Unit=liquilens-execution-observer.service

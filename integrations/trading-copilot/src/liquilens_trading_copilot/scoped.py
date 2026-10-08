@@ -12,6 +12,7 @@ import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -43,6 +44,7 @@ from .entry_profile import (
 )
 from .evidence import OperatorEvidenceError, _json
 from .funding import parse_corporate_research, parse_funding_scope
+from .source_access import read_source_token
 
 FUNDING_URL = "https://api.seiche.info/api/money-markets"
 CORPORATE_URL = "https://api.liquilens.in/api/public-signals/corporate-transmission"
@@ -54,7 +56,13 @@ def _text(at: datetime) -> str:
 
 
 class ScopedUpstreamTransport:
-    def __init__(self, *, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
+        undertow_token_file: Path | None = None,
+    ) -> None:
+        self.undertow_token_file = undertow_token_file
         self.client = httpx.AsyncClient(
             transport=transport,
             follow_redirects=False,
@@ -96,12 +104,22 @@ class ScopedUpstreamTransport:
         )
         if content is not None and len(content) > 65536:
             raise OperatorEvidenceError("scoped_request_too_large")
+        headers = {"Content-Type": "application/json"} if content else {}
+        if (method, url) == (
+            "POST",
+            UNDERTOW_URL,
+        ) and self.undertow_token_file is not None:
+            # Never install a default Authorization header: other sources are
+            # different origins. Explicit credential failures cannot go anonymous.
+            headers["Authorization"] = "Bearer " + read_source_token(
+                self.undertow_token_file
+            )
         async with asyncio.timeout(7):
             async with self.client.stream(
                 method,
                 url,
                 content=content,
-                headers={"Content-Type": "application/json"} if content else None,
+                headers=headers,
             ) as response:
                 if (
                     response.status_code != 200

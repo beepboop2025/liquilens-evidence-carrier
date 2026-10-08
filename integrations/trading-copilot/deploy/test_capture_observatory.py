@@ -136,6 +136,20 @@ class CaptureTests(unittest.TestCase):
             self.assertIsNone(value)
             self.assertNotIn("secret", error)
 
+    def test_source_credential_path_passed_without_inherited_broker_secrets(self):
+        path = Path("/run/credentials/observer/undertow.token")
+        with (
+            patch.dict(os.environ, {"ALPACA_PAPER_SECRET_KEY": "do-not-copy"}),
+            patch.object(
+                capture, "run_bounded", return_value=(0, json.dumps(report()).encode())
+            ) as run,
+        ):
+            capture.observe(path)
+        command, env = run.call_args.args
+        self.assertEqual(command[-2:], ["--undertow-token-file", str(path)])
+        self.assertNotIn("ALPACA_PAPER_SECRET_KEY", env)
+        self.assertNotIn("--env-file", command)
+
     def test_child_timeout_is_an_explicit_failure(self):
         with patch.object(
             capture,

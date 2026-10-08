@@ -35,21 +35,34 @@ upgrading; do not overwrite another installation's unit without reconciliation.
 The dynamic service identity owns only
 `/var/lib/liquilens-execution-observer` (mode 0700). The sandbox explicitly hides
 the trading copilot and agent-host state directories, as well as home
-directories, and supplies no environment/credential file. The collector launches
-only `observe --format json`, using a fixed small environment and no account
-flags. Its source transport accepts only the three configured public source
+directories. It receives only its dedicated Undertow source token through
+systemd `LoadCredential`; no broker credentials or inherited environment are
+provided. The collector launches `observe --format json --undertow-token-file`
+with the private credential path, using a fixed small environment and no account
+flags. Its source transport accepts only the three configured source
 operations. A healthy observer cannot enable or repair a trading engine.
+
+Register the reserved `liquilens-execution-observer` service with Undertow's
+operator provisioning helper. Store its token in the root-owned mode-0600
+`/etc/liquilens-source-access/observer.token` under a mode-0700 directory.
+The paper host uses its separate registered `liquilens-paper-host` identity and
+`paper-host.token`. These grant only the public `trade_safety_exit_context` tool;
+they grant no market-data rights or trading authority. Do not use a paid-user
+grant or an owner token. Retain expiry/rotation receipts, never token values.
+After rotation, restart the observer service to load the new systemd copy.
 
 ## Capture and recurrence
 
 Start the observer once, inspect its report, then enable the observer timer.
 Record the first successful scheduled recurrence separately from the manual
-run. The timer schedules a new observation fifteen minutes after the prior run
+run. The timer schedules a new observation thirty minutes after the prior run
 finishes, with up to fifteen seconds of jitter; it never sends notifications.
 This is owned verification traffic, not customer usage. The steady-state schedule
-uses about 96 MCP calls per day, plus startup/manual checks. Undertow's anonymous
-endpoint currently returns a 200-call daily limit shared with other usage from
-the same client. Verify the current quota before increasing cadence; do not
+uses at most 48 scheduled MCP calls per day, plus startup/manual checks.
+Undertow applies a separate 60-call daily trade-safety proof limit as well as
+the 200-call public-tool limit. The registered identity avoids a shared
+anonymous-IP allowance while preserving both caps and a stable meter across
+rotation. Reserve the remaining allowance for operator checks. Do not
 rotate identities or retry repeatedly to bypass it. A quota refusal remains an
 unavailable source until the provider's allowance resets or changes.
 

@@ -9,7 +9,8 @@ DynamicUser=yes
 User=liquilens-execution-observer
 WorkingDirectory=/opt/liquilens-execution-observer/current
 # Installer substitutes the qualified immutable source SHA and exact release path.
-ExecStart=/opt/liquilens-execution-observer/current/integrations/trading-copilot/.venv/bin/python -B /opt/liquilens-execution-observer/current/integrations/trading-copilot/deploy/capture_observatory.py --state-dir /var/lib/liquilens-execution-observer --source-sha REPLACE_WITH_QUALIFIED_SOURCE_SHA
+LoadCredential=undertow.token:/etc/liquilens-source-access/observer.token
+ExecStart=/opt/liquilens-execution-observer/current/integrations/trading-copilot/.venv/bin/python -B /opt/liquilens-execution-observer/current/integrations/trading-copilot/deploy/capture_observatory.py --state-dir /var/lib/liquilens-execution-observer --source-sha REPLACE_WITH_QUALIFIED_SOURCE_SHA --undertow-token-file %d/undertow.token
 StateDirectory=liquilens-execution-observer
 StateDirectoryMode=0700
 UMask=0077
