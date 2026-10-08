@@ -49,6 +49,10 @@ only inside the encrypted archive. Temporary decrypted content remains root-priv
 The helper holds its whole-operation lock, then the source renewal and registry
 locks in that order. It records whether the host was active before stopping it,
 takes the existing account process lock, and snapshots the databases consistently.
+It copies each settled database and any WAL/SHM sidecars to private staging before
+opening SQLite. SQLite never opens the original journals, so capture cannot create
+root-owned sidecars in the service account's state directory. Committed WAL data
+is included in the snapshot.
 An unsettled source-token renewal is refused. Never discard pending renewal
 tokens, intent files, SQLite sidecars, account history or reserved order identities
 to make capture pass.
@@ -59,6 +63,10 @@ before maintenance and retain it until the change is complete. Backup recovery
 may resume only a previously active host whose disabled configuration, STOP
 state and unit bytes still match its durable intent. Unexpected drift requires
 review. A previously inactive host stays inactive; the helper never enables it.
+Before recording a resumed host, recovery requires an authenticated loopback
+capabilities response for the same agent, in paper mode with execution disabled,
+and a still-active systemd process. A transient `active` state alone is insufficient;
+failed startup retains the durable quiescing intent for reviewed recovery.
 
 The installed host must retain `serve --require-disabled`. This backup mechanism
 does not qualify an active trading service for automatic stop/restart. Before any

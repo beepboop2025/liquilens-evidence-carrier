@@ -23,6 +23,7 @@ import sqlite3
 import stat
 import subprocess
 import tarfile
+import tempfile
 import time
 import urllib.parse
 import urllib.request
@@ -214,7 +215,7 @@ def unit_info(name: str) -> dict:
             "show",
             name,
             "--no-pager",
-            "--property=ActiveState,UnitFileState,FragmentPath,DropInPaths,ExecStart",
+            "--property=ActiveState,UnitFileState,FragmentPath,DropInPaths,ExecStart,MainPID",
         ]
     )
     return dict(line.split("=", 1) for line in raw.decode().splitlines() if "=" in line)
@@ -404,11 +405,65 @@ class HostBackup:
         require(state in {"active", "inactive"}, "host_lifecycle_unstable")
         if intent["previously_active"] and state == "inactive":
             command(["systemctl", "start", HOST])
-            require(
-                unit_info(HOST)["ActiveState"] == "active", "host_resume_unverified"
-            )
+        if intent["previously_active"]:
+            self.wait_ready(intent["guards"])
         intent["phase"] = "resumed"
         durable_json(self.intent_path, intent)
+
+    def wait_ready(self, guards: dict) -> None:
+        """Prove lifespan startup locally; Type=simple active is insufficient."""
+        config = strict_json(
+            read_file(self.path(STATE) / "config.json", owner=self.owner)[0]
+        )
+        token = read_file(
+            self.path(STATE) / "agent-read.token", owner=self.owner, links=(1, 2)
+        )[0].strip()
+        require(
+            re.fullmatch(rb"[A-Za-z0-9_-]{32,512}", token), "invalid_readiness_token"
+        )
+        ports = re.findall(r" --port ([0-9]+)(?=\s|;|$)", unit_info(HOST)["ExecStart"])
+        require(len(ports) <= 1, "unexpected_host_port")
+        port = int(ports[0]) if ports else 8766
+        require(1024 <= port <= 65535, "unexpected_host_port")
+        opener = urllib.request.build_opener(
+            urllib.request.ProxyHandler({}), NoRedirect()
+        )
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{port}/v1/capabilities",
+            headers={"Authorization": "Bearer " + token.decode("ascii")},
+            method="GET",
+        )
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            require(self.guards() == guards, "recovery_guard_changed")
+            before = unit_info(HOST)
+            require(before["ActiveState"] == "active", "host_resume_unverified")
+            try:
+                with opener.open(request, timeout=1) as response:
+                    require(response.status == 200, "host_resume_unverified")
+                    body = strict_json(response.read(65537))
+            except (OSError, ValueError):
+                time.sleep(0.25)
+                continue
+            require(
+                isinstance(body, dict)
+                and body.get("schema") == "liquilens.agent-host-capabilities.v1"
+                and body.get("agent_id") == config["agent_id"]
+                and body.get("mode") == "paper"
+                and body.get("execution_enabled") is False
+                and body.get("live_execution_supported") is False,
+                "host_readiness_identity_mismatch",
+            )
+            after = unit_info(HOST)
+            require(
+                after["ActiveState"] == "active"
+                and before["MainPID"] == after["MainPID"]
+                and int(after["MainPID"]) > 0
+                and self.guards() == guards,
+                "host_resume_unverified",
+            )
+            return
+        raise BackupRefused("host_resume_unverified")
 
     def recover(self) -> dict:
         with self.locks():
@@ -462,9 +517,9 @@ class HostBackup:
                     base.endswith(".sqlite3") and (entry.parent / base).is_file(),
                     "unexpected_sqlite_sidecar",
                 )
-                # SQLite's backup API includes committed WAL data. Sidecars may
-                # disappear when that read-only connection closes; never archive
-                # these transient coordination files as restored database content.
+                # The staged SQLite backup includes committed WAL data. These
+                # original coordination files remain untouched and are never
+                # archived as restored database content.
                 if entry.exists():
                     info = entry.lstat()
                     require(
@@ -482,18 +537,31 @@ class HostBackup:
             if entry.name.endswith(".sqlite3"):
                 target = snapshot / "state" / entry.name
                 target.parent.mkdir(mode=0o700, exist_ok=True)
-                with (
-                    closing(
-                        sqlite3.connect(entry.as_uri() + "?mode=ro", uri=True)
-                    ) as source,
-                    closing(sqlite3.connect(target)) as dest,
-                ):
-                    deadline = time.monotonic() + 30
+                # Even a read-only SQLite connection can create WAL/SHM files.
+                # Copy the settled files while holding the account lock; SQLite
+                # may recover/checkpoint only these disposable private copies.
+                with tempfile.TemporaryDirectory(dir=snapshot) as staging:
+                    copied = Path(staging) / entry.name
+                    copied.write_bytes(raw)
+                    copied.chmod(0o600)
+                    for suffix in ("-wal", "-shm"):
+                        sidecar = Path(str(entry) + suffix)
+                        if sidecar.exists() or sidecar.is_symlink():
+                            contents, _ = read_file(sidecar, owner=self.owner)
+                            staged = Path(str(copied) + suffix)
+                            staged.write_bytes(contents)
+                            staged.chmod(0o600)
+                    with (
+                        closing(sqlite3.connect(copied)) as source,
+                        closing(sqlite3.connect(target)) as dest,
+                    ):
+                        deadline = time.monotonic() + 30
 
-                    def progress(_status, _remaining, _total, *, until=deadline):
-                        require(time.monotonic() < until, "sqlite_snapshot_timeout")
+                        def progress(_status, _remaining, _total, *, until=deadline):
+                            require(time.monotonic() < until, "sqlite_snapshot_timeout")
 
-                    source.backup(dest, pages=128, progress=progress, sleep=0.01)
+                        source.backup(dest, pages=128, progress=progress, sleep=0.01)
+                require(target.stat().st_size <= MAX_FILE, "source_file_too_large")
                 raw = target.read_bytes()
                 target.unlink()
                 put("state/" + entry.name, raw, metadata)

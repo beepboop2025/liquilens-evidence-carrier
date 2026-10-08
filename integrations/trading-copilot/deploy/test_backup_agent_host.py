@@ -1,4 +1,4 @@
-"""Fault-path tests use an isolated fake host; no services or networks are called."""
+"""Isolated fake host and loopback readiness tests; no broker/source calls."""
 
 from __future__ import annotations
 
@@ -45,6 +45,7 @@ class FakeSystem:
         release = "/opt/liquilens-execution-observer/releases/" + REVISION
         return {
             "ActiveState": self.state if name == backup.HOST else "active",
+            "MainPID": "123" if self.state == "active" else "0",
             "UnitFileState": "enabled",
             "FragmentPath": "/etc/systemd/system/" + name,
             "DropInPaths": "",
@@ -175,6 +176,7 @@ def fixture(tmp_path, monkeypatch):
     system = FakeSystem(host)
     monkeypatch.setattr(backup, "unit_info", system.info)
     monkeypatch.setattr(backup, "command", system.command)
+    monkeypatch.setattr(host, "wait_ready", lambda _guards: None)
     snapshot = root / "snapshot"
     snapshot.mkdir(mode=0o700)
     return host, system, snapshot
@@ -557,13 +559,160 @@ def test_sqlite_snapshot_includes_committed_wal_without_archiving_sidecars(fixtu
         writer.commit()
         for suffix in ("-wal", "-shm"):
             Path(str(path) + suffix).chmod(0o600)
+        before = state_fingerprints(host)
         manifest = host.snapshot(snapshot, RUN_ID)
+        assert state_fingerprints(host) == before
         assert manifest["databases"]["state/audit.sqlite3"]["rows"] == {"events": 2}
         assert not any(name.endswith(("-wal", "-shm")) for name in manifest["files"])
         assert backup.verify_snapshot(snapshot)["verified"] is True
         assert writer.execute("SELECT count(*) FROM events").fetchone() == (2,)
     finally:
         writer.close()
+
+
+def state_fingerprints(host):
+    def fingerprint(path):
+        info = path.stat()
+        return (
+            backup.sha(path.read_bytes()),
+            info.st_ino,
+            info.st_uid,
+            info.st_gid,
+            info.st_mode,
+            info.st_nlink,
+            info.st_size,
+            info.st_mtime_ns,
+            info.st_ctime_ns,
+        )
+
+    return {p.name: fingerprint(p) for p in host.path(backup.STATE).iterdir()}
+
+
+@pytest.mark.parametrize("distinct_owner", [False, True])
+def test_closed_wal_capture_never_opens_original_database_or_creates_sidecars(
+    fixture, monkeypatch, distinct_owner
+):
+    host, _system, snapshot = fixture
+    path = host.path(backup.STATE) / "alpaca-submissions.sqlite3"
+    db = sqlite3.connect(path)
+    db.execute("PRAGMA journal_mode=WAL")
+    db.close()
+    if distinct_owner:
+        if os.geteuid() != 0:
+            pytest.skip("distinct account ownership requires native root qualification")
+        host.owner = 65534
+        for owned in (
+            host.path(backup.STATE),
+            *host.path(backup.STATE).iterdir(),
+            host.path("/var/lib/liquilens-agent-attach"),
+        ):
+            os.chown(owned, host.owner, host.owner)
+    assert not Path(str(path) + "-wal").exists()
+    assert not Path(str(path) + "-shm").exists()
+    before = state_fingerprints(host)
+    connect = backup.sqlite3.connect
+    opened = []
+
+    def isolated_only(database, *args, **kwargs):
+        text = str(database)
+        assert str(host.path(backup.STATE)) not in text
+        assert str(snapshot) in text
+        opened.append(text)
+        return connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(backup.sqlite3, "connect", isolated_only)
+    host.snapshot(snapshot, RUN_ID)
+    assert opened and state_fingerprints(host) == before
+    assert not Path(str(path) + "-wal").exists()
+    assert not Path(str(path) + "-shm").exists()
+
+
+def test_failed_readiness_preserves_quiescing_intent(fixture, monkeypatch):
+    host, system, snapshot = fixture
+
+    def startup_failed(_guards):
+        system.state = "failed"
+        raise backup.BackupRefused("host_resume_unverified")
+
+    monkeypatch.setattr(host, "wait_ready", startup_failed)
+    with pytest.raises(backup.BackupRefused, match="host_resume_unverified"):
+        host.snapshot(snapshot, RUN_ID)
+    assert host.read_intent()["phase"] == "quiescing"
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [None, {"agent_id": "wrong-agent"}, {"execution_enabled": True}, {"mode": "live"}],
+)
+def test_readiness_uses_authenticated_loopback_capabilities(
+    fixture, monkeypatch, changed
+):
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from threading import Thread
+
+    host, system, _snapshot = fixture
+    observed = []
+    token = (host.path(backup.STATE) / "agent-read.token").read_text().strip()
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            observed.append((self.path, self.headers.get("Authorization")))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(
+                json.dumps(
+                    {
+                        "schema": "liquilens.agent-host-capabilities.v1",
+                        "agent_id": "fixture-agent",
+                        "mode": "paper",
+                        "execution_enabled": False,
+                        "live_execution_supported": False,
+                        **(changed or {}),
+                    }
+                ).encode()
+            )
+
+        def log_message(self, *_args):
+            pass
+
+    with HTTPServer(("127.0.0.1", 0), Handler) as server:
+        thread = Thread(target=server.handle_request, daemon=True)
+        thread.start()
+
+        def unit_info(name):
+            info = system.info(name)
+            info["ExecStart"] += f" --port {server.server_port} "
+            return info
+
+        monkeypatch.setattr(backup, "unit_info", unit_info)
+        monkeypatch.setenv("HTTP_PROXY", "http://unreachable.invalid:1")
+        if changed:
+            with pytest.raises(
+                backup.BackupRefused, match="host_readiness_identity_mismatch"
+            ):
+                backup.HostBackup.wait_ready(host, host.guards())
+        else:
+            backup.HostBackup.wait_ready(host, host.guards())
+        thread.join(timeout=2)
+        assert not thread.is_alive()
+    assert observed == [("/v1/capabilities", "Bearer " + token)]
+
+
+def test_readiness_rejects_transient_active_then_failed_unit(fixture, monkeypatch):
+    host, system, _snapshot = fixture
+    guards = host.guards()
+
+    class UnreadyOpener:
+        def open(self, *_args, **_kwargs):
+            system.state = "failed"
+            raise ConnectionRefusedError()
+
+    monkeypatch.setattr(
+        backup.urllib.request, "build_opener", lambda *_args: UnreadyOpener()
+    )
+    monkeypatch.setattr(backup.time, "sleep", lambda _seconds: None)
+    with pytest.raises(backup.BackupRefused, match="host_resume_unverified"):
+        backup.HostBackup.wait_ready(host, guards)
 
 
 def test_atime_changes_do_not_masquerade_as_content_drift(fixture):
