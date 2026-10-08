@@ -1,0 +1,40 @@
+[Unit]
+Description=Encrypted recovery verification for the disabled private paper host
+After=network-online.target liquilens-paper-backup-recover.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=@RELEASE_DIR@
+EnvironmentFile=/root/.config/anchor/object-storage.env
+EnvironmentFile=/etc/liquilens-paper-backup/backup.env
+ExecStart=/usr/bin/python3 -B @RELEASE_DIR@/integrations/trading-copilot/deploy/backup_agent_host.py backup
+ExecStopPost=/usr/bin/python3 -B @RELEASE_DIR@/integrations/trading-copilot/deploy/backup_agent_host.py recover
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=CAP_DAC_OVERRIDE
+ReadWritePaths=/var/lib/liquilens-paper-backup /var/lib/liquilens-trading-copilot
+ReadWritePaths=/etc/liquilens-source-access/.renew.lock /etc/undertow-mcp/.service-identities.lock
+TimeoutStartSec=1h
+TimeoutStopSec=5min
+MemoryMax=1G
+TasksMax=128
+Nice=10
+
+# Render @RELEASE_DIR@ to the qualified immutable checkout. PID 1 reads the
+# root-only EnvironmentFiles; children receive only explicitly selected values.
+# The helper needs root DAC access to snapshot service-owned state, and DBus
+# access to stop/resume only an unchanged, previously active, disabled host.
+# No [Install]: start once and verify the remote restore before enabling its timer.
