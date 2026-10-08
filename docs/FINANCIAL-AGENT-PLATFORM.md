@@ -2,7 +2,7 @@
 
 Updated 2026-10-08. Product direction for LIQUILENS PRIVATE LIMITED, grounded in
 carrier source `3e52f324342634fdb2b77acd73a86cd6a87be602` and this private paper
-agent-tool change. This is a strategy and implementation map, not a claim of
+agent host and tool changes. This is a strategy and implementation map, not a claim of
 deployed execution, customer adoption or industry-wide reliance.
 
 ## Intended business
@@ -41,14 +41,28 @@ we cannot require unaffiliated agents or the financial industry to use it.
 | Trade Safety gateway; Python/TypeScript guards | Existing; public gateway is read-only | Customer policy and private issuer integration |
 | Alpaca paper adapter with durable journal | Existing | Authorized customer installation and observed broker outcomes |
 | Deterministic BTC/USD paper copilot | Existing, including additional account controls | Current source admission and authorized account activation |
-| Runtime-neutral private agent tools | Added here, using the same guard/journal | Authenticated host integration and external pilot |
-| Live-money execution | Unsupported here | Broker/account mandate, execution-grade sources, full account controls, deployment/recovery qualification and specific activation |
+| Runtime-neutral private agent tools | Implemented using the same guard/journal | Authorized installation and external pilot |
+| Authenticated private agent REST host and reference client | Source integration: three-product assessment, fixed account binding, scoped tokens, durable intents, account controls and outcome reconciliation | Release qualification, current source admission, authorized installation and observed recurring use |
+| Private MCP execution bridge | Implemented over the authenticated paper host; assessment/status by default, explicit submission exposure | Customer runtime installation and paper-account qualification |
+| Customer-owned live Alpaca connector | Separate disabled integration candidate; exact limit orders, account limits, durable reservation, STOP, cancellation and reconciliation | Qualified live receipt issuer, entitled execution-grade sources, verified broker preview, customer account mandate, deployment/recovery qualification and specific activation |
 | Transfers, credit, collateral, settlement | Possible later workflows | Dedicated action contracts, connectors and domain validation |
 
 The [agent guide](../integrations/alpaca-paper/AGENT-TOOLS.md) includes an offline
 walkthrough. No caller argument selects keys, clocks, broker URLs, enable flags
 or alternate policy definitions. Synthetic tests do not prove source admission,
 account activation or actual broker fills.
+
+The [private host guide](../integrations/trading-copilot/AGENT-HOST.md) provides
+installation, client commands, endpoint contracts and recovery behavior. The
+default source profile supports exactly $1,000 BTC/USD paper proposals. Its
+development status must stay explicit in API/MCP marketplace copy; public
+research endpoints do not acquire private execution capabilities.
+
+The [live connector guide](../integrations/trading-copilot/LIVE-CONNECTOR.md)
+describes the separately installed customer-account interface. Its local
+preflight does not issue a broker preview or qualify public research evidence
+for live trading. Source implementation, broker qualification and activation
+remain distinct; no actual live broker calls or fills were produced by this work.
 
 ## Delivery sequence for evidence and execution
 
@@ -107,7 +121,8 @@ interface. No customer outreach or account activation is part of this change.
 
 ## Concurrent work and release ownership
 
-Work is isolated on `codex/agent-execution-tools-20261008` in the carrier repo.
+Work is isolated on `codex/agent-execution-tools-20261008` and the stacked
+`codex/agent-platform-host-20261008` branch in the carrier repo.
 It does not change active Seiche recovery/release, product data, payment details,
 distribution work or the separate treasury-review PR. Qualify this change in
 the carrier release lane. Broker secrets do not belong in public MCP
