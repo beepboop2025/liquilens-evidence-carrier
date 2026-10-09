@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import os
 import runpy
 from datetime import UTC, datetime, timedelta
@@ -92,3 +94,34 @@ def test_changed_baseline_source_is_rejected(tmp_path):
     path.write_text("raise AssertionError('must never execute altered source')")
     with pytest.raises(ValueError, match="baseline_harness_identity_mismatch"):
         ADAPTER["load_candidate_harness"](path)
+
+
+def test_execution_uses_verified_bytes_when_path_changes(tmp_path, monkeypatch):
+    path = tmp_path / "harness.py"
+    anchor = 'strategy_sha = file_sha256(Path(__file__).with_name("strategy.py"))'
+    trusted = (
+        "from liquilens_trading_copilot.strategy import propose\n"
+        "class Replay: pass\n"
+        "SOURCE_MARKER = 'verified'\n"
+        'ADAPTATION_ANCHORS = """\n'
+        + ADAPTER["OLD_ADMISSION"] + anchor + '\n"""\n'
+    ).encode()
+    replacement = trusted.replace(b"'verified'", b"'unverified replacement'")
+    loader = ADAPTER["load_candidate_harness"]
+    monkeypatch.setitem(
+        loader.__globals__, "BASE_HARNESS_SHA256", hashlib.sha256(trusted).hexdigest()
+    )
+    original_open = Path.open
+    reads = 0
+
+    def changing_file(self, mode="r", *args, **kwargs):
+        nonlocal reads
+        if self != path:
+            return original_open(self, mode, *args, **kwargs)
+        contents = trusted if reads == 0 else replacement
+        reads += 1
+        return io.BytesIO(contents) if "b" in mode else io.StringIO(contents.decode())
+
+    monkeypatch.setattr(Path, "open", changing_file)
+    module, _ = loader(path)
+    assert module.SOURCE_MARKER == "verified"

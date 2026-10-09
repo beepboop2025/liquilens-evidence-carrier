@@ -53,9 +53,12 @@ def memory_store() -> state.CycleStore:
 
 
 def load_candidate_harness(path: Path):
-    if digest(path) != BASE_HARNESS_SHA256:
+    # Verify the exact bytes that will run. Reopening the path after hashing
+    # would let a concurrent replacement bypass the immutable-source check.
+    source = path.read_bytes()
+    if hashlib.sha256(source).hexdigest() != BASE_HARNESS_SHA256:
         raise ValueError("baseline_harness_identity_mismatch")
-    original = path.read_text()
+    original = source.decode("utf-8")
     old_hash = 'strategy_sha = file_sha256(Path(__file__).with_name("strategy.py"))'
     if original.count(OLD_ADMISSION) != 1 or original.count(old_hash) != 1:
         raise ValueError("baseline_adaptation_anchor_mismatch")
