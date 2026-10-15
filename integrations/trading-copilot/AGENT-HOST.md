@@ -124,11 +124,18 @@ redirects, uses no environment proxy and never retries a request automatically.
 | POST `/v1/orders/submit` | `submit` | `assessment_id` |
 | POST `/v1/orders/status` | `read` | `assessment_id` |
 | POST `/v1/orders/reconcile` | `reconcile` | `assessment_id` |
+| POST `/v1/outcomes/export` | `outcomes:read` plus active recipient-bound grant | `consent_id`, `after`, `through`, `limit` |
 
 All requests need `Authorization: Bearer <agent-token>`; POSTs require
 `application/json`. Caller-selected accounts, policy, evidence, receipts, clocks,
 broker endpoints and enable flags are rejected. A token grants access only to
 this host's fixed binding. Configure separate installations for distinct tenants.
+
+Customers can explicitly share a time-bounded portion of their paper decision
+and outcome history using [OUTCOMES.md](OUTCOMES.md). This uses a separate export
+token: the existing read and execution tokens cannot export history. The grant
+is checked on every page and can be revoked without restarting the host. Outcome
+export is an operator/reviewer REST interface, not an additional public MCP tool.
 
 ## Connect an MCP-compatible agent
 

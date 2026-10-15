@@ -27,6 +27,8 @@ from liquilens_evidence import (
 )
 
 from .config import SCOPED_PROFILE, CopilotConfig
+from .outcomes import capture as capture_outcome
+from .outcomes import initialize as initialize_outcomes
 from .runner import _audit_receipt
 from .state import CycleStore
 from .strategy import PortfolioSnapshot, _valid_config, _valid_portfolio
@@ -151,6 +153,7 @@ class PaperAgentService:
                 assessment_id TEXT NOT NULL UNIQUE, request TEXT NOT NULL,
                 receipt TEXT NOT NULL, observed_at TEXT NOT NULL);
         """)
+        initialize_outcomes(store.db)
         identity = _json(asdict(self.binding))
         with store.db:
             store.db.execute(
@@ -194,8 +197,23 @@ class PaperAgentService:
                 self.store.event("agent_" + action, result, self.now())
                 return result
             finally:
-                self._preflight_at = None
-                self._busy = False
+                try:
+                    if action == "assess":
+                        candidate = proposal(payload)
+                        row = self.store.db.execute(
+                            "SELECT assessment_id FROM agent_assessments "
+                            "WHERE intent_id=?",
+                            (candidate["intent_id"],),
+                        ).fetchone()
+                        if row is not None:
+                            capture_outcome(self, row[0])
+                    elif isinstance(payload, dict) and isinstance(
+                        payload.get("assessment_id"), str
+                    ):
+                        capture_outcome(self, payload["assessment_id"])
+                finally:
+                    self._preflight_at = None
+                    self._busy = False
 
         task = asyncio.create_task(owned())
         self._tasks.add(task)

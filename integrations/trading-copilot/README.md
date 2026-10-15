@@ -11,6 +11,8 @@ strategy. The public Trade Safety gateway remains unchanged and read-only.
 External agents can use the separate [private agent host](AGENT-HOST.md) to submit
 their own bounded proposals through the same evidence and account controls. It
 includes authenticated REST endpoints and an explicit, non-retrying client.
+The host also supports [consented decision/outcome exports](OUTCOMES.md), linking
+verified receipts to observed paper outcomes under a separate recipient token.
 
 ## Inspect the three live sources without submitting an order
 

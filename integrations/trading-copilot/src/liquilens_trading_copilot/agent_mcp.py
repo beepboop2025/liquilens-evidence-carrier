@@ -38,7 +38,8 @@ OPERATIONS = {
     ),
     "assess_paper_order": (
         "assess",
-        "Retain an exact proposal and evaluate evidence and account limits.",
+        "Retain an exact proposal and evaluate source evidence. "
+        "Account limits are checked separately at submission.",
     ),
     "paper_order_status": (
         "status",

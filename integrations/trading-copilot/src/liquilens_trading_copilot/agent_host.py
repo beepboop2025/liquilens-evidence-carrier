@@ -33,15 +33,17 @@ from .agent_service import AgentServiceError, PaperAgentService, agent_binding
 from .config import SCOPED_PROFILE, CopilotConfig, PaperCredentials, strict_json
 from .evidence import LiquiLensStrategyContext, OperatorEvidenceService
 from .market import PaperAccountReader
+from .outcomes import OutcomeError, export_page
 from .runner import utc_now
 from .state import CycleStore, operator_lock
 
-_SCOPES = frozenset({"read", "assess", "submit", "reconcile"})
+_SCOPES = frozenset({"read", "assess", "submit", "reconcile", "outcomes:read"})
 _ROUTES = {
     "/v1/assessments": ("assess", "assess"),
     "/v1/orders/submit": ("submit", "submit"),
     "/v1/orders/status": ("status", "read"),
     "/v1/orders/reconcile": ("reconcile", "reconcile"),
+    "/v1/outcomes/export": ("outcomes", "outcomes:read"),
 }
 
 
@@ -146,6 +148,7 @@ def create_agent_app(
     allowed_hosts: tuple[str, ...] = ("127.0.0.1", "localhost"),
     requests_per_minute: int = 60,
     monotonic: Callable[[], float] = time.monotonic,
+    outcome_consent_file: Path | None = None,
 ) -> FastAPI:
     if (
         not allowed_hosts
@@ -189,6 +192,9 @@ def create_agent_app(
         if request.query_params:
             return _error("query_parameters_not_supported", 400)
         request.state.scopes = scopes
+        request.state.token_hash = hashlib.sha256(
+            request.headers["authorization"].partition(" ")[2].encode("ascii")
+        ).hexdigest()
         try:
             return await call_next(request)
         except AgentServiceError as error:
@@ -229,6 +235,7 @@ def create_agent_app(
                 "cash_transfers_supported": False,
                 "credentials_in_tool_arguments": False,
                 "source_policy_pass_is_order_authorization": False,
+                "outcome_export_requires_separate_scope_and_consent": True,
             }
         )
 
@@ -254,8 +261,23 @@ def create_agent_app(
         except (ValueError, RecursionError, TimeoutError):
             return _error("invalid_bounded_json", 400)
         try:
-            return _response(await request.app.state.service.run(action, payload))
+            service = request.app.state.service
+            if action == "outcomes":
+                if outcome_consent_file is None:
+                    return _error("outcome_export_not_configured", 403)
+                if service._closed or service._busy:
+                    return _error("operator_lane_busy", 503)
+                try:
+                    grant = private_json(outcome_consent_file)
+                except (OSError, ValueError, RecursionError):
+                    return _error("outcome_consent_unavailable", 403)
+                return _response(
+                    export_page(service, grant, payload, request.state.token_hash)
+                )
+            return _response(await service.run(action, payload))
         except AgentServiceError as error:
+            return _error(error.code, error.status)
+        except OutcomeError as error:
             return _error(error.code, error.status)
 
     for route in _ROUTES:

@@ -20,6 +20,7 @@ _OPERATIONS = {
     "submit": ("POST", "/v1/orders/submit"),
     "status": ("POST", "/v1/orders/status"),
     "reconcile": ("POST", "/v1/orders/reconcile"),
+    "outcomes": ("POST", "/v1/outcomes/export"),
 }
 
 
@@ -128,9 +129,33 @@ def main() -> int:
     parser.add_argument("--side", choices=("buy", "sell"))
     parser.add_argument("--notional-usd", type=float)
     parser.add_argument("--assessment-id")
+    parser.add_argument("--consent-id")
+    parser.add_argument("--after", type=int, default=0)
+    parser.add_argument("--through", type=int)
+    parser.add_argument("--limit", type=int, default=25)
     args = parser.parse_args()
     proposal_args = (args.intent_id, args.side, args.notional_usd)
-    if args.operation == "assess":
+    if args.operation != "outcomes" and (
+        args.consent_id is not None
+        or args.after != 0
+        or args.through is not None
+        or args.limit != 25
+    ):
+        parser.error("outcome pagination arguments apply only to outcomes")
+    if args.operation == "outcomes":
+        if (
+            not args.consent_id
+            or args.assessment_id
+            or any(value is not None for value in proposal_args)
+        ):
+            parser.error("outcomes requires only consent-id and pagination arguments")
+        payload = {
+            "consent_id": args.consent_id,
+            "after": args.after,
+            "through": args.through,
+            "limit": args.limit,
+        }
+    elif args.operation == "assess":
         if any(value is None for value in proposal_args) or args.assessment_id:
             parser.error("assess requires only intent-id, side and notional-usd")
         payload = dict(
