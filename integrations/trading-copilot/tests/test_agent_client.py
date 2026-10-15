@@ -82,3 +82,28 @@ def test_client_preserves_business_error_even_with_http_success() -> None:
         assert result["result"]["status"] == "uncertain"
     finally:
         client.close()
+
+
+def test_outcome_client_sends_only_the_explicit_export_request() -> None:
+    calls = []
+    payload = {"consent_id": "pilot-1", "after": 4, "through": 20, "limit": 5}
+
+    def respond(request):
+        import json
+
+        calls.append(request)
+        assert request.method == "POST"
+        assert request.url.path == "/v1/outcomes/export"
+        assert json.loads(request.content) == payload
+        return httpx.Response(200, json={"mode": "paper", "records": []})
+
+    client = AgentHostClient(
+        "https://private.example",
+        token=TOKEN,
+        transport=httpx.MockTransport(respond),
+    )
+    try:
+        assert client.call("outcomes", payload)["http_status"] == 200
+        assert len(calls) == 1
+    finally:
+        client.close()

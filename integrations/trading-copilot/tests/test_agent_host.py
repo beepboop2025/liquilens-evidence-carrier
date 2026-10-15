@@ -116,6 +116,8 @@ async def rig(
     config_change: dict | None = None,
     max_requests: int = 60,
     scoped: bool = False,
+    outcome_token: str | None = None,
+    outcome_consent_file: Path | None = None,
 ):
     state_dir = state_dir.resolve()
     policy = default_policy()
@@ -280,12 +282,19 @@ async def rig(
                 finally:
                     await service.close()
 
+            auth = auth_config(config.agent_id)
+            if outcome_token is not None:
+                auth["tokens"].append(
+                    {
+                        "sha256": hashlib.sha256(outcome_token.encode()).hexdigest(),
+                        "scopes": ["outcomes:read"],
+                    }
+                )
             app = create_agent_app(
                 factory,
-                authority=BearerAuthority(
-                    auth_config(config.agent_id), agent_id=config.agent_id
-                ),
+                authority=BearerAuthority(auth, agent_id=config.agent_id),
                 requests_per_minute=max_requests,
+                outcome_consent_file=outcome_consent_file,
             )
             try:
                 async with (

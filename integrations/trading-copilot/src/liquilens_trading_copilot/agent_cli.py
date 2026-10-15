@@ -79,11 +79,26 @@ def initialize(state_dir: Path) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("init", "doctor", "serve"))
+    parser.add_argument(
+        "command",
+        choices=(
+            "init",
+            "doctor",
+            "serve",
+            "grant-outcomes",
+            "revoke-outcomes",
+        ),
+    )
     parser.add_argument("--state-dir", required=True, type=Path)
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--allowed-host", action="append", default=[])
     parser.add_argument("--undertow-token-file", type=Path)
+    parser.add_argument("--consent-id")
+    parser.add_argument("--recipient-id")
+    parser.add_argument("--expires-at")
+    parser.add_argument(
+        "--traffic-class", choices=("operator", "synthetic", "customer", "unknown")
+    )
     parser.add_argument(
         "--require-disabled",
         action="store_true",
@@ -94,10 +109,40 @@ def main() -> int:
         parser.error("--undertow-token-file applies only to serve")
     if args.require_disabled and args.command != "serve":
         parser.error("--require-disabled applies only to serve")
+    consent_arguments = (
+        args.consent_id,
+        args.recipient_id,
+        args.expires_at,
+        args.traffic_class,
+    )
+    if args.command == "grant-outcomes":
+        if any(item is None for item in consent_arguments):
+            parser.error(
+                "grant-outcomes requires consent-id, recipient-id, "
+                "expires-at and traffic-class"
+            )
+    elif any(item is not None for item in consent_arguments):
+        parser.error("consent arguments apply only to grant-outcomes")
     state_dir = args.state_dir.expanduser().resolve()
     try:
         if args.command == "init":
             print(json.dumps(initialize(state_dir)))
+            return 0
+        if args.command in {"grant-outcomes", "revoke-outcomes"}:
+            from .outcome_consent import grant_outcomes, revoke_outcomes
+
+            result = (
+                revoke_outcomes(state_dir)
+                if args.command == "revoke-outcomes"
+                else grant_outcomes(
+                    state_dir,
+                    consent_id=args.consent_id,
+                    recipient_id=args.recipient_id,
+                    expires_at=args.expires_at,
+                    traffic_class=args.traffic_class,
+                )
+            )
+            print(json.dumps(result))
             return 0
         if args.command == "doctor":
             from .agent_diagnostics import diagnose_agent_host
@@ -125,6 +170,7 @@ def main() -> int:
             ),
             authority=authority,
             allowed_hosts=tuple(["127.0.0.1", "localhost", *args.allowed_host]),
+            outcome_consent_file=state_dir / "outcome-consent.json",
         )
         import uvicorn
 
