@@ -217,5 +217,5 @@ real fills, current source admission, returns or customer adoption.
 An external pilot should record the customer's runtime, covered workflow,
 integration time, recurring use, evidence refusals and separately observed broker
 outcomes. Keep verification traffic excluded from adoption. Follow the
-[platform delivery map](../../docs/FINANCIAL-AGENT-PLATFORM.md) for the live-money,
-treasury and commercial work that still needs separate implementation and proof.
+[integration reference](../../docs/FINANCIAL-AGENT-PLATFORM.md) for source interfaces
+and their operating requirements.

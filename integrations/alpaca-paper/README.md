@@ -8,8 +8,8 @@ operator-bound `pass` receipt. It cannot route live orders.
 For external agent runtimes, the [private agent-tool interface](AGENT-TOOLS.md)
 provides discovery, submit, status and reconciliation dispatch using this same
 guard and durable journal. It is disabled by default and belongs inside an
-operator-authenticated host. The [platform direction](../../docs/FINANCIAL-AGENT-PLATFORM.md)
-connects this paper implementation to the evidence and future execution work.
+operator-authenticated host. The [integration reference](../../docs/FINANCIAL-AGENT-PLATFORM.md)
+describes the existing interfaces and their separate operating requirements.
 
 The adapter deliberately keeps the raw Alpaca `TradingClient` and credentials
 outside the agent's tool inventory. Before claiming a receipt it:
