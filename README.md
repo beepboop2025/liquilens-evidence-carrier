@@ -207,8 +207,7 @@ the same request and account. Current public adapters satisfy none of those live
 gates. A `pass` is not advice, broker approval, or an execution instruction;
 the immutable authority object keeps execution, recommendation, allocation,
 credit-rating, and executable-quote authority false. See
-[`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md), the
-[`adoption plan`](docs/TRADE-SAFETY-ADOPTION-PLAN.md), and the
+[`docs/TRADE-SAFETY-RECEIPT-V1.md`](docs/TRADE-SAFETY-RECEIPT-V1.md) and the
 [`read-only sandbox gateway`](integrations/trade-safety-gateway/README.md).
 
 The gateway `0.2.0` source candidate adds a server-owned policy floor and an
