@@ -1,0 +1,53 @@
+{
+  "$schema": "https://fundingjson.org/schema/v1.1.0.json",
+  "version": "2026-10-27",
+  "entity": {
+    "type": "organisation",
+    "role": "maintainer",
+    "name": "LIQUILENS PRIVATE LIMITED",
+    "email": "mrinal091997@liquilens.in",
+    "description": "LIQUILENS PRIVATE LIMITED is a Jaipur, India-based software company maintaining LiquiLens Evidence Carrier. Mrinal Singh Meena is the sole full-time operating founder. This request supports maintenance and reproducibility of an existing Apache-2.0 project. Independent adoption of this component is not yet established. The company is pre-revenue; product traffic, package availability and automated requests are not presented as customers or revenue.",
+    "webpageUrl": {
+      "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+      "wellKnown": "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/funding/foss-united-20261027/.well-known/funding-manifest-urls"
+    }
+  },
+  "projects": [
+    {
+      "guid": "liquilens-evidence-carrier",
+      "name": "LiquiLens Evidence Carrier",
+      "description": "An existing open-source contract and toolkit for carrying source references, timestamps, redistribution-rights information and integrity checks through research software and AI-assisted workflows. The public repository includes Python tooling, a Node verifier, schemas, examples and release documentation. The proposed work will improve installation reproducibility, cross-language conformance, documentation and independent reproduction. The software does not confer rights to third-party data or authority to execute trades, recommend investments or issue credit ratings. Source data remain subject to their own terms.",
+      "webpageUrl": {
+        "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+        "wellKnown": "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/funding/foss-united-20261027/.well-known/funding-manifest-urls"
+      },
+      "repositoryUrl": {
+        "url": "https://github.com/beepboop2025/liquilens-evidence-carrier",
+        "wellKnown": "https://github.com/beepboop2025/liquilens-evidence-carrier/blob/funding/foss-united-20261027/.well-known/funding-manifest-urls"
+      },
+      "licenses": ["spdx:Apache-2.0"],
+      "tags": ["developer-tools", "data-provenance", "reproducibility", "python", "javascript", "open-source"]
+    }
+  ],
+  "funding": {
+    "channels": [
+      {
+        "guid": "grant-contact",
+        "type": "other",
+        "description": "Contact the business email to arrange an agreed grant and verified payee details privately. No bank account details are published in this manifest. Any award remains subject to the funder's applicant/payee checks and grant terms."
+      }
+    ],
+    "plans": [
+      {
+        "guid": "six-month-maintenance",
+        "status": "active",
+        "name": "Six-month Evidence Carrier maintenance and reproducibility grant",
+        "description": "Request: INR 300,000 over six months from award commencement, with milestone-based disbursement if required. Proposed allocations: INR 180,000 maintainer time (INR 30,000/month for six months); INR 60,000 capped project-specific infrastructure and reproducibility environments; INR 40,000 independent reproduction/review; INR 20,000 documentation, accessibility and community demonstration work. These are proposed allocations, not existing invoices or contracted reviewer fees. Months 1-2: publish an installation/reproduction baseline for Python and Node, document the tested environments, and release fixes for reproduced issues. Months 3-4: extend or refresh at least 20 documented conformance/regression cases covering timestamps, integrity and rights boundaries; publish expected Python/Node outcomes and a community update. Months 5-6: run an external reproduction exercise, publish findings including failures or unfilled reviewer participation, address accepted issues, and publish a release, spending summary and second community update. Acceptance evidence will be public source changes, fixtures, reproduction instructions, findings and release notes, not traffic counts. Paid reviewers are prospective and none are represented as already committed. Grant-funded changes will be published under the project's Apache-2.0 licence. The grant will not pay for proprietary datasets, unrelated company expenditure, historic deficits or hardware without a documented project need and funder agreement. Costs funded here will be excluded from any other grant claim. Longer-term maintenance may be supported by paid implementation/support and further sponsorship while the funded source remains open. Independent user adoption and commercial sustainability remain to be demonstrated.",
+        "amount": 300000,
+        "currency": "INR",
+        "frequency": "one-time",
+        "channels": ["grant-contact"]
+      }
+    ]
+  }
+}
