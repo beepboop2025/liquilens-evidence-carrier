@@ -224,7 +224,9 @@ boundary and must be operated by the adopter. The independent gateway-tag lane
 publishes OCI only; it builds a wheel as validation evidence but does not publish
 that wheel, an sdist, or a GitHub Release.
 
-Gateway `0.2.3` has an independent release identity so publishing it does not
+Gateway `0.2.3` returns the complete capability object in both MCP text and
+structured content, preserving read-only authority for clients consuming either
+representation. It has an independent release identity so publishing it does not
 move or reuse the immutable core `v0.19.0` tag. After the release commit has
 landed on `origin/main`, an allowlisted release owner may create and push the
 annotated, signed tag `trade-safety-gateway-v0.2.3`. The workflow rejects a
