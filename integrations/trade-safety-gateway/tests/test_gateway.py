@@ -681,7 +681,7 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         health = client.get("/healthz")
         assert health.status_code == 200
         assert health.json()["state"] == "read_only_sandbox"
-        assert health.json()["version"] == SERVICE_VERSION == "0.2.2"
+        assert health.json()["version"] == SERVICE_VERSION == "0.2.3"
         assert health.json()["source_revision"] == SERVICE_REVISION
         assert health.json()["telemetry"] == {
             "state": "disabled",
@@ -2361,3 +2361,24 @@ def test_body_limit_and_duplicate_json_keys_are_rejected_before_handlers() -> No
         )
         assert duplicate.status_code == 400
     assert fake.calls == []
+
+
+def test_mcp_capabilities_text_preserves_structured_details() -> None:
+    with TestClient(create_app()) as client:
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": "capability-text",
+                "method": "tools/call",
+                "params": {"name": "trade_safety_capabilities", "arguments": {}},
+            },
+            headers={"MCP-Protocol-Version": MCP_LEGACY_PROTOCOL_VERSION},
+        )
+    assert response.status_code == 200
+    result = response.json()["result"]
+    assert result["isError"] is False
+    decoded = json.loads(result["content"][0]["text"])
+    assert decoded == result["structuredContent"]
+    assert decoded["execution_tools"] == []
+    assert all(value is False for value in decoded["authority"].values())
