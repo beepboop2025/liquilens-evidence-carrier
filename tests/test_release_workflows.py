@@ -124,7 +124,7 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
     )
     assert 'test "$source_gateway_version" = "$tag_gateway_version"' in workflow
     assert 'EXPECTED_GATEWAY_VERSION: "0.2.3"' in workflow
-    assert 'EXPECTED_GATEWAY_CORE_VERSION: "0.19.0"' in workflow
+    assert 'EXPECTED_GATEWAY_CORE_VERSION: "0.20.1"' in workflow
     assert 'test "$source_core_version" = "$EXPECTED_GATEWAY_CORE_VERSION"' in (
         workflow
     )
