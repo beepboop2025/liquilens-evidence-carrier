@@ -232,7 +232,7 @@ landed on `origin/main`, an allowlisted release owner may create and push the
 annotated, signed tag `trade-safety-gateway-v0.2.3`. The workflow rejects a
 lightweight or unsigned tag, an unsigned target commit, a target outside
 `origin/main`, a gateway/tag version mismatch, or any core `VERSION` other than
-`0.19.0`. It also rejects pre-existing gateway version, source-commit, or signed
+`0.20.1`. It also rejects pre-existing gateway version, source-commit, or signed
 tag-object OCI tags before publishing. The gateway-only lane emits no floating
 `latest` or `core-*` alias; its multi-architecture image retains maximum build
 provenance, an SBOM, a separate GitHub provenance attestation, and the signed
