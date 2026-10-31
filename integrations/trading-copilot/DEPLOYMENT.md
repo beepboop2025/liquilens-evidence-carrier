@@ -68,8 +68,8 @@ export CARRIER_UV="$CARRIER_RECEIPTS/bootstrap/bin/uv"
 chmod -R go+rX,go-w "$CARRIER_RELEASE"
 ```
 
-The isolated bootstrap pins uv 0.12.5, matching CI, and the SHA-256 of its Linux
-glibc x86_64 wheel from [PyPI metadata](https://pypi.org/pypi/uv/0.12.5/json).
+The isolated bootstrap pins uv 0.13.4, matching CI, and the SHA-256 of its Linux
+glibc x86_64 wheel from [PyPI metadata](https://pypi.org/pypi/uv/0.13.4/json).
 It never installs into the host's system Python or depends on an ambient `uv`
 command. The bootstrap directory belongs to root and stays outside
 the service's source/state directories. If the host lacks `venv`/pip or has a

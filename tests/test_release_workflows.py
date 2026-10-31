@@ -1,6 +1,7 @@
 """Release smoke tests bind to the same immutable carrier identity."""
 
 import json
+import re
 import tomllib
 from pathlib import Path
 
@@ -347,3 +348,36 @@ def test_release_preflight_runs_before_any_immutable_tag_is_created():
         "validate_repository_tag_policy",
     ):
         assert binding in controller
+
+
+def test_every_uv_pin_moves_with_the_deployment_bootstrap():
+    """The copilot bootstrap documents uv as "matching CI", so no pin may drift."""
+    bootstrap = (
+        ROOT / "integrations/trading-copilot/deploy/uv-bootstrap-requirements.txt"
+    ).read_text(encoding="utf-8")
+    pins = re.findall(
+        r"^uv==(\S+) --hash=sha256:[0-9a-f]{64}$", bootstrap, re.MULTILINE
+    )
+    assert len(pins) == 1, "pin exactly one hash: the Linux glibc x86_64 wheel"
+    version = pins[0]
+    metadata = f"https://pypi.org/pypi/uv/{version}/json"
+    assert metadata in bootstrap
+
+    deployment = (ROOT / "integrations/trading-copilot/DEPLOYMENT.md").read_text(
+        encoding="utf-8"
+    )
+    assert f"The isolated bootstrap pins uv {version}, matching CI" in deployment
+    assert metadata in deployment
+
+    sites = sorted((ROOT / ".github/workflows").glob("*.yml")) + [
+        ROOT / "deploy/railway-ci/Dockerfile",
+        ROOT / "integrations/trade-safety-gateway/Dockerfile",
+    ]
+    found = {}
+    for path in sites:
+        for pinned in re.findall(
+            r"(?<![\w.-])uv==([0-9][^\s\\]*)", path.read_text(encoding="utf-8")
+        ):
+            found.setdefault(pinned, []).append(path.relative_to(ROOT).as_posix())
+    assert found, "CI must pin uv explicitly"
+    assert set(found) == {version}, found

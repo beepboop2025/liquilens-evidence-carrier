@@ -8,7 +8,7 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 WORKDIR /build/evidence-carrier
 COPY . .
 
-RUN python -m pip install --no-cache-dir uv==0.12.5 \
+RUN python -m pip install --no-cache-dir uv==0.13.4 \
     && uv sync \
       --project integrations/trade-safety-gateway \
       --locked \
