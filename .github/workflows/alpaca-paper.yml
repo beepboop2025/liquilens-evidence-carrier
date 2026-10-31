@@ -34,7 +34,7 @@ jobs:
           python-version: "3.13"
       - name: Install locked adapter environment
         run: |
-          python -m pip install uv==0.12.5
+          python -m pip install uv==0.13.4
           uv sync --project integrations/alpaca-paper --locked --extra test
       - name: Verify fail-closed adapter
         run: |

@@ -7,7 +7,7 @@ RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && apt-get update && apt-get install -y --no-install-recommends \
        bash ca-certificates curl git openssh-client tini unzip \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir uv==0.12.5 PyYAML==6.0.3
+    && pip install --no-cache-dir uv==0.13.4 PyYAML==6.0.3
 ENV UV_PYTHON_INSTALL_DIR=/opt/python UV_PYTHON_PREFERENCE=only-managed \
     PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=2 OMP_NUM_THREADS=2 \
     DO_NOT_TRACK=1 UV_LINK_MODE=copy
