@@ -355,7 +355,9 @@ def test_every_uv_pin_moves_with_the_deployment_bootstrap():
     bootstrap = (
         ROOT / "integrations/trading-copilot/deploy/uv-bootstrap-requirements.txt"
     ).read_text(encoding="utf-8")
-    pins = re.findall(r"^uv==(\S+) --hash=sha256:[0-9a-f]{64}$", bootstrap, re.M)
+    pins = re.findall(
+        r"^uv==(\S+) --hash=sha256:[0-9a-f]{64}$", bootstrap, re.MULTILINE
+    )
     assert len(pins) == 1, "pin exactly one hash: the Linux glibc x86_64 wheel"
     version = pins[0]
     metadata = f"https://pypi.org/pypi/uv/{version}/json"
