@@ -36,7 +36,7 @@ def test_registry_metadata_is_remote_read_only_and_exact() -> None:
         ],
         "_meta": {
             "io.modelcontextprotocol.registry/publisher-provided": {
-                "protocolVersions": ["2026-07-28", "2025-11-25"],
+                "protocolVersions": ["2026-07-28", "2025-11-25", "2025-06-18"],
                 "mode": "read-only-sandbox",
                 "financialAuthority": "none",
                 "executionAuthority": False,

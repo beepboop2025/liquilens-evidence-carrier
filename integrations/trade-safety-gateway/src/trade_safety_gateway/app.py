@@ -81,9 +81,17 @@ SERVICE_VERSION = "0.2.3"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
+# Initialization-based revisions, newest first. Initialize answers with the
+# client's requested revision when it is listed here and otherwise with the
+# newest one, per MCP version negotiation. Stateless 2026-07-28 has no
+# initialize handshake, so it never appears in this tuple.
+MCP_LEGACY_PROTOCOL_VERSIONS = (
+    MCP_LEGACY_PROTOCOL_VERSION,
+    "2025-06-18",
+)
 MCP_SUPPORTED_PROTOCOL_VERSIONS = (
     MCP_PROTOCOL_VERSION,
-    MCP_LEGACY_PROTOCOL_VERSION,
+    *MCP_LEGACY_PROTOCOL_VERSIONS,
 )
 MCP_HEADER_VALUE_MAX_BYTES = 512
 
@@ -1548,10 +1556,7 @@ def capabilities(
             "upstream_connect_timeout_seconds": UPSTREAM_CONNECT_TIMEOUT_SECONDS,
             "admission": (admission or RequestAdmission()).limits.public,
         },
-        "mcp_protocol_versions": [
-            MCP_PROTOCOL_VERSION,
-            MCP_LEGACY_PROTOCOL_VERSION,
-        ],
+        "mcp_protocol_versions": list(MCP_SUPPORTED_PROTOCOL_VERSIONS),
         "mcp_tools": ["assess_trade_safety", "trade_safety_capabilities"],
         "execution_tools": [],
     }
@@ -2515,8 +2520,9 @@ def create_app(
             # notifications are deliberately accepted as bounded no-ops.
             return Response(status_code=202)
         if envelope.method == "initialize":
+            client_version = envelope.params.get("protocolVersion")
             if (
-                not isinstance(envelope.params.get("protocolVersion"), str)
+                not isinstance(client_version, str)
                 or not isinstance(envelope.params.get("capabilities"), dict)
                 or not isinstance(envelope.params.get("clientInfo"), dict)
             ):
@@ -2530,6 +2536,13 @@ def create_app(
                 return _bounded_response(
                     _rpc_error(envelope.id, -32602, "invalid initialize params")
                 )
+            # Echo a supported revision; otherwise offer the newest one and
+            # let the client decide whether to continue.
+            negotiated_version = (
+                client_version
+                if client_version in MCP_LEGACY_PROTOCOL_VERSIONS
+                else MCP_LEGACY_PROTOCOL_VERSION
+            )
             active_telemetry.emit(
                 MCP_ACTIVATION,
                 transport="mcp",
@@ -2541,7 +2554,7 @@ def create_app(
                 _rpc_result(
                     envelope.id,
                     {
-                        "protocolVersion": MCP_LEGACY_PROTOCOL_VERSION,
+                        "protocolVersion": negotiated_version,
                         "capabilities": {"tools": {"listChanged": False}},
                         "serverInfo": {
                             "name": SERVICE_NAME,
