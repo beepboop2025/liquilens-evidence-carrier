@@ -93,6 +93,7 @@ and qualifiers that do not apply raise: nothing falls back to a calm state.
 | Undertow | `exit_check.available`, `exit_check.unavailable`, `exit_check.partial` | Derived, Unavailable, Partial | Available, Unavailable, Partial |
 | Undertow | `restricted` (input-rights boundary) | Restricted | Restricted |
 | Undertow | `observed`, `derived`, `structural`, `unavailable` (a reading's own evidence state) | the same | the word capitalised |
+| Undertow | Exit Atlas `issuer_disclosed`, `context`, `accruing`, `partial` | Observed, Research, Partial, Partial | Issuer disclosed, Context (display only), Accruing, Partial |
 
 Three things are not readings and never get a display state:
 

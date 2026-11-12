@@ -856,6 +856,10 @@ SECTION_4_ROWS: list[tuple[tuple[str, str, dict[str, Any]], tuple[str, str, str 
     (("undertow", "derived", {}), (p.DERIVED, "Derived", None)),
     (("undertow", "structural", {}), (p.STRUCTURAL, "Structural", None)),
     (("undertow", "unavailable", {}), (p.UNAVAILABLE, "Unavailable", None)),
+    (("undertow", "issuer_disclosed", {}), (p.OBSERVED, "Issuer disclosed", None)),
+    (("undertow", "context", {}), (p.RESEARCH, "Context (display only)", None)),
+    (("undertow", "accruing", {}), (p.PARTIAL, "Accruing", None)),
+    (("undertow", "partial", {}), (p.PARTIAL, "Partial", None)),
 ]
 
 UNDERTOW_TABLE: dict[str, tuple[dict[str, Any], str, str]] = {
@@ -877,6 +881,10 @@ UNDERTOW_TABLE: dict[str, tuple[dict[str, Any], str, str]] = {
     "derived": ({}, p.DERIVED, "Derived"),
     "structural": ({}, p.STRUCTURAL, "Structural"),
     "unavailable": ({}, p.UNAVAILABLE, "Unavailable"),
+    "issuer_disclosed": ({}, p.OBSERVED, "Issuer disclosed"),
+    "context": ({}, p.RESEARCH, "Context (display only)"),
+    "accruing": ({}, p.PARTIAL, "Accruing"),
+    "partial": ({}, p.PARTIAL, "Partial"),
 }
 
 
@@ -899,11 +907,25 @@ def test_every_undertow_native_resolves_to_exactly_one_row() -> None:
         (result,) = results
         assert (result.state, result.label) == (state, label)
     folded = [native.casefold() for native in natives]
-    # Case alone separates the tier word UNAVAILABLE from the evidence word.
-    assert {native for native in folded if folded.count(native) > 1} == {"unavailable"}
+    # Case alone separates the upper-case tier words from the evidence words.
+    assert {native for native in folded if folded.count(native) > 1} == {
+        "unavailable",
+        "partial",
+        "accruing",
+    }
     for licence in ("consent_required", "licensed", "metadata_only"):
         with pytest.raises(ValueError):
             p.state_for("undertow", licence)
+    context = p.state_for("undertow", "context")
+    assert not p.DISPLAY_STATES[context.state].calm
+    assert p.DISPLAY_STATES[context.state].role != "good"
+    reading = p.reading_from_native(context, label="Synthetic sibling reading", value="7")
+    for colour in ("truecolor", "ansi256", "ansi16"):
+        good = p._ANSI_EXPORT["roles"]["good"][colour]
+        assert f"\x1b[{good}m" not in p.render_reading(reading, colour=colour)
+    assert GOOD_HEX not in p.render_html(reading)
+    for gap in ("accruing", "partial"):
+        assert p.state_for("undertow", gap).state in p.GAP_STATES
 
 
 @pytest.mark.parametrize(("call", "expected"), SECTION_4_ROWS)

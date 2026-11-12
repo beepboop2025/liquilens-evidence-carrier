@@ -1081,13 +1081,20 @@ _UNDERTOW_GAP_WORDS = ("ACCRUING", "PARTIAL")
 _UNDERTOW_NO_MEASURES = "UNAVAILABLE"
 _UNDERTOW_BOARD_WORDS = ("behind", "stale", "unreachable")
 _UNDERTOW_RIGHTS = "restricted"
-# Seiche's evidence vocabulary as Undertow serves it per reading (for example
-# undertow.gold-india.v1 evidence_state). Lower case, so never a tier word.
+# Per-reading evidence words: Seiche's vocabulary as Undertow serves it (for
+# example undertow.gold-india.v1 evidence_state) and the Exit Atlas words
+# (undertow.exit-atlas.v1 evidence_states). Lower case, so never a tier word.
 _UNDERTOW_EVIDENCE = {
-    "observed": OBSERVED,
-    "derived": DERIVED,
-    "structural": STRUCTURAL,
-    "unavailable": UNAVAILABLE,
+    "observed": (OBSERVED, "Observed"),
+    "derived": (DERIVED, "Derived"),
+    "structural": (STRUCTURAL, "Structural"),
+    "unavailable": (UNAVAILABLE, "Unavailable"),
+    "issuer_disclosed": (OBSERVED, "Issuer disclosed"),
+    # A sibling lab surface's own reading: display only, never scored, so it
+    # never takes the calm colour.
+    "context": (RESEARCH, "Context (display only)"),
+    "accruing": (PARTIAL, "Accruing"),
+    "partial": (PARTIAL, "Partial"),
 }
 # crypto_workbench.exit_check venue, rung and overall rows, namespaced so they
 # cannot collide with tier or board words.
@@ -1179,8 +1186,8 @@ def _undertow_state(native: str, given: Mapping[str, object]) -> ProductState:
         return ProductState(state, label, None, "undertow", native)
     if native in _UNDERTOW_EVIDENCE:
         _qualifiers("undertow", native, given, {})
-        state = _UNDERTOW_EVIDENCE[native]
-        return ProductState(state, native.capitalize(), None, "undertow", native)
+        state, label = _UNDERTOW_EVIDENCE[native]
+        return ProductState(state, label, None, "undertow", native)
     if native == _UNDERTOW_RIGHTS:
         # The input-rights boundary withheld the whole result.
         _qualifiers("undertow", native, given, {})
@@ -1252,11 +1259,14 @@ def state_for(product: str, native: str, **qualifiers: object) -> ProductState:
     and ``exit_check.partial``; print the producer's reason codes as the
     reading's reason. ``restricted`` (the input-rights boundary withheld the
     whole result) is Restricted; pass the ``source_rights`` summary as the
-    reason or limits. A reading's own ``evidence_state`` in Seiche's words
-    (``observed``, ``derived``, ``structural``, ``unavailable``, lower case)
-    maps to the same state, labelled with the word capitalised. Licence values
-    such as ``consent_required`` are not states: they belong in the reading's
-    rights and limits, and raise here.
+    reason or limits. A reading's own evidence state, in lower case, maps
+    too: Seiche's words ``observed``, ``derived``, ``structural`` and
+    ``unavailable`` (the same state, labelled with the word capitalised) and
+    the Exit Atlas words ``issuer_disclosed`` (Observed, "Issuer disclosed"),
+    ``context`` (Research, "Context (display only)": a sibling lab surface's
+    reading, never scored), ``accruing`` (Partial, "Accruing") and ``partial``
+    (Partial, "Partial"). Licence values such as ``consent_required`` are not
+    states: they belong in the reading's rights and limits, and raise here.
 
     Check words (LiquiLens reconciliation, Undertow ``verify()``) and name
     resolution statuses are not readings: they raise here; use
