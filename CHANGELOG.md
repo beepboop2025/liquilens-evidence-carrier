@@ -25,7 +25,8 @@ authority.
   liquilens-site evidence presentation contract at commit `59302ce8`: ten
   display states, the section 3 derivation order, `state_for` for each
   product's native values, `check_label` and `resolution_notice` for values
-  that are not readings, plain text with optional ANSI colour, a notebook
+  that are not readings, plain text with optional ANSI colour and an
+  optional byte cap that keeps gaps ahead of calm readings, a notebook
   table and display columns beside `to_flat_row`. It is one stdlib-only file
   that runs on Python 3.10; no runtime dependency is added.
 - Vendor the liquilens-site `design/ansi.json` and `design/family-tokens.json`

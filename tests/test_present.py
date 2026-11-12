@@ -779,6 +779,9 @@ SECTION_4_ROWS: list[tuple[tuple[str, str, dict[str, Any]], tuple[str, str, str 
     (("liquilens", "observed", {}), (p.OBSERVED, "Accepted filing evidence", None)),
     (("liquilens", "stale", {}), (p.STALE, "Stale evidence", None)),
     (("liquilens", "historical", {}), (p.STALE, "Historical evidence", None)),
+    (("liquilens", "CALM", {}), (p.OBSERVED, "CALM", "good")),
+    (("liquilens", "WATCH", {}), (p.OBSERVED, "WATCH", "warn")),
+    (("liquilens", "ALARM", {}), (p.OBSERVED, "ALARM", "bad")),
     (("liquilens", "unavailable", {}), (p.UNAVAILABLE, "Evidence unavailable", None)),
     (("liquilens", "not_disclosed", {}), (p.UNAVAILABLE, "Not disclosed", None)),
     (("liquilens", "provisional", {}), (p.PROVISIONAL, "Provisional business update", None)),
@@ -1112,6 +1115,14 @@ CHECK_WORDS = {
     ("liquilens", "reconciled"): "Reconciled",
     ("liquilens", "within_rounding"): "Within rounding",
     ("liquilens", "inconsistent"): "Inconsistent",
+    ("liquilens", "clean"): "Clean",
+    ("liquilens", "clean_pass"): "Clean pass",
+    ("liquilens", "flagged"): "Flagged",
+    ("liquilens", "warned"): "Warned",
+    ("liquilens", "false_alarm"): "False alarm",
+    ("liquilens", "missed"): "Missed",
+    ("liquilens", "missed_fraud_masked"): "Missed fraud masked",
+    ("liquilens", "insufficient_data"): "Insufficient data",
     ("undertow", "match"): "Match",
     ("undertow", "mismatch"): "Mismatch",
     ("undertow", "indeterminate"): "Indeterminate",
@@ -1645,3 +1656,144 @@ def test_a_vendored_copy_runs_alone(tmp_path: Path, interpreter: str) -> None:
     )
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout.strip() == "ok 80 False"
+
+
+# ---------------------------------------------------------------------------
+# (n) Severity words, never-hidden checks, capped views and dashes.
+
+SEVERITY_WORDS = {"CALM": "good", "WATCH": "warn", "ALARM": "bad"}
+
+
+def test_liquilens_severity_words_ride_beside_an_observed_reading() -> None:
+    for word, severity in SEVERITY_WORDS.items():
+        row = p.state_for("liquilens", word)
+        shown = p.reading_from_native(row, label="Synthetic leg", value="11.0", unit="bp")
+        assert (shown.state, shown.state_label, shown.severity) == (
+            p.OBSERVED,
+            word,
+            severity,
+        )
+        assert f"Observed ({word})" in p.render_reading(shown)
+        missing = p.reading_from_native(row, label="Synthetic leg")
+        assert (missing.state, missing.severity) == (p.UNAVAILABLE, None)
+        assert word not in p.render_reading(missing)
+        with pytest.raises(TypeError):
+            p.state_for("liquilens", word, scored=True)
+        for other in ("seiche", "undertow"):
+            with pytest.raises(ValueError):
+                p.state_for(other, word)
+
+
+def test_never_hidden_checks_are_known_check_words() -> None:
+    for product, words in p.NEVER_HIDDEN_CHECKS.items():
+        for word in words:
+            assert p.check_label(product, word)
+    assert {"inconsistent", "missed", "missed_fraud_masked"} <= p.NEVER_HIDDEN_CHECKS[
+        "liquilens"
+    ]
+    assert "mismatch" in p.NEVER_HIDDEN_CHECKS["undertow"]
+
+
+def _served_mix(pattern: str) -> list[p.Reading]:
+    """'g' is a gap reading and 'v' a value reading, in served order."""
+
+    readings = []
+    for index, kind in enumerate(pattern):
+        label = f"Synthetic reading {index}"
+        if kind == "g":
+            readings.append(_gap_reading(p.UNAVAILABLE, label=label, subject=None))
+        else:
+            readings.append(_value_reading(p.OBSERVED, label=label, subject=None))
+    return readings
+
+
+def _shown_kinds(text: str, pattern: str) -> list[str]:
+    found = re.findall(r"^Synthetic reading (\d+):", text, flags=re.MULTILINE)
+    return [pattern[int(index)] for index in found]
+
+
+@pytest.mark.parametrize(
+    "pattern", ["", "v", "g", "vg", "gv", "vvgvgg", "gggvvv", "vg" * 10, "v" * 7 + "g"]
+)
+def test_a_capped_view_counts_first_then_gaps_and_holds_its_cap(pattern: str) -> None:
+    readings = _served_mix(pattern)
+    whole = p.render_text(readings, max_bytes=10**9)
+    assert p.FULL_LIST_LINE not in whole
+    for cap in range(1, len(whole.encode("utf-8")) + 2):
+        try:
+            text = p.render_text(readings, max_bytes=cap)
+        except ValueError:
+            continue
+        assert len(text.encode("utf-8")) <= cap
+        blocks = text.split("\n\n")
+        assert blocks[-1] == p.DEFAULT_BOUNDARY
+        if len(readings) > 1:
+            assert blocks[0].startswith(f"Readings: {len(readings)}. ")
+        kinds = _shown_kinds(text, pattern)
+        assert kinds == sorted(kinds, key=lambda kind: kind != "g")
+        if "v" in kinds:
+            assert kinds.count("g") == pattern.count("g")
+        cut = len(kinds) < len(pattern)
+        assert (p.FULL_LIST_LINE in blocks) is cut
+        if cut:
+            assert blocks[-2] == p.FULL_LIST_LINE
+    smallest = p.render_text(readings, max_bytes=len(whole.encode("utf-8")))
+    assert smallest == whole
+
+
+def test_an_uncapped_view_is_unchanged() -> None:
+    readings = _served_mix("vgvvg")
+    expected = "\n\n".join(
+        [*(p.render_reading(reading) for reading in readings), p.DEFAULT_BOUNDARY]
+    )
+    assert p.render_text(readings) == expected
+
+
+@pytest.mark.parametrize("cap", [True, 1.5, "4096"])
+def test_a_cap_must_be_a_whole_number(cap: Any) -> None:
+    with pytest.raises(TypeError):
+        p.render_text(_served_mix("vg"), max_bytes=cap)
+
+
+@pytest.mark.parametrize("cap", [0, -1, 10])
+def test_a_cap_too_small_for_the_fixed_lines_raises(cap: int) -> None:
+    with pytest.raises(ValueError):
+        p.render_text(_served_mix("vg"), max_bytes=cap)
+
+
+def test_dashes_in_producer_text_print_as_hyphens_in_text_and_html() -> None:
+    dashed = f"Synthetic {EN_DASH} text {EM_DASH} here"
+    source = p.SourceRef(
+        publisher=dashed, title=dashed, url=f"https://example.org/a{EN_DASH}b"
+    )
+    reading = p.reading_from_native(
+        p.state_for("liquilens", "observed"),
+        label=dashed,
+        subject=dashed,
+        value=f"2024{EN_DASH}25",
+        unit=dashed,
+        sources=[source],
+        attribution=dashed,
+        limits=dashed,
+        boundary=dashed,
+    )
+    gap = p.reading_from_native(
+        p.state_for("liquilens", "unavailable"), label=dashed, reason=dashed, limits=dashed
+    )
+    views = [
+        p.render_text([reading, gap]),
+        p.render_text([reading, gap], max_bytes=4096),
+        p.render_html([reading, gap]),
+    ]
+    for text in views:
+        assert EN_DASH not in text and EM_DASH not in text
+        assert "Synthetic - text - here" in text
+    assert "2024-25" in views[0]
+    assert "example.org/a" not in views[2]
+
+
+def test_the_mcp_example_takes_its_clock_from_the_served_payload() -> None:
+    page = DOCS_PAGE.read_text(encoding="utf-8")
+    section = page[page.index("### An MCP tool result") : page.index("### A notebook table")]
+    assert "now(" not in section
+    assert 'checked_at=served["retrieved_at"]' in section

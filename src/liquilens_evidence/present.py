@@ -45,8 +45,10 @@ __all__ = [
     "DISPLAY_COLUMNS",
     "DISPLAY_STATES",
     "DISPOSITIONS",
+    "FULL_LIST_LINE",
     "GAP_STATES",
     "MARK_MODES",
+    "NEVER_HIDDEN_CHECKS",
     "NOT_COVERED",
     "NOT_STATED",
     "OBSERVED",
@@ -96,6 +98,8 @@ TOKENS_REPOSITORY = "beepboop2025/liquilens-site"
 TOKENS_COMMIT = "59302ce87ef186ed01fb8ce15f665cf29ad4cfb6"
 
 NOT_STATED = "Not stated"
+# Closes a capped view (render_text with max_bytes) when any reading was cut.
+FULL_LIST_LINE = "Full list in the JSON block."
 DEFAULT_BOUNDARY = "No execution, recommendation or credit-rating authority."
 
 OBSERVED = "observed"
@@ -530,17 +534,25 @@ _PLACEHOLDERS = frozenset(
 _PLAIN_NUMBER = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
 
 
+# Typographic normalisation: the family's text never carries an en or em
+# dash, so those two characters in producer text print as a hyphen-minus.
+_DASHES = frozenset("\N{EN DASH}\N{EM DASH}")
+
+
 def _clean(text: str) -> str:
     """Producer text verbatim, except that it can never start a new line,
     recolour a terminal or reorder a line: line and tab controls become
     spaces; other control and bidirectional formatting characters print as
-    visible backslash-u escapes."""
+    visible backslash-u escapes. As typographic normalisation, an en or em
+    dash prints as a hyphen-minus."""
 
     out: list[str] = []
     for char in text:
         code = ord(char)
         if char in _LINE_CONTROLS:
             out.append(" ")
+        elif char in _DASHES:
+            out.append("-")
         elif code < 0x20 or 0x7F <= code <= 0x9F or char in _FORMAT_CONTROLS:
             out.append(f"\\u{code:04x}")
         else:
@@ -1035,8 +1047,28 @@ _RESOLUTION_STATUSES = frozenset({"resolved", "ambiguous", "not_found"})
 # Checks are not readings: they print as words through check_label only.
 _CHECK_WORDS: Mapping[str, tuple[str, ...]] = MappingProxyType(
     {
-        "liquilens": ("reconciled", "within_rounding", "inconsistent"),
+        "liquilens": (
+            "reconciled",
+            "within_rounding",
+            "inconsistent",
+            # Historical replay verdicts, exactly as the evidence tools serve them.
+            "clean",
+            "clean_pass",
+            "flagged",
+            "warned",
+            "false_alarm",
+            "missed",
+            "missed_fraud_masked",
+            "insufficient_data",
+        ),
         "undertow": ("match", "mismatch", "indeterminate"),
+    }
+)
+# Check results a surface must always print, never cut to fit or leave out.
+NEVER_HIDDEN_CHECKS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {
+        "liquilens": frozenset({"inconsistent", "missed", "missed_fraud_masked"}),
+        "undertow": frozenset({"mismatch"}),
     }
 )
 _ALL_CHECK_WORDS = frozenset(
@@ -1064,6 +1096,9 @@ _LIQUILENS_BUSINESS_UPDATE = {
 }
 # LiquiLens's own stale rule: annual evidence over 400 days, other over 183.
 _LIQUILENS_STALE_DAYS = {True: 400, False: 183}
+# LiquiLens board and regime words: a severity beside the reading's own state,
+# the same rule as a scored Undertow tier.
+_LIQUILENS_SEVERITIES = {"CALM": "good", "WATCH": "warn", "ALARM": "bad"}
 _SEICHE_ROWS = {
     "observed": OBSERVED,
     "derived": DERIVED,
@@ -1140,6 +1175,14 @@ def _liquilens_state(native: str, given: Mapping[str, object]) -> ProductState:
                 "the contract has no row for published Failure Radar tiers"
             )
         return ProductState(RESEARCH, "Research only", None, "liquilens", native)
+    if native in _LIQUILENS_SEVERITIES:
+        # The served reading is Observed and the word is its severity. A
+        # reading that is itself a gap takes its own gap row instead, and a
+        # severity row whose reading has no value becomes Unavailable without
+        # the word (reading_from_native).
+        _qualifiers("liquilens", native, given, {})
+        severity = _LIQUILENS_SEVERITIES[native]
+        return ProductState(OBSERVED, native, severity, "liquilens", native)
     if given.get("provisional_business_update") is True:
         _qualifiers(
             "liquilens", native, given, {"provisional_business_update": (bool,)}
@@ -1243,6 +1286,9 @@ def state_for(product: str, native: str, **qualifiers: object) -> ProductState:
     ``annual`` is not given) it is "Stale evidence". ``failure_radar`` with
     ``tier_publication`` (the served ``tier_publication.state``) is Research,
     "Research only", with no tier or severity while tiers are paused.
+    ``CALM``, ``WATCH`` and ``ALARM`` (board and regime words) are Observed
+    with the word as severity (good, warn, bad), like a scored Undertow tier;
+    a reading that is itself a gap takes its own gap row instead.
 
     Seiche values: ``observed``, ``derived``, ``structural``, ``restricted``
     and ``unavailable``, each labelled with its own word.
@@ -1300,10 +1346,14 @@ def check_label(product: str, word: str) -> str:
     """The human word for a check result, which is not a reading.
 
     LiquiLens reconciliation (``reconciled``, ``within_rounding``,
-    ``inconsistent``) and Undertow ``verify()`` (``match``, ``mismatch``,
-    ``indeterminate``). The word gets no display state, mark or state colour;
-    ``inconsistent`` and ``mismatch`` are always printed, and
-    ``indeterminate`` is never a pass or a mismatch. Unknown words raise.
+    ``inconsistent``), LiquiLens historical replay verdicts (``clean``,
+    ``clean_pass``, ``flagged``, ``warned``, ``false_alarm``, ``missed``,
+    ``missed_fraud_masked``, ``insufficient_data``) and Undertow ``verify()``
+    (``match``, ``mismatch``, ``indeterminate``). The word gets no display
+    state, mark or state colour. The words in ``NEVER_HIDDEN_CHECKS``
+    (``inconsistent``, ``missed``, ``missed_fraud_masked``, ``mismatch``) are
+    always printed, never cut to fit, and ``indeterminate`` is never a pass or
+    a mismatch. Unknown words raise.
     """
 
     if not isinstance(product, str) or not isinstance(word, str):
@@ -1838,25 +1888,90 @@ def render_reading(
     return "\n".join(_reading_lines(reading, marks, colour))
 
 
+def _count_line(items: list[Reading]) -> str:
+    parts = []
+    for key in STATE_ORDER:
+        count = sum(1 for item in items if item.state == key)
+        if count:
+            parts.append(f"{DISPLAY_STATES[key].word} {count}")
+    return f"Readings: {len(items)}. " + ", ".join(parts) + "."
+
+
+def _utf8_size(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def _capped(items: list[Reading], blocks: list[str], boundary: str, max_bytes: int) -> str:
+    """Gap readings first, then the rest in served order, cut from the end."""
+
+    head = [_count_line(items)] if len(items) > 1 else []
+    sizes = [_utf8_size(block) for block in blocks]
+    fixed = sum(_utf8_size(line) for line in head) + _utf8_size(boundary)
+    cut_size = _utf8_size(FULL_LIST_LINE)
+
+    def total(shown: int) -> int:
+        cut = shown < len(blocks)
+        parts = len(head) + shown + int(cut) + 1
+        return fixed + sum(sizes[:shown]) + (cut_size if cut else 0) + 2 * (parts - 1)
+
+    shown = len(blocks)
+    if total(shown) > max_bytes:
+        shown = -1
+        while shown + 1 < len(blocks) and total(shown + 1) <= max_bytes:
+            shown += 1
+        if shown < 0 and total(0) > max_bytes:
+            raise ValueError(
+                "max_bytes is too small for the count line, the closing line "
+                "and the boundary"
+            )
+        shown = max(shown, 0)
+    parts = head + blocks[:shown]
+    if shown < len(blocks):
+        parts.append(FULL_LIST_LINE)
+    parts.append(boundary)
+    return "\n\n".join(parts)
+
+
 def render_text(
     readings: Reading | Iterable[Reading],
     *,
     marks: str = "unicode",
     colour: str = "none",
     boundary: str | None = None,
+    max_bytes: int | None = None,
 ) -> str:
     """A view: each reading as a block, then the boundary sentence once.
 
     Without an explicit ``boundary``, each distinct producer sentence carried
     by the readings prints once; with none, the contract's default does.
+
+    With ``max_bytes`` the view fits in that many UTF-8 bytes and is laid out
+    for a reader who may not see every reading: a count of the readings per
+    display state first (when there are two or more), then every gap reading,
+    then the other readings in served order, and, when any reading had to be
+    cut, the line "Full list in the JSON block." before the boundary. Readings
+    are cut from the end of that order, so a gap is never cut before a calm
+    reading. The count, the closing line and the boundary are never cut; when
+    they alone do not fit, ``ValueError``.
     """
 
     _require_mode(marks, MARK_MODES, "marks")
     _require_mode(colour, COLOUR_MODES, "colour")
+    if max_bytes is not None and (
+        isinstance(max_bytes, bool) or not isinstance(max_bytes, int)
+    ):
+        raise TypeError("max_bytes must be a whole number of bytes")
+    if max_bytes is not None and max_bytes < 1:
+        raise ValueError("max_bytes must be positive")
     items = _readings(readings)
-    blocks = ["\n".join(_reading_lines(item, marks, colour)) for item in items]
-    blocks.append("\n".join(_boundaries(items, boundary)))
-    return "\n\n".join(blocks)
+    boundary_text = "\n".join(_boundaries(items, boundary))
+    if max_bytes is None:
+        blocks = ["\n".join(_reading_lines(item, marks, colour)) for item in items]
+        return "\n\n".join([*blocks, boundary_text])
+    ordered = [item for item in items if item.state in GAP_STATES]
+    ordered += [item for item in items if item.state not in GAP_STATES]
+    blocks = ["\n".join(_reading_lines(item, marks, colour)) for item in ordered]
+    return _capped(items, blocks, boundary_text, max_bytes)
 
 
 # ---------------------------------------------------------------------------
@@ -1881,6 +1996,9 @@ def _https_href(url: str | None) -> str | None:
     if url is None or not url.lower().startswith("https://"):
         return None
     if any(char.isspace() or ord(char) < 0x20 or char in "<>\"'`\\" for char in url):
+        return None
+    if any(char in _DASHES for char in url):
+        # Normalising a dash would change the link target: no link at all.
         return None
     return html.escape(url, quote=True)
 

@@ -84,6 +84,7 @@ and qualifiers that do not apply raise: nothing falls back to a calm state.
 | LiquiLens | `PARTIAL` | Partial | PARTIAL |
 | LiquiLens | `identity` | Structural | Identity record |
 | LiquiLens | `failure_radar` with `tier_publication` paused | Research | Research only, with no tier or severity |
+| LiquiLens | `CALM`, `WATCH`, `ALARM` (board and regime words) | Observed, severity good, warn, bad; a gap reading keeps its own gap row | the word |
 | Seiche | `observed`, `derived`, `structural`, `restricted`, `unavailable` | the same | the word itself |
 | Undertow | `SURPLUS`, `NORMAL`, `STRAINED`, `DEFICIENT` with `scored=True` | Observed, severity good, good, warn, bad | the tier word |
 | Undertow | `ACCRUING`, `PARTIAL`, or a tier without `scored=True` | Partial | ACCRUING or PARTIAL |
@@ -99,9 +100,13 @@ Three things are not readings and never get a display state:
 
 - Check words print through `check_label(product, word)` as words only, with
   no mark or state colour: LiquiLens reconciliation (`reconciled`,
-  `within_rounding`, `inconsistent`) and Undertow `verify()` (`match`,
-  `mismatch`, `indeterminate`). `inconsistent` and `mismatch` are always
-  printed, and `indeterminate` is never shown as a pass or a mismatch.
+  `within_rounding`, `inconsistent`), LiquiLens historical replay verdicts
+  (`clean`, `clean_pass`, `flagged`, `warned`, `false_alarm`, `missed`,
+  `missed_fraud_masked`, `insufficient_data`) and Undertow `verify()`
+  (`match`, `mismatch`, `indeterminate`). The words in
+  `NEVER_HIDDEN_CHECKS` (`inconsistent`, `missed`, `missed_fraud_masked`,
+  `mismatch`) are always printed and never cut to fit, and `indeterminate`
+  is never shown as a pass or a mismatch.
 - Name lookups print through `resolution_notice(status, candidates=...)`:
   "No match for this name" or "Ambiguous (3 candidates)". A name with no match
   may still be covered under another name or key, so it is never Not covered.
@@ -116,7 +121,12 @@ or 402 into Restricted, "Withheld", with the gate's message as the reason.
 ## Rendering
 
 `render_text` prints a view: each reading as two or three lines, then the
-boundary sentence once. `render_reading` prints one reading. Marks are
+boundary sentence once. `render_reading` prints one reading. With
+`max_bytes`, `render_text` fits the view in that many UTF-8 bytes: a count of
+the readings per display state first, then every gap reading, then the rest in
+served order, and the line "Full list in the JSON block." when any reading was
+cut. Readings are cut from the end, so a gap is never cut before a calm
+reading; the count, the closing line and the boundary are never cut. Marks are
 Unicode or ASCII. Colour is `none`, `truecolor`, `ansi256` or `ansi16` from
 the token roles, and goes only on the mark and state word (and a scored
 Undertow tier word). It never sets a background, and body text keeps the
@@ -129,7 +139,10 @@ included), a number is never rounded or regrouped. A period prints as
 `YYYY-MM-DD`, an instant as `YYYY-MM-DD HH:MM UTC`, and nothing is converted
 to local time. Producer text cannot start a new line or recolour a terminal:
 line breaks become spaces, and other control and bidirectional formatting
-characters print as visible escapes.
+characters print as visible escapes. As typographic normalisation, an en or em
+dash in producer text prints as a hyphen-minus in text and HTML, so no family
+surface prints either; a source link that contains one is shown without a link
+rather than rewritten.
 
 ## Three uses
 
@@ -140,11 +153,11 @@ Every name, figure and message below is synthetic.
 Keep the existing serialized JSON as the first text block, unchanged, because
 clients and tests may parse it. Append the contract rendering as an additional
 text block after the serialized JSON. It states nothing that
-`structuredContent` lacks.
+`structuredContent` lacks, so every clock it prints, `checked_at` included,
+comes from the served payload and never from the time of rendering.
 
 ```python
 import json
-from datetime import datetime, timezone
 
 from liquilens_evidence import present
 
@@ -157,6 +170,7 @@ served = {  # synthetic
     "period_end": "2026-09-30",
     "filed_at": "2026-10-24",
     "publisher": "Example Publisher",
+    "retrieved_at": "2026-11-12T08:30:00Z",
 }
 
 reading = present.reading_from_native(
@@ -167,13 +181,13 @@ reading = present.reading_from_native(
     unit=served["unit"],
     period=served["period_end"],
     known_at=served["filed_at"],
-    checked_at=datetime.now(timezone.utc),
+    checked_at=served["retrieved_at"],  # a served clock, never the render time
     sources=[served["publisher"]],
 )
 result = {
     "content": [
         {"type": "text", "text": json.dumps(served)},
-        {"type": "text", "text": present.render_text(reading)},
+        {"type": "text", "text": present.render_text(reading, max_bytes=4096)},
     ],
     "structuredContent": served,
 }
@@ -275,6 +289,14 @@ No execution, recommendation or credit-rating authority.
 
 Each choice is the reading that never makes a gap look calm.
 
+- A capped view (`max_bytes`) prints gap readings before calm ones and cuts
+  from the end, so what a reader loses first is always a calm reading.
+- `CALM`, `WATCH` and `ALARM` are severities, like Undertow tiers: the reading
+  stays Observed and the word rides beside it; a reading that is itself a gap
+  shows its gap and never the word.
+- Replay verdicts are checks, not readings, and a miss is never left out.
+- En and em dashes in producer text print as a hyphen-minus (typographic
+  normalisation), never as an escape sequence.
 - A gap never shows a value, Stale included, even when a product's own stale
   rule (not the carrier's expiry) made it stale. Its clocks still print.
 - A non-`full` disposition always carries a reason code. An unknown code is
