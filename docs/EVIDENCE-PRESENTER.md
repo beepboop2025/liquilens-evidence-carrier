@@ -86,6 +86,8 @@ and qualifiers that do not apply raise: nothing falls back to a calm state.
 | LiquiLens | `failure_radar` with `tier_publication` paused | Research | Research only, with no tier or severity |
 | LiquiLens | `CALM`, `WATCH`, `ALARM` (board and regime words) | Observed, severity good, warn, bad; a gap reading keeps its own gap row | the word |
 | Seiche | `observed`, `derived`, `structural`, `restricted`, `unavailable` | the same | the word itself |
+| Seiche | `stale` and the market atlas's `STALE` (Seiche's own stale rule: past the aging limit for the series' cadence) | Stale | the word itself |
+| Seiche | the market atlas's availability words `RESTRICTED` (no publishable value from a source that is not open and redistributable) and `UNAVAILABLE` (nothing to publish) | Restricted, Unavailable | the word itself |
 | Undertow | `SURPLUS`, `NORMAL`, `STRAINED`, `DEFICIENT` with `scored=True` | Observed, severity good, good, warn, bad | the tier word |
 | Undertow | `ACCRUING`, `PARTIAL`, or a tier without `scored=True` | Partial | ACCRUING or PARTIAL |
 | Undertow | `UNAVAILABLE` (no qualifying measures; `scored=True` raises) | Unavailable | UNAVAILABLE |

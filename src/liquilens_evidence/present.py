@@ -1105,6 +1105,16 @@ _SEICHE_ROWS = {
     "structural": STRUCTURAL,
     "restricted": RESTRICTED,
     "unavailable": UNAVAILABLE,
+    # Seiche's own stale rule: a series is stale once its latest observation is
+    # past the aging limit for its expected cadence (StalenessState). The
+    # market atlas serves the same word upper-cased.
+    "stale": STALE,
+    "STALE": STALE,
+    # The market atlas's availability words for a metric with no publishable
+    # value: RESTRICTED when its source is not an open, redistributable one,
+    # UNAVAILABLE when there is nothing to publish.
+    "RESTRICTED": RESTRICTED,
+    "UNAVAILABLE": UNAVAILABLE,
 }
 _UNDERTOW_TIERS = {
     "SURPLUS": "good",
@@ -1291,7 +1301,12 @@ def state_for(product: str, native: str, **qualifiers: object) -> ProductState:
     a reading that is itself a gap takes its own gap row instead.
 
     Seiche values: ``observed``, ``derived``, ``structural``, ``restricted``
-    and ``unavailable``, each labelled with its own word.
+    and ``unavailable``, each labelled with its own word. ``stale`` and the
+    market atlas's ``STALE`` (Seiche's own stale rule) are Stale; the atlas's
+    availability words ``RESTRICTED`` and ``UNAVAILABLE`` are Restricted and
+    Unavailable. Freshness words that are not states (``fresh``, ``aging``,
+    ``dead``, ``unknown`` in either case) and coverage words such as
+    ``available`` or ``partial`` raise.
 
     Undertow values: a tier word (``SURPLUS``, ``NORMAL``, ``STRAINED``,
     ``DEFICIENT``) with ``scored=True`` is Observed with the tier as severity

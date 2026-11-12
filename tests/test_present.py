@@ -828,6 +828,10 @@ SECTION_4_ROWS: list[tuple[tuple[str, str, dict[str, Any]], tuple[str, str, str 
     (("seiche", "structural", {}), (p.STRUCTURAL, "structural", None)),
     (("seiche", "restricted", {}), (p.RESTRICTED, "restricted", None)),
     (("seiche", "unavailable", {}), (p.UNAVAILABLE, "unavailable", None)),
+    (("seiche", "stale", {}), (p.STALE, "stale", None)),
+    (("seiche", "STALE", {}), (p.STALE, "STALE", None)),
+    (("seiche", "RESTRICTED", {}), (p.RESTRICTED, "RESTRICTED", None)),
+    (("seiche", "UNAVAILABLE", {}), (p.UNAVAILABLE, "UNAVAILABLE", None)),
     (("undertow", "SURPLUS", {"scored": True}), (p.OBSERVED, "SURPLUS", "good")),
     (("undertow", "NORMAL", {"scored": True}), (p.OBSERVED, "NORMAL", "good")),
     (("undertow", "STRAINED", {"scored": True}), (p.OBSERVED, "STRAINED", "warn")),
@@ -931,6 +935,39 @@ def test_every_undertow_native_resolves_to_exactly_one_row() -> None:
         assert p.state_for("undertow", gap).state in p.GAP_STATES
 
 
+SEICHE_TABLE: dict[str, str] = {
+    "observed": p.OBSERVED,
+    "derived": p.DERIVED,
+    "structural": p.STRUCTURAL,
+    "restricted": p.RESTRICTED,
+    "unavailable": p.UNAVAILABLE,
+    "stale": p.STALE,
+    "STALE": p.STALE,
+    "RESTRICTED": p.RESTRICTED,
+    "UNAVAILABLE": p.UNAVAILABLE,
+}
+
+
+def test_seiche_rows_are_exactly_its_words_and_the_added_ones_are_gaps() -> None:
+    assert set(p._SEICHE_ROWS) == set(SEICHE_TABLE)
+    for native, state in SEICHE_TABLE.items():
+        result = p.state_for("seiche", native)
+        assert (result.state, result.label, result.severity) == (state, native, None)
+    for native in ("stale", "STALE", "RESTRICTED", "UNAVAILABLE"):
+        result = p.state_for("seiche", native)
+        display = p.DISPLAY_STATES[result.state]
+        assert result.state in p.GAP_STATES
+        assert not display.calm and display.role != "good"
+        # A gap drops a value it is given and prints its word, never a figure.
+        reading = p.reading_from_native(
+            result, label="Synthetic series", value="1.25", unit="%"
+        )
+        assert reading.value is None and reading.state == result.state
+        text = p.render_reading(reading)
+        assert "1.25" not in text
+        assert text.startswith(f"Synthetic series: {display.mark} {display.word}\n")
+
+
 @pytest.mark.parametrize(("call", "expected"), SECTION_4_ROWS)
 def test_section_4_rows(
     call: tuple[str, str, dict[str, Any]], expected: tuple[str, str, str | None]
@@ -959,7 +996,33 @@ UNKNOWN_NATIVES = {
         "tier",
         "",
     ),
-    "seiche": ("Observed", "research", "provisional", "stale", "PARTIAL", "", "derived "),
+    "seiche": (
+        "Observed",
+        "research",
+        "provisional",
+        "Stale",
+        "PARTIAL",
+        "",
+        "derived ",
+        # Freshness words that are not states, in both cases Seiche serves them.
+        "fresh",
+        "FRESH",
+        "aging",
+        "AGING",
+        "dead",
+        "DEAD",
+        "unknown",
+        "UNKNOWN",
+        # Coverage and availability words that are not readings.
+        "available",
+        "AVAILABLE",
+        "DERIVED_CONTEXT",
+        "partial",
+        "partial_or_unknown",
+        "partial_release",
+        "scenario",
+        "NORMAL",
+    ),
     "undertow": (
         "strained",
         "fresh",
