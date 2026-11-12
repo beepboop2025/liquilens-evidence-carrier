@@ -104,11 +104,13 @@ Three things are not readings and never get a display state:
   no mark or state colour: LiquiLens reconciliation (`reconciled`,
   `within_rounding`, `inconsistent`), LiquiLens historical replay verdicts
   (`clean`, `clean_pass`, `flagged`, `warned`, `false_alarm`, `missed`,
-  `missed_fraud_masked`, `insufficient_data`) and Undertow `verify()`
-  (`match`, `mismatch`, `indeterminate`). The words in
-  `NEVER_HIDDEN_CHECKS` (`inconsistent`, `missed`, `missed_fraud_masked`,
-  `mismatch`) are always printed and never cut to fit, and `indeterminate`
-  is never shown as a pass or a mismatch.
+  `missed_fraud_masked`, `insufficient_data`), Undertow `verify()`
+  (`match`, `mismatch`, `indeterminate`) and Undertow sealed-record outcomes
+  (`HIT`, `MISS`). The words in `NEVER_HIDDEN_CHECKS` (`inconsistent`,
+  `missed`, `missed_fraud_masked`, `mismatch`, `MISS`) are always printed and
+  never cut to fit, and `indeterminate` is never shown as a pass or a
+  mismatch. The sealed outcomes `VOID` and `PENDING` are not decided and
+  raise.
 - Name lookups print through `resolution_notice(status, candidates=...)`:
   "No match for this name" or "Ambiguous (3 candidates)". A name with no match
   may still be covered under another name or key, so it is never Not covered.

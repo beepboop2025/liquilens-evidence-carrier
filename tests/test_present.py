@@ -1189,6 +1189,8 @@ CHECK_WORDS = {
     ("undertow", "match"): "Match",
     ("undertow", "mismatch"): "Mismatch",
     ("undertow", "indeterminate"): "Indeterminate",
+    ("undertow", "HIT"): "HIT",
+    ("undertow", "MISS"): "MISS",
 }
 
 
@@ -1755,6 +1757,23 @@ def test_never_hidden_checks_are_known_check_words() -> None:
         "liquilens"
     ]
     assert "mismatch" in p.NEVER_HIDDEN_CHECKS["undertow"]
+    assert "MISS" in p.NEVER_HIDDEN_CHECKS["undertow"]
+    assert "HIT" not in p.NEVER_HIDDEN_CHECKS["undertow"]
+
+
+def test_sealed_outcomes_are_checks_and_only_hit_and_miss_are_decided() -> None:
+    assert p.check_label("undertow", "HIT") == "HIT"
+    assert p.check_label("undertow", "MISS") == "MISS"
+    for undecided in ("VOID", "PENDING", "hit", "Miss", "BACKFILLED"):
+        with pytest.raises(ValueError):
+            p.check_label("undertow", undecided)
+    for word in ("HIT", "MISS", "hit", "miss"):
+        for product in ("liquilens", "seiche", "undertow"):
+            with pytest.raises(ValueError, match="check_label"):
+                p.state_for(product, word)
+    for product in ("liquilens", "seiche"):
+        with pytest.raises(ValueError):
+            p.check_label(product, "HIT")
 
 
 def _served_mix(pattern: str) -> list[p.Reading]:
