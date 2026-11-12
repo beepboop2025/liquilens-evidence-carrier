@@ -58,7 +58,7 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-liquilens_evidence = ["py.typed"]
+liquilens_evidence = ["py.typed", "design/*.json"]
 
 [tool.setuptools.data-files]
 "share/liquilens_evidence/protocol" = ["protocol/*.schema.json", "protocol/*.json", "protocol/*.mjs"]
