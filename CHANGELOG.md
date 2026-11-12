@@ -21,6 +21,16 @@ authority.
 
 ## [Unreleased]
 
+- Add `liquilens_evidence.present`, the shared presenter that follows the
+  liquilens-site evidence presentation contract at commit `59302ce8`: ten
+  display states, the section 3 derivation order, `state_for` for each
+  product's native values, `check_label` and `resolution_notice` for values
+  that are not readings, plain text with optional ANSI colour, a notebook
+  table and display columns beside `to_flat_row`. It is one stdlib-only file
+  that runs on Python 3.10; no runtime dependency is added.
+- Vendor the liquilens-site `design/ansi.json` and `design/family-tokens.json`
+  exports byte for byte, with a `SOURCE.json` digest record, as package data.
+  The version is unchanged; the next signed release re-pins the MCPB digest.
 - Prepare independently versioned Trade Safety gateway `0.2.0` against the
   unchanged core `0.19.0` protocol: consume Seiche
   `seiche.risk-context.v1` and Undertow
