@@ -1056,6 +1056,7 @@ _LIQUILENS_ROWS = {
     "not_applicable": (NOT_COVERED, "Not applicable"),
     "not_assessed": (NOT_COVERED, "Not assessed"),
     "PARTIAL": (PARTIAL, "PARTIAL"),
+    "identity": (STRUCTURAL, "Identity record"),
 }
 _LIQUILENS_BUSINESS_UPDATE = {
     "provisional": (PROVISIONAL, "Provisional business update"),
@@ -1077,7 +1078,24 @@ _UNDERTOW_TIERS = {
     "DEFICIENT": "bad",
 }
 _UNDERTOW_GAP_WORDS = ("ACCRUING", "PARTIAL")
+_UNDERTOW_NO_MEASURES = "UNAVAILABLE"
 _UNDERTOW_BOARD_WORDS = ("behind", "stale", "unreachable")
+_UNDERTOW_RIGHTS = "restricted"
+# Seiche's evidence vocabulary as Undertow serves it per reading (for example
+# undertow.gold-india.v1 evidence_state). Lower case, so never a tier word.
+_UNDERTOW_EVIDENCE = {
+    "observed": OBSERVED,
+    "derived": DERIVED,
+    "structural": STRUCTURAL,
+    "unavailable": UNAVAILABLE,
+}
+# crypto_workbench.exit_check venue, rung and overall rows, namespaced so they
+# cannot collide with tier or board words.
+_UNDERTOW_EXIT_CHECK = {
+    "exit_check.available": (DERIVED, "Available"),
+    "exit_check.unavailable": (UNAVAILABLE, "Unavailable"),
+    "exit_check.partial": (PARTIAL, "Partial"),
+}
 
 
 def _qualifiers(
@@ -1155,6 +1173,24 @@ def _seiche_state(native: str, given: Mapping[str, object]) -> ProductState:
 
 
 def _undertow_state(native: str, given: Mapping[str, object]) -> ProductState:
+    if native in _UNDERTOW_EXIT_CHECK:
+        _qualifiers("undertow", native, given, {})
+        state, label = _UNDERTOW_EXIT_CHECK[native]
+        return ProductState(state, label, None, "undertow", native)
+    if native in _UNDERTOW_EVIDENCE:
+        _qualifiers("undertow", native, given, {})
+        state = _UNDERTOW_EVIDENCE[native]
+        return ProductState(state, native.capitalize(), None, "undertow", native)
+    if native == _UNDERTOW_RIGHTS:
+        # The input-rights boundary withheld the whole result.
+        _qualifiers("undertow", native, given, {})
+        return ProductState(RESTRICTED, "Restricted", None, "undertow", native)
+    if native == _UNDERTOW_NO_MEASURES:
+        # Board policy: no qualifying measures. Being scored contradicts it.
+        values = _qualifiers("undertow", native, given, {"scored": (bool,)})
+        if values.get("scored") is True:
+            raise ValueError("an UNAVAILABLE segment cannot be scored")
+        return ProductState(UNAVAILABLE, native, None, "undertow", native)
     if native in _UNDERTOW_TIERS or native in _UNDERTOW_GAP_WORDS:
         values = _qualifiers("undertow", native, given, {"scored": (bool,)})
         if native in _UNDERTOW_GAP_WORDS:
@@ -1192,9 +1228,10 @@ def state_for(product: str, native: str, **qualifiers: object) -> ProductState:
     ``not_covered``, ``lender_not_listed`` and ``not_in_slim`` (Not covered;
     print the page's sentence as the reading's reason); ``not_applicable``
     (Not covered, "Not applicable"; print the producer's basis as the reason);
-    ``not_assessed`` (Not covered, "Not assessed"); ``PARTIAL``; and
-    ``provisional`` or, with ``provisional_business_update=True``, ``stale``
-    for a provisional business update. ``observed`` also takes ``age_days``
+    ``not_assessed`` (Not covered, "Not assessed"); ``PARTIAL``; ``identity``
+    (Structural, "Identity record": ontology ids, names, keys, aliases and
+    links); and ``provisional`` or, with ``provisional_business_update=True``,
+    ``stale`` for a provisional business update. ``observed`` also takes ``age_days``
     and ``annual``: past 400 days (annual) or 183 days (other, and when
     ``annual`` is not given) it is "Stale evidence". ``failure_radar`` with
     ``tier_publication`` (the served ``tier_publication.state``) is Research,
@@ -1206,10 +1243,20 @@ def state_for(product: str, native: str, **qualifiers: object) -> ProductState:
     Undertow values: a tier word (``SURPLUS``, ``NORMAL``, ``STRAINED``,
     ``DEFICIENT``) with ``scored=True`` is Observed with the tier as severity
     (good, good, warn, bad); without ``scored=True`` it is Partial labelled
-    "PARTIAL". ``ACCRUING`` and ``PARTIAL`` are Partial. Board ``behind`` and
-    ``stale`` are Stale labelled with ``note`` (the board's own note);
-    ``unreachable``, or any board value with ``ok=False``, is Unavailable
-    labelled with ``status``.
+    "PARTIAL". ``ACCRUING`` and ``PARTIAL`` are Partial. ``UNAVAILABLE`` (no
+    qualifying measures) is Unavailable, and ``scored=True`` with it raises.
+    Board ``behind`` and ``stale`` are Stale labelled with ``note`` (the
+    board's own note); ``unreachable``, or any board value with ``ok=False``,
+    is Unavailable labelled with ``status``. Exit checks are namespaced:
+    ``exit_check.available`` (Derived, "Available"), ``exit_check.unavailable``
+    and ``exit_check.partial``; print the producer's reason codes as the
+    reading's reason. ``restricted`` (the input-rights boundary withheld the
+    whole result) is Restricted; pass the ``source_rights`` summary as the
+    reason or limits. A reading's own ``evidence_state`` in Seiche's words
+    (``observed``, ``derived``, ``structural``, ``unavailable``, lower case)
+    maps to the same state, labelled with the word capitalised. Licence values
+    such as ``consent_required`` are not states: they belong in the reading's
+    rights and limits, and raise here.
 
     Check words (LiquiLens reconciliation, Undertow ``verify()``) and name
     resolution statuses are not readings: they raise here; use
@@ -2029,6 +2076,9 @@ class ReadingTable:
 def reading_number(reading: Reading) -> float:
     """The value as a float for a numeric column: NaN when absent, never 0.
 
+    This always returns NaN for an absent value, which suits pandas and other
+    data frames. NaN is not valid JSON: for a JSON surface use
+    ``add_display_columns(..., json_safe=True)``, which gives None instead.
     Numbers convert directly. A string converts only when it is a plain
     machine number; a producer-formatted string (lakh grouping, for example)
     gives NaN unless the reading carries ``numeric``.
@@ -2049,18 +2099,47 @@ def reading_number(reading: Reading) -> float:
     return number if math.isfinite(number) else math.nan
 
 
-def add_display_columns(row: Mapping[str, Any], reading: Reading) -> dict[str, Any]:
+def _non_finite_path(value: object, path: str) -> str | None:
+    if isinstance(value, float) and not math.isfinite(value):
+        return path
+    if isinstance(value, Decimal) and not value.is_finite():
+        return path
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            found = _non_finite_path(item, f"{path}.{key}")
+            if found is not None:
+                return found
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            found = _non_finite_path(item, f"{path}[{index}]")
+            if found is not None:
+                return found
+    return None
+
+
+def add_display_columns(
+    row: Mapping[str, Any], reading: Reading, *, json_safe: bool = False
+) -> dict[str, Any]:
     """Return ``row`` (for example ``to_flat_row`` output) plus the display
     columns ``display_state``, ``value``, ``unit`` and ``source_publisher``.
 
     No existing column is renamed, reordered or changed. ``display_state`` is
-    the literal state word; ``value`` is a float, NaN when absent and never 0.
+    the literal state word; ``value`` is a float and never 0 for an absent
+    value. The default form is for pandas and other data frames: an absent
+    value is NaN. ``json_safe=True`` is the form for JSON surfaces (APIs,
+    OpenBB ``OBBject`` rows, Workspace widgets): an absent value is None, and
+    a row that would carry NaN or Infinity anywhere raises instead.
     """
 
     if not isinstance(row, Mapping):
         raise TypeError("row must be a mapping such as to_flat_row output")
     if not isinstance(reading, Reading):
         raise TypeError("reading must be a Reading")
+    _flag(json_safe, "json_safe")
+    if json_safe:
+        bad = _non_finite_path(dict(row), "row")
+        if bad is not None:
+            raise ValueError(f"{bad} is NaN or Infinity, which is not valid JSON")
     clash = [name for name in DISPLAY_COLUMNS if name in row]
     if clash:
         raise ValueError(f"row already has display columns: {', '.join(clash)}")
@@ -2069,8 +2148,9 @@ def add_display_columns(row: Mapping[str, Any], reading: Reading) -> dict[str, A
         if ours is not None and key in row and row[key] != ours:
             raise ValueError(f"row and reading describe different carriers ({key})")
     out = dict(row)
+    number = reading_number(reading)
     out["display_state"] = DISPLAY_STATES[reading.state].word
-    out["value"] = reading_number(reading)
+    out["value"] = None if json_safe and math.isnan(number) else number
     out["unit"] = reading.unit if reading.unit is not None else NOT_STATED
     publishers = dict.fromkeys(source.publisher for source in reading.sources)
     out["source_publisher"] = "; ".join(publishers) or NOT_STATED
