@@ -721,8 +721,9 @@ def test_health_capabilities_openapi_and_sandbox_headers() -> None:
         assert capabilities["version"] == SERVICE_VERSION
         assert capabilities["source_revision"] == SERVICE_REVISION
         assert capabilities["mcp_protocol_versions"] == [
-            MCP_PROTOCOL_VERSION,
-            MCP_LEGACY_PROTOCOL_VERSION,
+            "2026-07-28",
+            "2025-11-25",
+            "2025-06-18",
         ]
         assert capabilities["limits"]["request_bytes"] == MAX_REQUEST_BYTES
         assert capabilities["upstreams"]["undertow"]["required_venues"] == sorted(
@@ -2206,6 +2207,154 @@ def test_mcp_lists_only_read_only_tools_and_calls_assessment() -> None:
         assert "no execution" in result["content"][0]["text"]
 
 
+@pytest.mark.parametrize(
+    ("requested", "negotiated"),
+    [
+        ("2025-11-25", "2025-11-25"),
+        ("2025-06-18", "2025-06-18"),
+        ("2025-03-26", "2025-11-25"),
+        ("2024-11-05", "2025-11-25"),
+        # Stateless 2026-07-28 has no initialize handshake.
+        ("2026-07-28", "2025-11-25"),
+        ("2099-01-01", "2025-11-25"),
+        ("not-a-revision", "2025-11-25"),
+    ],
+)
+def test_mcp_initialize_echoes_a_supported_revision_or_offers_the_newest(
+    requested: str,
+    negotiated: str,
+) -> None:
+    fake = FakeUpstream()
+    with _client(fake) as client:
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": "init",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": requested,
+                    "capabilities": {},
+                    "clientInfo": {"name": "pytest", "version": "1"},
+                },
+            },
+        )
+    assert response.status_code == 200
+    assert response.json()["result"]["protocolVersion"] == negotiated
+    assert fake.calls == []
+
+
+def test_mcp_2025_06_18_client_completes_a_legacy_session() -> None:
+    fake = FakeUpstream()
+    legacy = {"MCP-Protocol-Version": "2025-06-18"}
+    with _client(fake) as client:
+        # Some clients already send the version header on initialize.
+        initialized = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": "init",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {},
+                    "clientInfo": {"name": "pytest-2025-06-18", "version": "1"},
+                },
+            },
+            headers=legacy,
+        )
+        notified = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "method": "notifications/initialized"},
+            headers=legacy,
+        )
+        pinged = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 1, "method": "ping"},
+            headers=legacy,
+        )
+        listed = client.post(
+            "/mcp",
+            json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
+            headers=legacy,
+        )
+        described = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 3,
+                "method": "tools/call",
+                "params": {"name": "trade_safety_capabilities", "arguments": {}},
+            },
+            headers=legacy,
+        )
+        assessed = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "tools/call",
+                "params": {
+                    "name": "assess_trade_safety",
+                    "arguments": {"request": _request(), "policy": _policy()},
+                },
+            },
+            headers=legacy,
+        )
+
+    assert initialized.status_code == 200
+    assert initialized.json()["result"]["protocolVersion"] == "2025-06-18"
+    assert notified.status_code == 202
+    assert notified.content == b""
+    assert pinged.status_code == 200
+    assert pinged.json()["result"] == {}
+    assert listed.status_code == 200
+    listed_result = listed.json()["result"]
+    assert {tool["name"] for tool in listed_result["tools"]} == {
+        "assess_trade_safety",
+        "trade_safety_capabilities",
+    }
+    assert not {"resultType", "ttlMs", "cacheScope", "_meta"} & set(listed_result)
+    assert described.status_code == 200
+    structured = described.json()["result"]["structuredContent"]
+    assert structured["mcp_protocol_versions"] == [
+        "2026-07-28",
+        "2025-11-25",
+        "2025-06-18",
+    ]
+    assert structured["execution_tools"] == []
+    assert assessed.status_code == 200
+    result = assessed.json()["result"]
+    assert result["isError"] is False
+    assert result["structuredContent"]["decision"]["outcome"] == "pass"
+
+
+def test_mcp_stateless_requests_still_accept_only_2026_07_28() -> None:
+    fake = FakeUpstream()
+    meta = {
+        "io.modelcontextprotocol/protocolVersion": "2025-06-18",
+        "io.modelcontextprotocol/clientCapabilities": {},
+    }
+    with _client(fake) as client:
+        response = client.post(
+            "/mcp",
+            json={
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/list",
+                "params": {"_meta": meta},
+            },
+            headers={"MCP-Protocol-Version": "2025-06-18", "Mcp-Method": "tools/list"},
+        )
+    assert response.status_code == 400
+    assert response.json()["error"] == {
+        "code": -32022,
+        "message": "Unsupported protocol version",
+        "data": {"supported": [MCP_PROTOCOL_VERSION], "requested": "2025-06-18"},
+    }
+    assert fake.calls == []
+
+
 def test_mcp_streamable_http_transport_contract() -> None:
     fake = FakeUpstream()
     issuer = httpx.URL(ISSUER_ENDPOINT)
@@ -2313,7 +2462,7 @@ def test_mcp_streamable_http_transport_contract() -> None:
         "code": -32022,
         "message": "Unsupported protocol version",
         "data": {
-            "supported": [MCP_PROTOCOL_VERSION, MCP_LEGACY_PROTOCOL_VERSION],
+            "supported": ["2026-07-28", "2025-11-25", "2025-06-18"],
             "requested": "1900-01-01",
         },
     }

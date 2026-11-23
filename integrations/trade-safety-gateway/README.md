@@ -42,13 +42,16 @@ settings are exposed under `limits.admission` in the capability response.
   it challenges and settles paid access to an otherwise identical assessment.
 - `POST /mcp` supports `initialize`, `ping`, `tools/list`, and `tools/call`.
 - MCP exposes only `assess_trade_safety` and `trade_safety_capabilities`.
-- MCP negotiates initialization-based `2025-11-25` and stateless
-  `2026-07-28`; the latter exposes `server/discover` metadata and requires
-  matching `MCP-Protocol-Version`, `Mcp-Method`, and applicable `Mcp-Name`
-  headers. Invalid versions or header/body mismatches return HTTP 400.
-- After legacy initialization, every subsequent legacy POST must carry
-  `MCP-Protocol-Version: 2025-11-25`; accepted notifications return HTTP 202
-  without a JSON-RPC body.
+- MCP negotiates initialization-based `2025-11-25` and `2025-06-18`, and
+  stateless `2026-07-28`; the latter exposes `server/discover` metadata and
+  requires matching `MCP-Protocol-Version`, `Mcp-Method`, and applicable
+  `Mcp-Name` headers. Invalid versions or header/body mismatches return HTTP 400.
+- `initialize` answers with the client's requested revision when it is
+  `2025-11-25` or `2025-06-18`, and otherwise offers `2025-11-25`, the newest
+  initialization-based revision; the client decides whether to continue.
+- After legacy initialization, every subsequent legacy POST must carry the
+  negotiated `MCP-Protocol-Version` (`2025-11-25` or `2025-06-18`); accepted
+  notifications return HTTP 202 without a JSON-RPC body.
 - Browser-originated MCP requests accept only the canonical HTTPS issuer
   origin; non-browser clients may omit `Origin`, while any other origin returns
   HTTP 403. Accepted legacy `notifications/initialized` posts return HTTP 202
