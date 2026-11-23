@@ -6,8 +6,8 @@ server instructions alone. They never read the code. So a sentence saying
 there is no credential tool is graded as a credential channel, an explicit
 openWorldHint of true is graded as over-broad scope, and a description that
 names a sibling tool is graded as tool shadowing. The fleet audit of
-23 Nov 2026 found the first two on the live 0.2.3 gateway. This test holds the
-surface to the fleet rules before any release.
+23 Nov 2026 found the first two on the live gateway (source aedc73dc). This
+test holds the surface to the fleet rules before any release.
 
 Rules (fleet canon of 23 Nov 2026; keep in step with the fleet audit script):
  1. A tool's metadata describes only that tool: no other tool's name appears
@@ -371,7 +371,7 @@ def test_every_free_text_parameter_is_bounded(surfaces) -> None:
 
 
 def test_the_gate_catches_what_the_scanner_caught() -> None:
-    """The rules must fire on the exact live 0.2.3 text the fleet audit flagged."""
+    """The rules must fire on the exact live text the fleet audit flagged."""
     flagged_instructions = (
         "Read-only public sandbox. Live results fail closed; there is no broker "
         "preview, recommendation, order route, resize, credential, custody, trade "
