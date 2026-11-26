@@ -202,10 +202,10 @@ docker build -f integrations/trade-safety-gateway/Dockerfile \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
   --build-arg CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   --build-arg ISSUER_ENDPOINT=https://your-sandbox.example/v1/check \
-  -t liquilens-trade-safety-gateway:0.2.3 .
+  -t liquilens-trade-safety-gateway:0.2.4 .
 docker run --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --security-opt no-new-privileges \
-  -p 8080:8080 liquilens-trade-safety-gateway:0.2.3
+  -p 8080:8080 liquilens-trade-safety-gateway:0.2.4
 ```
 
 The Dockerfile pins its base image by multi-platform digest, installs from the
@@ -227,12 +227,14 @@ boundary and must be operated by the adopter. The independent gateway-tag lane
 publishes OCI only; it builds a wheel as validation evidence but does not publish
 that wheel, an sdist, or a GitHub Release.
 
-Gateway `0.2.3` returns the complete capability object in both MCP text and
-structured content, preserving read-only authority for clients consuming either
-representation. It has an independent release identity so publishing it does not
+Gateway `0.2.4` negotiates MCP `2025-06-18` alongside `2025-11-25`, so clients that
+do not yet speak the newer revision can list and call its tools, and its advertised
+MCP surface follows the fleet scanner-hygiene rules. It keeps the complete capability
+object of `0.2.3` in both MCP text and structured content, preserving read-only
+authority for clients consuming either representation. It has an independent release identity so publishing it does not
 move or reuse the immutable core `v0.19.0` tag. After the release commit has
 landed on `origin/main`, an allowlisted release owner may create and push the
-annotated, signed tag `trade-safety-gateway-v0.2.3`. The workflow rejects a
+annotated, signed tag `trade-safety-gateway-v0.2.4`. The workflow rejects a
 lightweight or unsigned tag, an unsigned target commit, a target outside
 `origin/main`, a gateway/tag version mismatch, or any core `VERSION` other than
 `0.20.1`. It also rejects pre-existing gateway version, source-commit, or signed

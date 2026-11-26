@@ -77,7 +77,7 @@ from .x402_access import (
 from .x402_runtime import X402Runtime, x402_runtime_from_env
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.2.3"
+SERVICE_VERSION = "0.2.4"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
