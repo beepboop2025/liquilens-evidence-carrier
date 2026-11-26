@@ -66,9 +66,11 @@ IMPERATIVE = re.compile(
     r"|\bFIRST,? before\b",
     re.I,
 )
+# One class per astral range: code scanners decode astral endpoints as replacement characters,
+# so two astral ranges in one class read as overlapping. The matched set is unchanged.
 INVISIBLE = re.compile(
-    "[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufe00-\ufe0f"
-    "\U000e0000-\U000e007f\U000e0100-\U000e01ef]"
+    "[\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufe00-\ufe0f]"
+    "|[\U000e0000-\U000e007f]|[\U000e0100-\U000e01ef]"
 )
 URL = re.compile(r"https?://[^\s)\"'>\]]+", re.I)
 FETCH_VERB = re.compile(
