@@ -1,0 +1,20 @@
+{
+  "repository": "beepboop2025/liquilens-site",
+  "commit": "59302ce87ef186ed01fb8ce15f665cf29ad4cfb6",
+  "note": "Head of liquilens-site pull request 224, not merged when vendored on 2026-11-12. Re-vendor from main after it merges.",
+  "rule": "Copied byte for byte. Never edit a vendored copy; change the source in liquilens-site and copy it again.",
+  "files": [
+    {
+      "file": "ansi.json",
+      "path": "design/ansi.json",
+      "git_blob": "6e89cb34d03bf328c192674ff0156c4ca134cfa2",
+      "sha256": "cc76fdd4e22c302fcc967377ce4958ee542344f01fb814e954d66b5363a73644"
+    },
+    {
+      "file": "family-tokens.json",
+      "path": "design/family-tokens.json",
+      "git_blob": "b9a3d7a83dd6f118ebe5ea11cb2a66cb04cc0f95",
+      "sha256": "982f52563c7bc942155908e16407c42a175e84c4b24f8e597a357337b5054317"
+    }
+  ]
+}

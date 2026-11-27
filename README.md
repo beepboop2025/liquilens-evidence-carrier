@@ -298,6 +298,42 @@ bundle for compatible desktop clients. Registry identity:
 
 <!-- mcp-name: io.github.beepboop2025/liquilens-evidence-carrier -->
 
+## Present readings the same way on every surface
+
+`liquilens_evidence.present` is the shared presenter that MCP servers, CLIs
+and notebooks call so a LiquiLens, Seiche or Undertow reading shows the same
+display state, clocks, source, rights and limits everywhere. It follows the
+evidence presentation contract in liquilens-site at commit `59302ce8`: ten
+display states with words and marks, the contract's derivation order from a
+verified carrier, each product's native values through `state_for`, plain
+text with optional terminal colour, a notebook table, and display columns
+beside `to_flat_row`. A gap (Partial, Stale, Restricted, Not covered or
+Unavailable) never shows a value, a zero or the calm colour.
+
+`present.py` is one standard-library file that runs on Python 3.10 and can be
+copied byte for byte. The design tokens it embeds are vendored in
+`src/liquilens_evidence/design/` with their source commit and digests. It
+never verifies a carrier: pass it the result of `verify_evidence_carrier`.
+
+```python
+from liquilens_evidence import present
+
+reading = present.reading_from_native(
+    present.state_for("seiche", "observed"),
+    label="Example funding spread",  # synthetic
+    value="0.25",
+    unit="pp",
+    period="2026-09-30",
+    known_at="2026-10-01",
+    sources=["Example Publisher"],
+)
+print(present.render_text(reading))
+```
+
+See [`docs/EVIDENCE-PRESENTER.md`](docs/EVIDENCE-PRESENTER.md) for the product
+rows, the MCP, notebook and terminal examples, and the choices it makes where
+the contract leaves one.
+
 ## Integration kit
 
 - [`docs/EVIDENCE-CARRIER-V1.md`](docs/EVIDENCE-CARRIER-V1.md) defines the
