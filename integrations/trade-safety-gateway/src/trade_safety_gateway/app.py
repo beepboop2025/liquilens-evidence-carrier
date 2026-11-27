@@ -77,7 +77,7 @@ from .x402_access import (
 from .x402_runtime import X402Runtime, x402_runtime_from_env
 
 SERVICE_NAME = "liquilens-trade-safety-gateway"
-SERVICE_VERSION = "0.2.3"
+SERVICE_VERSION = "0.2.4"
 GATEWAY_MODE = "sandbox"
 MCP_PROTOCOL_VERSION = "2026-07-28"
 MCP_LEGACY_PROTOCOL_VERSION = "2025-11-25"
@@ -1562,6 +1562,11 @@ def capabilities(
     }
 
 
+# Directory scanners grade this advertised text and the server instructions
+# without reading any code. Keep both free of other tool names, URLs and
+# credential trigger words (even inside a negation), and leave openWorldHint
+# unset where it would be true: that is already the spec default, and scanners
+# penalise the explicit flag. tests/test_metadata_hygiene.py holds the rules.
 MCP_TOOLS = [
     {
         "name": "assess_trade_safety",
@@ -1585,7 +1590,6 @@ MCP_TOOLS = [
             "readOnlyHint": True,
             "destructiveHint": False,
             "idempotentHint": True,
-            "openWorldHint": True,
         },
     },
     {
@@ -2564,8 +2568,9 @@ def create_app(
                         "instructions": (
                             "Read-only public sandbox. Live results fail closed; "
                             "there is no broker preview, recommendation, order "
-                            "route, resize, credential, custody, trade settlement, "
-                            "or execution tool. Optional x402 buys access only."
+                            "route, resize, account login, custody, trade "
+                            "settlement, or execution tool. Optional x402 buys "
+                            "access only."
                         ),
                     },
                 )

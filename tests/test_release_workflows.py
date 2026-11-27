@@ -83,7 +83,7 @@ def test_gateway_container_is_attested_multiarch_distribution_not_authority():
         "value['x402_access']['state']=='disabled'",
     ):
         assert token in workflow
-    assert 'org.opencontainers.image.version="0.2.3"' in dockerfile
+    assert 'org.opencontainers.image.version="0.2.4"' in dockerfile
     assert "trade_safety_gateway.asgi:app" in dockerfile
     assert "trade_safety_gateway.app:app" not in dockerfile
     assert 'io.liquilens.evidence.core.version="${CORE_VERSION}"' in dockerfile
@@ -124,7 +124,7 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
         "^trade-safety-gateway-v([0-9]+\\.[0-9]+\\.[0-9]+)$" in workflow
     )
     assert 'test "$source_gateway_version" = "$tag_gateway_version"' in workflow
-    assert 'EXPECTED_GATEWAY_VERSION: "0.2.3"' in workflow
+    assert 'EXPECTED_GATEWAY_VERSION: "0.2.4"' in workflow
     assert 'EXPECTED_GATEWAY_CORE_VERSION: "0.20.1"' in workflow
     assert 'test "$source_core_version" = "$EXPECTED_GATEWAY_CORE_VERSION"' in (
         workflow
@@ -145,7 +145,7 @@ def test_gateway_only_release_tag_is_signed_main_bound_and_immutable():
     assert "ruff check integrations/trade-safety-gateway/src" in test_step
     assert "uv build --project integrations/trade-safety-gateway" in test_step
     assert "PathDistribution(metadata_root)" in test_step
-    assert 'assert distribution.version == "0.2.3"' in test_step
+    assert 'assert distribution.version == "0.2.4"' in test_step
     assert 'distribution.metadata.get_all("License-File")' in test_step
     assert 'for legal_name in ("LICENSE", "NOTICE")' in test_step
     assert '"liquilens-trade-safety-x402-reconcile"' in test_step
@@ -173,7 +173,7 @@ def test_gateway_release_documentation_preserves_core_tag_identity():
         ROOT / "integrations/trade-safety-gateway/README.md"
     ).read_text(encoding="utf-8")
     for token in (
-        "trade-safety-gateway-v0.2.3",
+        "trade-safety-gateway-v0.2.4",
         "immutable core `v0.19.0` tag",
         "lightweight or unsigned tag",
         "`origin/main`",
